@@ -6,7 +6,7 @@ import time
 
 Note: Gilson 506C is connected to physical port COM1.
 
-com0com:
+com0com 2.2.2.0:
 >install 1 EmuBR=yes,EmuOverrun=yes PortName=COM12,EmuBR=yes,EmuOverrun=yes
 >install 2 EmuBR=yes,EmuOverrun=yes PortName=COM13,EmuBR=yes,EmuOverrun=yes
 >list
@@ -15,7 +15,7 @@ com0com:
        CNCA1 PortName=-,EmuBR=yes,EmuOverrun=yes
        CNCB1 PortName=COM12,EmuBR=yes,EmuOverrun=yes
 
-hub4com:
+hub4com 2.1.0.0:
 command prompt> hub4com --baud=19200 --parity=e --octs=off --route=1,2:0 --route=0:1,2 \\.\CNCA1 \\.\CNCA2 \\.\COM1
 
 This routes all traffic from CNCA1 (<->COM12) back and forth to CNCA2 (<-> virtual COM13) and COM1 (physical port)
