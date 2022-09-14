@@ -2,7 +2,7 @@ import socket
 import time
 import xml.etree.ElementTree as ET
 
-REMOTE_HOST = "192.168.1.3" # for GX-271
+REMOTE_HOST = "192.168.1.2" # for GX-271
 # REMOTE_HOST = "localhost" # for Syringe pumps
 LOCAL_HOST = "127.0.0.1"
 def recvall(sock):
@@ -20,6 +20,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.settimeout(10)
 sock.connect((REMOTE_HOST, 50185))
 
+# this doesn't work because GUID must be read off of beacon signals to make a connection. See test_gilsonethernet.py
 msg = '<Gilson><GilsonConnect>python</GilsonConnect><GUID>35</GUID></Gilson>'
 
 #msg = '<Gilson>​<CommandData>​<Command>​<CommandInfo>​<InstrumentInfo>​<DeviceName>GX-271</DeviceName>​<DeviceId>15</DeviceId>​</InstrumentInfo>​<SequenceNumber>6</#SequenceNumber>​<Synchronize>True</Synchronize>​<CommandXML>​<CommandName>Output Contacts</CommandName>​<Parameters>​<Parameter>​<ParameterName>Output 1</#ParameterName>​<ParameterValue>On</ParameterValue>​</Parameter>​<Parameter>​<ParameterName>Output 2</ParameterName>​<ParameterValue>Off</ParameterValue>​</Parameter>​</#Parameters>​</CommandXML>​</CommandInfo>​</Command>​</CommandData>​</Gilson>​'
