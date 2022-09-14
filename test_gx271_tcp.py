@@ -1,7 +1,10 @@
 import socket
+import time
 import xml.etree.ElementTree as ET
 
-REMOTE_HOST = "192.168.1.3"
+REMOTE_HOST = "192.168.1.3" # for GX-271
+# REMOTE_HOST = "localhost" # for Syringe pumps
+LOCAL_HOST = "127.0.0.1"
 def recvall(sock):
     BUFF_SIZE = 4096 # 4 KiB
     data = b''
@@ -17,7 +20,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.settimeout(10)
 sock.connect((REMOTE_HOST, 50185))
 
-msg = '<Gilson><GilsonConnect>python</GilsonConnect></Gilson>'
+msg = '<Gilson><GilsonConnect>python</GilsonConnect><GUID>35</GUID></Gilson>'
 
 #msg = '<Gilson>​<CommandData>​<Command>​<CommandInfo>​<InstrumentInfo>​<DeviceName>GX-271</DeviceName>​<DeviceId>15</DeviceId>​</InstrumentInfo>​<SequenceNumber>6</#SequenceNumber>​<Synchronize>True</Synchronize>​<CommandXML>​<CommandName>Output Contacts</CommandName>​<Parameters>​<Parameter>​<ParameterName>Output 1</#ParameterName>​<ParameterValue>On</ParameterValue>​</Parameter>​<Parameter>​<ParameterName>Output 2</ParameterName>​<ParameterValue>Off</ParameterValue>​</Parameter>​</#Parameters>​</CommandXML>​</CommandInfo>​</Command>​</CommandData>​</Gilson>​'
 sock.sendall(msg.encode())
@@ -34,12 +37,16 @@ print(newport)
 
 if True:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(5)
+    sock.settimeout(10)
+    #sock = socket.create_connection((REMOTE_HOST, newport), 10, (LOCAL_HOST, 0))
     sock.connect((REMOTE_HOST, newport))
+    
     msg = '<Gilson>​<CommandData>​<Command>​<CommandInfo>​<InstrumentInfo>​<DeviceName>GX-271</DeviceName>​<DeviceId>35</DeviceId>​</InstrumentInfo>​<SequenceNumber>6</SequenceNumber>​<Synchronize>True</Synchronize>​<CommandXML>​<CommandName>Output Contacts</CommandName>​<Parameters>​<Parameter>​<ParameterName>Output 1</ParameterName>​<ParameterValue>On</ParameterValue>​</Parameter>​<Parameter>​<ParameterName>Output 2</ParameterName>​<ParameterValue>Off</ParameterValue>​</Parameter>​</Parameters>​</CommandXML>​</CommandInfo>​</Command>​</CommandData>​</Gilson>​'
     #msg = '<Gilson>​<CommandData>​<Command>​<CommandInfo>​<InstrumentInfo>​<DeviceName>GX-271</DeviceName>​<DeviceId>15</DeviceId>​</InstrumentInfo>​<SequenceNumber>6</SequenceNumber>​<Synchronize>True</Synchronize>​<CommandXML>​<CommandName>Get Error</CommandName>​</CommandXML>​</CommandInfo>​</Command>​</CommandData>​</Gilson>​'
     #msg = '<Gilson></Gilson>'
-    msg = '<Gilson><CommandData><Commands><Command><CommandType>Local</CommandType><CommandInfo><InstrumentInfo><DeviceName>GX-27x</DeviceName><DeviceId>35</DeviceId></InstrumentInfo><SequenceNumber>2</SequenceNumber><Synchronize>True</Synchronize><Selected>False</Selected><CommandXML><CommandName>Get XY Position</CommandName></CommandXML></CommandInfo></Command></Commands></CommandData></Gilson>'
+    msg_gx271 = '<Gilson><CommandData><Commands><Command><CommandType>Local</CommandType><CommandInfo><InstrumentInfo><DeviceName>GX-27x</DeviceName><DeviceId>35</DeviceId></InstrumentInfo><SequenceNumber>2</SequenceNumber><Synchronize>True</Synchronize><Selected>False</Selected><CommandXML><CommandName>Get XY Position</CommandName></CommandXML></CommandInfo></Command></Commands></CommandData></Gilson>'
+    msg_syringepump = '<Gilson><CommandData><Commands><Command><CommandType>Local</CommandType><CommandInfo><InstrumentInfo><DeviceName>Verity 4120 Syringe Pump</DeviceName><DeviceId>-1</DeviceId></InstrumentInfo><SequenceNumber>2</SequenceNumber><Synchronize>True</Synchronize><Selected>False</Selected><CommandXML><CommandName>Get Serial Number</CommandName></CommandXML></CommandInfo></Command></Commands></CommandData></Gilson>'
+    msg = msg_gx271
     sock.sendall(msg.encode())
     for _ in range(10):
         try:
