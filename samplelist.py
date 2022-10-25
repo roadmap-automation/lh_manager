@@ -19,7 +19,6 @@ example_method = dict({
     'METHODNAME': 'NCNR_TransferWithRinse',
     'SAMPLENAME': 'Test sample',
     'SAMPLEDESCRIPTION': 'Description of a test sample',
-    'SAMPLEAMOUNT': '1',
     '#SourceZone': 'Solvent Zone',
     '#SourceWell': '1',
     '#SourceVolume': '1000',
