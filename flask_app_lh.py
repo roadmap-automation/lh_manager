@@ -1,12 +1,13 @@
 from flask import Flask, request
 from flask_restful import Resource, Api
+from samplelist import example_sample_list
 
 app = Flask(__name__)
 api = Api(app)
 
 # master list of current sample lists
 # key is the "ID". The sample list itself is JSON representing exactly what should be sent to the LH for a single sample list
-sample_lists = {}
+sample_lists = {'1': example_sample_list}
 
 # keeps track of which sample lists have been completed, in case requests come in for status updates on previous sample lists
 completed_sample_lists = {}

@@ -43,5 +43,5 @@ class SampleList:
 current_time = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')
 current_time_short = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 example_sample_list = SampleList('test sample list', '1', 'description of test sample list', current_time, current_time_short, current_time_short, [example_method])
-print(example_sample_list)
-print(asdict(example_sample_list))
+#print(example_sample_list)
+#print(asdict(example_sample_list))
