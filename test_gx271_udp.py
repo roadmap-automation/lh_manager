@@ -1,13 +1,16 @@
 import socket
+import select
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(('', 50184))
-sock.settimeout(10)
-#sock.connect(('192.168.1.3', 50184))
+# this allows accepting UDP packets from 50184 even though the GEARS application is also listening there
 
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock.bind(('',50184))
+sock.setblocking(0)
 
-data = sock.recvfrom(1500)
-
-print(data)
+for _ in range(10):
+    result = select.select([sock],[],[])
+    msg = result[0][0].recv(1500) 
+    print (msg)
 
 sock.close()
