@@ -12,19 +12,19 @@ def liquid_handler_method(func):
 ## ========== Methods specification =============
 
 method_fields = dict({
-    'NCNR_TransferWithRinse': ['#SourceZone', '#SourceWell', '#SourceVolume(uL)', '#FlowRate(mL/min)', '#ResultZone', '#ResultWell']
+    'NCNR_TransferWithRinse': ['Source_Zone', 'Source_Well', 'Source_Volume', 'Flow_Rate', 'Target_Zone', 'Target_Well']
 })
 
 example_method = dict({
     'METHODNAME': 'NCNR_TransferWithRinse',
     'SAMPLENAME': 'Test sample',
     'SAMPLEDESCRIPTION': 'Description of a test sample',
-    '#SourceZone': 'Solvent Zone',
-    '#SourceWell': '1',
-    '#SourceVolume': '1000',
-    '#FlowRate': '2',
-    '#ResultZone': 'Mix Zone',
-    '#ResultWell': '1'
+    'Source_Zone': 'Solvent Zone',
+    'Source_Well': '1',
+    'Transfer_Volume': '1000',
+    'Flow_Rate': '2',
+    'Target_Zone': 'Mix Zone',
+    'Target_Well': '1'
 })
 
 @dataclass
