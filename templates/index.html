@@ -1,0 +1,42 @@
+<head>
+    <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+    <script>
+
+        methoddata = {}
+
+        function make_form() {
+            //var key = $("#method_select").options[$("#method_select").selectedIndex]
+            var key = $("#method_select :selected").text()
+            console.log(key)
+            console.log(methoddata)
+            for (const field of methoddata[key]) {
+                console.log(field)
+            }
+        }
+
+        window.onload = function() {
+            fetch('/GUI/GetMethods/')
+                .then(function (response) {
+                    return response.json();
+                }).then(function (text) {
+                    form = document.getElementById("form")
+                    console.log(text)
+                    console.log(Object.keys(text))
+                    
+                    for (const k of Object.keys(text)) {
+                        console.log(k)
+                        option = document.createElement("option")
+                        option.text = k
+                        $("#method_select").append(option)
+                    }
+                    methoddata = text
+                });
+        }
+    </script>
+</head>
+<body>
+    <div id="form">
+        <select id="method_select"></select>
+        <button id="make_form" onclick="make_form()">Make form</button>
+    </div>
+</body>

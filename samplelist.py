@@ -1,31 +1,39 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, InitVar, fields
+from enum import EnumMeta
 import datetime
 
-methodlist = []
+methods = {}
 
 def liquid_handler_method(func):
     """Decorator function to add methods dataclasses to methodlist global"""
-    def wrapper():
-        methodlist.append(func)
+    def wrapper(*args, **kwargs):
+        fi = func(*args, **kwargs)
+        methods[fi.METHODNAME] = [f.name for f in fields(fi)]
+        return fi
     return wrapper
 
 ## ========== Methods specification =============
 
-method_fields = dict({
-    'NCNR_TransferWithRinse': ['Source_Zone', 'Source_Well', 'Source_Volume', 'Flow_Rate', 'Target_Zone', 'Target_Well']
-})
+class Zone(EnumMeta):
+    SOLVENT = 'Solvent Zone'
+    SAMPLE = 'Sample Zone'
+    STOCK = 'Stock Zone'
+    MIX = 'Mix Zone'
+    INJECT = 'Injection Zone'
 
-example_method = dict({
-    'METHODNAME': 'NCNR_TransferWithRinse',
-    'SAMPLENAME': 'Test sample',
-    'SAMPLEDESCRIPTION': 'Description of a test sample',
-    'Source_Zone': 'Solvent Zone',
-    'Source_Well': '1',
-    'Transfer_Volume': '1000',
-    'Flow_Rate': '2',
-    'Target_Zone': 'Mix Zone',
-    'Target_Well': '1'
-})
+@liquid_handler_method
+@dataclass
+class TransferWithRinse:
+    """Transfer with rinse"""
+    SAMPLENAME: str
+    SAMPLEDESCRIPTION: str
+    Source_Zone: Zone
+    Source_Well: str
+    Transfer_Volume: str
+    Flow_Rate: str
+    Target_Zone: Zone
+    Target_Well: str
+    METHODNAME: str = 'NCNR_TransferWithRinse'
 
 @dataclass
 class SampleList:
@@ -39,8 +47,11 @@ class SampleList:
     columns: list[dict]
     createdBy: str = 'System'
 
+example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 current_time = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')
 current_time_short = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 example_sample_list = SampleList('test sample list', '1', 'description of test sample list', current_time, current_time_short, current_time_short, [example_method])
 #print(example_sample_list)
 #print(asdict(example_sample_list))
+print(methods)
+#print(example_method)

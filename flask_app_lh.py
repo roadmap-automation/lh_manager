@@ -1,6 +1,6 @@
-from flask import Flask, request
+from flask import Flask, render_template, request
 from flask_restful import Resource, Api
-from samplelist import example_sample_list
+from samplelist import example_sample_list, methods
 from dataclasses import asdict
 import copy
 
@@ -50,11 +50,23 @@ class PutSampleData(Resource):
         # Probable logic: once sample data is posted as successful, flag it as completed and move from sample_lists to completed_sample_lists
         return {sample_list_id, data}, 200
 
+# LH URIs
 api.add_resource(GetListofSampleLists, '/LH/GetListofSampleLists')
 api.add_resource(GetSampleList, '/LH/GetSampleList/<sample_list_id>')
 api.add_resource(PutSampleList, '/LH/PutSampleList/')
 api.add_resource(PutSampleData, '/LH/PutSampleData/')
 api.add_resource(PutSampleListValidation, '/LH/PutSampleListValidation/<sample_list_id>')
+
+class GetLHMethods(Resource):
+    def get(self):
+        return methods, 200
+
+# GUI URIs
+api.add_resource(GetLHMethods, '/GUI/GetMethods/')
+
+@app.route('/')
+def root():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5001, debug=True)
