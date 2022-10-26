@@ -9,7 +9,8 @@ api = Api(app)
 
 # master list of current sample lists
 # key is the "ID". The sample list itself is JSON representing exactly what should be sent to the LH for a single sample list
-sample_lists = {'1': asdict(example_sample_list)}
+sample_lists = {'3': asdict(example_sample_list)}
+#                '2': asdict(example_sample_list)}
 
 # keeps track of which sample lists have been completed, in case requests come in for status updates on previous sample lists
 completed_sample_lists = {}
@@ -62,7 +63,7 @@ class GetLHMethods(Resource):
         return methods, 200
 
 # GUI URIs
-api.add_resource(GetLHMethods, '/GUI/GetMethods/')
+api.add_resource(GetLHMethods, '/GUI/GetLHMethods/')
 
 @app.route('/')
 def root():
