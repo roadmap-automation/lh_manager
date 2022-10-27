@@ -2,6 +2,8 @@ from dataclasses import dataclass, field, asdict, InitVar, fields
 from enum import EnumMeta
 import datetime
 
+DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
+
 ## ========== Methods specification =============
 # methods must also be added to lh_methods list to be used
 
@@ -49,8 +51,16 @@ class InjectWithRinse:
     Flow_Rate: str
     METHODNAME: str = 'NCNR_InjectWithRinse'
 
+@dataclass
+class Sleep:
+    """Sleep"""
+    SAMPLENAME: str
+    SAMPLEDESCRIPTION: str
+    Time: str
+    METHODNAME: str = 'NCNR_Sleep'
+
 # get "methods" specification of fields
-lh_methods = [TransferWithRinse, MixWithRinse, InjectWithRinse]
+lh_methods = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
 methods = {}
 for method in lh_methods:
     fieldlist = []
@@ -67,18 +77,38 @@ class SampleList:
     """Class representing a Gilson LH sample list"""
     name: str
     id: str
+    createdBy: str
     description: str
     createDate: str
     startDate: str
     endDate: str
     columns: list[dict]
-    createdBy: str = 'System'
 
-example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
-current_time = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-current_time_short = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-example_sample_list = SampleList('test sample list3', '3', 'description of test sample list3', current_time, current_time_short, current_time_short, [example_method])
-#print(example_sample_list)
-#print(asdict(example_sample_list))
-print(methods)
-#print(example_method)
+class Sample:
+    """Class representing a sample to be created by Gilson LH"""
+
+    def __init__(self, id: str, name: str, description: str, methods: list = []) -> None:
+        self.id = id
+        self.name = name
+        self.description = description
+        self.methods = methods
+        self.createdDate = None
+
+    def toSampleList(self, entry=False) -> dict:
+        """Generates dictionary for LH sample list
+        
+            entry: if a list of sample lists entry, SampleList columns field is null; otherwise,
+                    if a full sample list, expose all methods 
+        """
+
+        current_time = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')
+        self.createdDate = current_time if self.createdDate is None else self.createdDate
+        expose_methods = None if entry else self.methods
+        return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, current_time, current_time, expose_methods))
+
+#example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
+example_method = Sleep('Test sample', 'Description of a test sample', '0.1')
+example_sample = Sample('12', 'test sample', 'test sample description')
+example_sample.methods.append(example_method)
+#print(methods)
+
