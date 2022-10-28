@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict, fields
-from enum import EnumMeta, EnumMeta
+from enum import Enum, EnumMeta
 import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -7,7 +7,7 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 ## ========== Methods specification =============
 # methods must also be added to lh_methods list to be used
 
-class Zone(EnumMeta):
+class Zone(str, Enum):
     SOLVENT = 'Solvent Zone'
     SAMPLE = 'Sample Zone'
     STOCK = 'Stock Zone'
@@ -61,7 +61,7 @@ class Sleep:
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
-lh_methods = {}
+lh_methods = {'enums': {'Zone': [v for v in Zone]}, 'methods': {}}
 for method in method_list:
     fieldlist = []
     for fi in fields(method):
@@ -69,7 +69,7 @@ for method in method_list:
             fieldlist.append(fi.name)
         else:
             key = fi.default
-    lh_methods[key] = fieldlist    
+    lh_methods['methods'][key] = fieldlist    
 
 # =============== Sample list handling =================
 

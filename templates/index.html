@@ -3,15 +3,39 @@
     <script>
 
         methoddata = {}
+        zones = {}
 
         function make_form() {
             //var key = $("#method_select").options[$("#method_select").selectedIndex]
+            $('#auto_form').empty()
             var key = $("#method_select :selected").text()
             console.log(key)
             console.log(methoddata)
             for (const field of methoddata[key]) {
                 console.log(field)
+                var lbl = $("<label>").text(field)
+                if (field.includes('Zone')) {
+                    newsel = $("<select>").attr({
+                        name: field
+                        }).appendTo(lbl)
+                    for (const zone of zones) {
+                        $("<option>").text(zone).appendTo(newsel)
+                    }
+                }
+                else {
+                    
+                    $("<input>").attr({
+                        name: field,
+                        value: "0"
+                        }).appendTo(lbl)
+                }
+                $("<br>").appendTo(lbl)
+                lbl.appendTo('#auto_form')
             }
+        }
+
+        function send_sample() {
+            //read in form inputs, make JSON, and send to server
         }
 
         window.onload = function() {
@@ -20,16 +44,17 @@
                     return response.json();
                 }).then(function (text) {
                     form = document.getElementById("form")
-                    console.log(text)
-                    console.log(Object.keys(text))
+                    console.log(text['methods'])
+                    console.log(Object.keys(text['methods']))
                     
-                    for (const k of Object.keys(text)) {
+                    for (const k of Object.keys(text['methods'])) {
                         console.log(k)
                         option = document.createElement("option")
                         option.text = k
                         $("#method_select").append(option)
                     }
-                    methoddata = text
+                    methoddata = text['methods']
+                    zones = text['enums']['Zone']
                 });
         }
     </script>
@@ -38,5 +63,7 @@
     <div id="form">
         <select id="method_select"></select>
         <button id="make_form" onclick="make_form()">Make form</button>
+        <div id="auto_form"></div>
+        <button id="send_sample" onclick="send_sample()">Send Sample</button>
     </div>
 </body>
