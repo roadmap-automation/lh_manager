@@ -14,11 +14,6 @@ class Zone(EnumMeta):
     MIX = 'Mix Zone'
     INJECT = 'Injection Zone'
 
-class SampleStatus(EnumMeta):
-    PENDING = 'pending'
-    ACTIVE = 'active'
-    COMPLETED = 'completed'
-
 @dataclass
 class TransferWithRinse:
     """Transfer with rinse"""
@@ -77,6 +72,12 @@ for method in method_list:
     lh_methods[key] = fieldlist    
 
 # =============== Sample list handling =================
+
+class SampleStatus(EnumMeta):
+    PENDING = 'pending'
+    ACTIVE = 'active'
+    COMPLETED = 'completed'
+
 @dataclass
 class SampleList:
     """Class representing a sample list in JSON
