@@ -4,7 +4,7 @@ import time
 
 """ Configuration using com0com and hub4com:
 
-Note: Gilson 506C is connected to physical port COM1.
+Note: Gilson 506C is connected to physical port COM1. GSIOC server points to COM12.
 
 com0com 2.2.2.0:
 >install 1 EmuBR=yes,EmuOverrun=yes PortName=COM12,EmuBR=yes,EmuOverrun=yes
