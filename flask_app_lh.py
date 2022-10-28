@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
-from samplelist import methods, SampleContainer, SampleStatus, example_sample
+from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list
 
 app = Flask(__name__)
 api = Api(app)
@@ -9,11 +9,17 @@ api = Api(app)
 # key can be either 'id' or 'name'
 
 samples = SampleContainer()
-samples.addSample(example_sample)
+
+for example_sample in example_sample_list:
+    samples.addSample(example_sample)
 
 class GetListofSampleLists(Resource):
     def get(self):
-        return {'sampleLists': [sample.toSampleList(entry=True) for sample in samples.samples if sample.status==SampleStatus.ACTIVE]}, 200
+        sample_list = [sample.toSampleList(entry=True) for sample in samples.samples if sample.status==SampleStatus.ACTIVE]
+        if len(sample_list):
+            return {'sampleLists': sample_list}, 200
+        else:
+            return {}, 200
 
 class GetSampleList(Resource):
     def get(self, sample_list_id):
@@ -26,11 +32,12 @@ class PutSampleListValidation(Resource):
         return {sample_list_id: data}, 200
 
 class PutSampleData(Resource):
-    def post(self, sample_list_id):
+    def post(self):
         data = request.get_json(force=True)
+        print(data)
         # TODO: some stuff
         # Probable logic: once sample data is posted as successful, flag it as completed and move from sample_lists to completed_sample_lists
-        return {sample_list_id: data}, 200
+        return {'data': data}, 200
 
 class RunSample(Resource):
     """Runs a sample """
@@ -54,13 +61,13 @@ class GetSamples(Resource):
                 'name': sample.name,
                 'status': sample.status
             }))
-
+        
         return {'samples': sample_list}, 200
 
 # LH URIs
 api.add_resource(GetListofSampleLists, '/LH/GetListofSampleLists')
 api.add_resource(GetSampleList, '/LH/GetSampleList/<sample_list_id>')
-api.add_resource(PutSampleData, '/LH/PutSampleData/')
+api.add_resource(PutSampleData, '/LH/PutSampleData')
 api.add_resource(PutSampleListValidation, '/LH/PutSampleListValidation/<sample_list_id>')
 
 # Should these be LH endpoints, or NICE endpoints, or general API?
@@ -69,7 +76,7 @@ api.add_resource(GetSamples, '/LH/GetSamples/')
 
 class GetLHMethods(Resource):
     def get(self):
-        return methods, 200
+        return lh_methods, 200
 
 # GUI URIs
 api.add_resource(GetLHMethods, '/GUI/GetLHMethods/')

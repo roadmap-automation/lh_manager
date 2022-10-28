@@ -65,16 +65,16 @@ class Sleep:
     METHODNAME: str = 'NCNR_Sleep'
 
 # get "methods" specification of fields
-lh_methods = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
-methods = {}
-for method in lh_methods:
+method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
+lh_methods = {}
+for method in method_list:
     fieldlist = []
     for fi in fields(method):
         if fi.name != 'METHODNAME':
             fieldlist.append(fi.name)
         else:
             key = fi.default
-    methods[key] = fieldlist    
+    lh_methods[key] = fieldlist    
 
 # =============== Sample list handling =================
 @dataclass
@@ -98,8 +98,14 @@ class Sample:
         self.name = name
         self.description = description
         self.methods = methods
+        self.methods_complete = [False] * len(methods)
         self.createdDate = None
         self.status = SampleStatus.PENDING
+
+    def addMethod(self, method) -> None:
+        """Adds new method and flag for completion"""
+        self.methods.append(method)
+        self.methods_complete.append(False)
 
     def toSampleList(self, entry=False) -> dict:
         """Generates dictionary for LH sample list
@@ -165,7 +171,12 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')
-example_sample = Sample('12', 'testsample12', 'test sample description')
-example_sample.methods.append(example_method)
+example_sample_list = []
+for i in range(10):
+    example_sample = Sample(f'{i}', f'testsample{i}', 'test sample description', methods=[])
+    example_sample.addMethod(example_method)
+    example_sample_list.append(example_sample)
+#example_sample = Sample('12', 'testsample12', 'test sample description')
+#example_sample.methods.append(example_method)
 #print(methods)
 
