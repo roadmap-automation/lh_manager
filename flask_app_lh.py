@@ -1,36 +1,23 @@
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
-from samplelist import example_sample, methods
-from dataclasses import asdict
-import copy
+from samplelist import methods, SampleContainer, SampleStatus, example_sample
 
 app = Flask(__name__)
 api = Api(app)
 
-# master list of current sample lists
-# key is the "ID". The sample list itself is JSON representing exactly what should be sent to the LH for a single sample list
-sample_lists = {example_sample.id: example_sample}
-#                '2': asdict(example_sample_list)}
+# master containers of sample lists (could also use status field)
+# key can be either 'id' or 'name'
 
-# keeps track of which sample lists have been completed, in case requests come in for status updates on previous sample lists
-completed_sample_lists = {}
+samples = SampleContainer()
+samples.addSample(example_sample)
 
 class GetListofSampleLists(Resource):
     def get(self):
-        return {'sampleLists': [item.toSampleList(entry=True) for item in sample_lists.values()]}, 200
+        return {'sampleLists': [sample.toSampleList(entry=True) for sample in samples.samples if sample.status==SampleStatus.ACTIVE]}, 200
 
 class GetSampleList(Resource):
     def get(self, sample_list_id):
-        return {'sampleList': sample_lists[sample_list_id].toSampleList()}, 200
-
-class PutSampleList(Resource):
-    def post(self):
-        data = request.get_json(force=True)
-        new_id = max([int(k) for k in sample_lists.keys()]) + 1
-        new_id = '%i' % new_id
-        data['id'] = new_id
-        sample_lists[new_id] = data
-        return {new_id: sample_lists[new_id]}, 200
+        return {'sampleList': samples.getSample('id', sample_list_id, status=SampleStatus.ACTIVE).toSampleList()}, 200
 
 class PutSampleListValidation(Resource):
     def post(self, sample_list_id):
@@ -45,12 +32,40 @@ class PutSampleData(Resource):
         # Probable logic: once sample data is posted as successful, flag it as completed and move from sample_lists to completed_sample_lists
         return {sample_list_id: data}, 200
 
+class RunSample(Resource):
+    """Runs a sample """
+    # TODO: Use POST to change status; might be useful for pausing, stopping; as coded this is best as a PUT
+    def get(self, sample_name):
+        sample = samples.getSample('name', sample_name)
+        if sample is not None:
+            sample.status = SampleStatus.ACTIVE
+            return {}, 200
+        else:
+            return {}, 404
+
+class GetSamples(Resource):
+    """Gets list of sample names, IDs, and status"""
+    def get(self):
+
+        sample_list = []
+        for sample in samples.samples:
+            sample_list.append(dict({
+                'id': sample.id,
+                'name': sample.name,
+                'status': sample.status
+            }))
+
+        return {'samples': sample_list}, 200
+
 # LH URIs
 api.add_resource(GetListofSampleLists, '/LH/GetListofSampleLists')
 api.add_resource(GetSampleList, '/LH/GetSampleList/<sample_list_id>')
-api.add_resource(PutSampleList, '/LH/PutSampleList/')
 api.add_resource(PutSampleData, '/LH/PutSampleData/')
 api.add_resource(PutSampleListValidation, '/LH/PutSampleListValidation/<sample_list_id>')
+
+# Should these be LH endpoints, or NICE endpoints, or general API?
+api.add_resource(RunSample, '/LH/RunSample/<sample_name>')
+api.add_resource(GetSamples, '/LH/GetSamples/')
 
 class GetLHMethods(Resource):
     def get(self):
