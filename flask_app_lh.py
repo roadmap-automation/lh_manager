@@ -8,6 +8,10 @@ api = Api(app)
 # master containers of sample lists (could also use status field)
 # key can be either 'id' or 'name'
 
+# TODO: Refactor so samples (which contains state) is imported from a separate state.py;
+# this allows each module that will interact with samples to import the same object separately
+# so state.samples becomes essentially a global variable
+
 samples = SampleContainer()
 
 for example_sample in example_sample_list:
