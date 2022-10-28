@@ -28,8 +28,14 @@ class GetSampleList(Resource):
 class PutSampleListValidation(Resource):
     def post(self, sample_list_id):
         data = request.get_json(force=True)
-        # TODO: some stuff, parse 'validationType' for SUCCESS or ERROR
-        return {sample_list_id: data}, 200
+
+        # check validation (SUCCESS or ERROR)
+        validation = data['validation']['validationType']
+        
+        # TODO: Actual error handling flow
+        assert validation == 'SUCCESS', f'Error in validation. Full message: ' + data['validation']['message']
+
+        return {sample_list_id: validation}, 200
 
 class PutSampleData(Resource):
     def post(self):
