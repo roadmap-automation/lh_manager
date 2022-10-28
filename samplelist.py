@@ -175,6 +175,7 @@ example_sample_list = []
 for i in range(10):
     example_sample = Sample(f'{i}', f'testsample{i}', 'test sample description', methods=[])
     example_sample.addMethod(example_method)
+    example_sample.addMethod(example_method)
     example_sample_list.append(example_sample)
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)

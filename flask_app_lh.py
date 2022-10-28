@@ -34,9 +34,34 @@ class PutSampleListValidation(Resource):
 class PutSampleData(Resource):
     def post(self):
         data = request.get_json(force=True)
-        print(data)
-        # TODO: some stuff
-        # Probable logic: once sample data is posted as successful, flag it as completed and move from sample_lists to completed_sample_lists
+
+        # Get ID, method number, and method name from returned data
+        sample_id = data['sampleData']['runData'][0]['sampleListID']
+        method_number = int(data['sampleData']['runData'][0]['iteration']) - 1
+        method_name = data['sampleData']['runData'][0]['methodName']
+
+        # check that run was successful
+        successful = False
+        for notification in data['sampleData']['resultNotifications']['notifications'].values():
+            if "completed successfully" in notification:
+                successful = True
+        
+        if successful:
+            # find relevant sample by ID
+            sample = samples.getSample('id', sample_id)
+
+            # double check that correct method is being referenced
+            assert method_name == sample.methods[method_number].METHODNAME, f'Wrong method name {method_name} in result, expected {sample.methods[method_number].METHODNAME}, full output ' + data
+
+            # mark method complete
+            sample.methods_complete[method_number] = True
+
+            # if all methods complete, change status of sample to completed
+            if all(sample.methods_complete):
+                sample.status = SampleStatus.COMPLETED
+
+        # TODO: ELSE: Throw error
+
         return {'data': data}, 200
 
 class RunSample(Resource):
