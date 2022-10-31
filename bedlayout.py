@@ -3,14 +3,20 @@ from dataclasses import dataclass
 from typing import Tuple
 from samplelist import Zone
 
-def ServerWell2LHWell(rack_id: str, well_number:int) -> Tuple(str, int):
-    """Translates internal server well specification to the LH well ID
+def ServerWell2GUIWell(rack_id: str, well_number: int):
+    """Translates internal server well specification to the GUI well ID"""
     
-        rack_id = rack identification string
-                    
-        Not currently used because Rack IDs are the same as Zone IDs"""
+    well_specification = rack_id, well_number
+
+    return well_specification
+
+def GUIWell2ServerWell(well_specification) -> Tuple(str, int):
+    """Translates GUI well specification to internal server specification"""
+    
+    rack_id, well_number = well_specification
 
     return rack_id, well_number
+
 
 @dataclass
 class Solvent:
@@ -122,6 +128,11 @@ class Rack:
 @dataclass
 class LHBed:
     racks = {}
+
+    def get_well(self, well_specification) -> Well:
+        """Get well using the GUI well specification"""
+        rack_id, well_number = GUIWell2ServerWell(well_specification)
+        return self.racks[rack_id][well_number]
 
 layout = LHBed(racks={'Solvent': Rack(3, 1, 700.0, []),
                       'Samples': Rack(4, 15, 2, []),
