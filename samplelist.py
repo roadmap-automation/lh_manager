@@ -1,5 +1,6 @@
 from dataclasses import dataclass, asdict, fields
 from enum import Enum, EnumMeta
+from typing import Literal
 import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -25,7 +26,7 @@ class TransferWithRinse:
     Flow_Rate: str
     Target_Zone: Zone
     Target_Well: str
-    METHODNAME: str = 'NCNR_TransferWithRinse'
+    METHODNAME: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
 @dataclass
 class MixWithRinse:
@@ -37,7 +38,7 @@ class MixWithRinse:
     Volume: str
     Flow_Rate: str
     Number_of_Mixes: str
-    METHODNAME: str = 'NCNR_MixWithRinse'
+    METHODNAME: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
 
 @dataclass
 class InjectWithRinse:
@@ -49,7 +50,7 @@ class InjectWithRinse:
     Volume: str
     Aspirate_Flow_Rate: str
     Flow_Rate: str
-    METHODNAME: str = 'NCNR_InjectWithRinse'
+    METHODNAME: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
 @dataclass
 class Sleep:
@@ -57,7 +58,7 @@ class Sleep:
     SAMPLENAME: str
     SAMPLEDESCRIPTION: str
     Time: str
-    METHODNAME: str = 'NCNR_Sleep'
+    METHODNAME: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
