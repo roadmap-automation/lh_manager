@@ -43,14 +43,6 @@ class Composition:
         self.solvents = [Solvent(name, fraction) for name, fraction in zip(solvent_names, solvent_fractions)]
         self.solutes = [Solute(name, conc) for name, conc in zip(solute_names, solute_concentrations)]
 
-    def unique_solvent_names(self):
-
-        return set([solvent.name for solvent in self.solvents])
-
-    def unique_solute_names(self):
-
-        return set([solute.name for solute in self.solutes])
-
     def get_solvent_fractions(self):
         """Returns lists of solvent names and volume fractions"""
 
@@ -85,6 +77,7 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 
     return new_components, new_concs, volume1 + volume2
 
+@dataclass
 class Well:
     """Class representing the contents of a single well
     
@@ -118,6 +111,7 @@ class Well:
 
 @dataclass
 class Rack:
+    """Class representing a rack"""
     columns: int
     rows: int
     max_volume: float
@@ -126,6 +120,7 @@ class Rack:
 
 @dataclass
 class LHBed:
+    """Class representing a general LH bed layout"""
     racks: dict = field(default_factory=dict)
 
     def get_well_and_rack(self, well_specification) -> Tuple[Well, Rack]:
