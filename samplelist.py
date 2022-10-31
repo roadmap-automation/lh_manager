@@ -81,7 +81,7 @@ class InjectWithRinse(BaseMethod):
     METHODNAME: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
     def execute(self, layout: LHBed):
-        well = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
+        well, _ = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
         well.volume -= float(self.Volume)
 
     def estimated_time(self):
