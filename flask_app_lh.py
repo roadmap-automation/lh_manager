@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
-from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list
+from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
+from bedlayout import layout
+from copy import copy, deepcopy
 
 app = Flask(__name__)
 api = Api(app)
@@ -66,6 +68,9 @@ class PutSampleData(Resource):
             # mark method complete
             sample.methods_complete[method_number] = True
 
+            # TODO: implement change of layout state as follows:
+            #sample.methods[method_number].execute(layout)
+
             # if all methods complete, change status of sample to completed
             if all(sample.methods_complete):
                 sample.status = SampleStatus.COMPLETED
@@ -73,6 +78,21 @@ class PutSampleData(Resource):
         # TODO: ELSE: Throw error
 
         return {'data': data}, 200
+
+class AddSample(Resource):
+    """Adds a single-method sample to the sample list (testing only)"""
+    def post(self):
+        data = request.get_json(force=True)
+        new_method = lh_methods[data['METHODNAME']](**data)
+        new_sample = Sample(id=f'{samples.getMaxIndex("id") + 1}', name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
+        samples.addSample(new_sample)
+
+        # dry run (testing only)
+        test_layout = deepcopy(layout)
+        for method in new_sample.methods:
+            method.execute(test_layout)
+
+        return {'new sample': new_sample.toSampleList()}, 200
 
 class RunSample(Resource):
     """Runs a sample """
@@ -106,12 +126,13 @@ api.add_resource(PutSampleData, '/LH/PutSampleData')
 api.add_resource(PutSampleListValidation, '/LH/PutSampleListValidation/<sample_list_id>')
 
 # Should these be LH endpoints, or NICE endpoints, or general API?
-api.add_resource(RunSample, '/LH/RunSample/<sample_name>')
-api.add_resource(GetSamples, '/LH/GetSamples/')
+api.add_resource(RunSample, '/test/RunSample/<sample_name>')
+api.add_resource(GetSamples, '/test/GetSamples/')
+api.add_resource(AddSample, '/test/AddSample')
 
 class GetLHMethods(Resource):
     def get(self):
-        return lh_methods, 200
+        return lh_method_fields, 200
 
 # GUI URIs
 api.add_resource(GetLHMethods, '/GUI/GetLHMethods/')

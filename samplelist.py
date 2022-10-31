@@ -98,7 +98,8 @@ class Sleep(BaseMethod):
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
-lh_methods = {'enums': {'Zone': [v for v in Zone]}, 'methods': {}}
+lh_methods = {v.METHODNAME: v for v in method_list}
+lh_method_fields = {'enums': {'Zone': [v for v in Zone]}, 'methods': {}}
 for method in method_list:
     fieldlist = []
     for fi in fields(method):
@@ -106,7 +107,7 @@ for method in method_list:
             fieldlist.append(fi.name)
         else:
             key = fi.default
-    lh_methods['methods'][key] = fieldlist    
+    lh_method_fields['methods'][key] = fieldlist    
 
 # =============== Sample list handling =================
 

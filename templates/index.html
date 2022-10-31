@@ -16,7 +16,8 @@
                 var lbl = $("<label>").text(field)
                 if (field.includes('Zone')) {
                     newsel = $("<select>").attr({
-                        name: field
+                        name: field,
+                        tag: 'form_element'
                         }).appendTo(lbl)
                     for (const zone of zones) {
                         $("<option>").text(zone).appendTo(newsel)
@@ -26,6 +27,7 @@
                     
                     $("<input>").attr({
                         name: field,
+                        tag: 'form_element',
                         value: "0"
                         }).appendTo(lbl)
                 }
@@ -35,7 +37,24 @@
         }
 
         function send_sample() {
-            //read in form inputs, make JSON, and send to server
+            var data = {}
+            var key = $("#method_select :selected").text()
+            $('*[tag=form_element]').each(function() {
+                data[this.name] = this.value
+            })
+            data['METHODNAME'] = key
+            fetch('/test/AddSample', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=UTF-8'
+                },
+                body: JSON.stringify(data),
+                })
+                .then(function (response) {
+                    return response.json()            
+                }).then(function (return_data) {
+                    console.log(return_data)
+                })
         }
 
         window.onload = function() {
