@@ -1,7 +1,6 @@
 """Class definitions for bed layout, wells, and compositions"""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
-from samplelist import Zone
 
 def ServerWell2GUIWell(rack_id: str, well_number: int):
     """Translates internal server well specification to the GUI well ID"""
@@ -10,7 +9,7 @@ def ServerWell2GUIWell(rack_id: str, well_number: int):
 
     return well_specification
 
-def GUIWell2ServerWell(well_specification) -> Tuple(str, int):
+def GUIWell2ServerWell(well_specification) -> Tuple[str, int]:
     """Translates GUI well specification to internal server specification"""
     
     rack_id, well_number = well_specification
@@ -32,8 +31,8 @@ class Solute:
 @dataclass
 class Composition:
     """Class representing a solution composition"""
-    solvents: list[Solvent] = []
-    solutes: list[Solute] = []
+    solvents: list[Solvent] = field(default_factory=list)
+    solutes: list[Solute] = field(default_factory=list)
 
 #    def __init__(self, solvents: list[Solvent], solutes: list[Solute]) -> None:
 #        self.solvents = solvents
@@ -127,12 +126,12 @@ class Rack:
 
 @dataclass
 class LHBed:
-    racks = {}
+    racks: dict = field(default_factory=dict)
 
-    def get_well(self, well_specification) -> Well:
+    def get_well_and_rack(self, well_specification) -> Tuple[Well, Rack]:
         """Get well using the GUI well specification"""
         rack_id, well_number = GUIWell2ServerWell(well_specification)
-        return self.racks[rack_id][well_number]
+        return self.racks[rack_id][well_number], self.racks[rack_id]
 
 layout = LHBed(racks={'Solvent': Rack(3, 1, 700.0, []),
                       'Samples': Rack(4, 15, 2, []),
