@@ -1,6 +1,7 @@
 from dataclasses import dataclass, asdict, fields
 from enum import Enum, EnumMeta
-from typing import Literal
+from typing import Literal, Tuple
+from bedlayout import LHBed, Well, ServerWell2GUIWell, GUIWell2ServerWell
 import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -16,10 +17,22 @@ class Zone(str, Enum):
     INJECT = 'Injection Zone'
 
 @dataclass
-class TransferWithRinse:
-    """Transfer with rinse"""
+class BaseMethod:
+    """Base class for LH methods"""
     SAMPLENAME: str
     SAMPLEDESCRIPTION: str
+
+    def execute(self, layout: LHBed):
+        """Actions to be taken upon executing method. Default is nothing changes"""
+        pass
+
+    def estimated_time(self):
+        """Estimated time for method in default time units"""
+        return 0.0
+
+@dataclass
+class TransferWithRinse(BaseMethod):
+    """Transfer with rinse"""
     Source_Zone: Zone
     Source_Well: str
     Volume: str
@@ -28,11 +41,25 @@ class TransferWithRinse:
     Target_Well: str
     METHODNAME: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
+    def execute(self, layout: LHBed):
+        source_well, _ = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
+        target_well, target_rack = layout.get_well_and_rack((self.Target_Zone, int(self.Target_Well)))
+        
+        # TODO: real error reporting
+        assert source_well.volume > self.Volume, f"{self.Source_Well} in {self.Source_Zone} rack contains {source_well.volume} but needs {self.Volume}"
+        source_well.volume -= float(self.Volume)
+
+        assert (target_well.volume + float(self.Volume)) < target_rack.max_volume, f"{self.Source_Well} in {self.Source_Zone} rack contains {source_well.volume} but needs {self.Volume}"
+
+        # Perform mix. Note that target_well volume is also changed by this operation
+        target_well.mix_with(float(self.Volume), source_well.composition)
+
+    def estimated_time(self):
+        return float(self.Volume) / float(self.Flow_Rate)
+
 @dataclass
-class MixWithRinse:
+class MixWithRinse(BaseMethod):
     """Inject with rinse"""
-    SAMPLENAME: str
-    SAMPLEDESCRIPTION: str
     Target_Zone: Zone
     Target_Well: str
     Volume: str
@@ -40,11 +67,12 @@ class MixWithRinse:
     Number_of_Mixes: str
     METHODNAME: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
 
+    def estimated_time(self):
+        return 2 * int(self.Number_of_Mixes) * float(self.Volume) / float(self.Flow_Rate)
+
 @dataclass
-class InjectWithRinse:
+class InjectWithRinse(BaseMethod):
     """Inject with rinse"""
-    SAMPLENAME: str
-    SAMPLEDESCRIPTION: str
     Source_Zone: Zone
     Source_Well: str
     Volume: str
@@ -52,13 +80,21 @@ class InjectWithRinse:
     Flow_Rate: str
     METHODNAME: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
+    def execute(self, layout: LHBed):
+        well = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
+        well.volume -= float(self.Volume)
+
+    def estimated_time(self):
+        return float(self.Volume) / float(self.Aspirate_Flow_Rate) + float(self.Volume) / float(self.Flow_Rate)
+
 @dataclass
-class Sleep:
+class Sleep(BaseMethod):
     """Sleep"""
-    SAMPLENAME: str
-    SAMPLEDESCRIPTION: str
     Time: str
     METHODNAME: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
+
+    def estimated_time(self):
+        return float(self.Time)
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
