@@ -1,7 +1,9 @@
+from attr import asdict
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
 from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
 from bedlayout import layout
+from dataclasses import asdict
 from copy import copy, deepcopy
 
 app = Flask(__name__)
@@ -92,7 +94,7 @@ class AddSample(Resource):
         for method in new_sample.methods:
             method.execute(test_layout)
 
-        return {'new sample': new_sample.toSampleList()}, 200
+        return {'new sample': new_sample.toSampleList(), 'layout': asdict(test_layout)}, 200
 
 class RunSample(Resource):
     """Runs a sample """
