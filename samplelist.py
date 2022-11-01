@@ -22,11 +22,11 @@ class BaseMethod:
     SAMPLENAME: str
     SAMPLEDESCRIPTION: str
 
-    def execute(self, layout: LHBed):
+    def execute(self, layout: LHBed) -> None:
         """Actions to be taken upon executing method. Default is nothing changes"""
         pass
 
-    def estimated_time(self):
+    def estimated_time(self) -> float:
         """Estimated time for method in default time units"""
         return 0.0
 
@@ -41,7 +41,7 @@ class TransferWithRinse(BaseMethod):
     Target_Well: str
     METHODNAME: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
-    def execute(self, layout: LHBed):
+    def execute(self, layout: LHBed) -> None:
         source_well, _ = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
         target_well, target_rack = layout.get_well_and_rack((self.Target_Zone, int(self.Target_Well)))
         
@@ -54,7 +54,7 @@ class TransferWithRinse(BaseMethod):
         # Perform mix. Note that target_well volume is also changed by this operation
         target_well.mix_with(float(self.Volume), source_well.composition)
 
-    def estimated_time(self):
+    def estimated_time(self) -> float:
         return float(self.Volume) / float(self.Flow_Rate)
 
 @dataclass
@@ -67,8 +67,8 @@ class MixWithRinse(BaseMethod):
     Number_of_Mixes: str
     METHODNAME: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
 
-    def estimated_time(self):
-        return 2 * int(self.Number_of_Mixes) * float(self.Volume) / float(self.Flow_Rate)
+    def estimated_time(self) -> float:
+        return 2 * float(self.Number_of_Mixes) * float(self.Volume) / float(self.Flow_Rate)
 
 @dataclass
 class InjectWithRinse(BaseMethod):
@@ -80,11 +80,11 @@ class InjectWithRinse(BaseMethod):
     Flow_Rate: str
     METHODNAME: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
-    def execute(self, layout: LHBed):
+    def execute(self, layout: LHBed) -> None:
         well, _ = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
         well.volume -= float(self.Volume)
 
-    def estimated_time(self):
+    def estimated_time(self) -> float:
         return float(self.Volume) / float(self.Aspirate_Flow_Rate) + float(self.Volume) / float(self.Flow_Rate)
 
 @dataclass
@@ -93,7 +93,7 @@ class Sleep(BaseMethod):
     Time: str
     METHODNAME: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
 
-    def estimated_time(self):
+    def estimated_time(self) -> float:
         return float(self.Time)
 
 # get "methods" specification of fields

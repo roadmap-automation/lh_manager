@@ -38,12 +38,12 @@ class Composition:
 #        self.solvents = solvents
 #        self.solutes = solutes
 
-    def from_list(self, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]):
+    def from_list(self, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
 
         self.solvents = [Solvent(name, fraction) for name, fraction in zip(solvent_names, solvent_fractions)]
         self.solutes = [Solute(name, conc) for name, conc in zip(solute_names, solute_concentrations)]
 
-    def get_solvent_fractions(self):
+    def get_solvent_fractions(self) -> Tuple[list[str], list[float]]:
         """Returns lists of solvent names and volume fractions"""
 
         names = [solvent.name for solvent in self.solvents]
@@ -51,7 +51,7 @@ class Composition:
 
         return names, fractions
 
-    def get_solute_concentrations(self):
+    def get_solute_concentrations(self) -> Tuple[list[str], list[float]]:
         """Returns lists of solute names and concentrations"""
 
         names = [solute.name for solute in self.solutes]
@@ -59,7 +59,7 @@ class Composition:
 
         return names, concentrations
 
-def combine_components(components1: list[str], concs1: list[float], volume1: float, components2: list[str], concs2: list[float], volume2: float):
+def combine_components(components1: list[str], concs1: list[float], volume1: float, components2: list[str], concs2: list[float], volume2: float) -> Tuple[list[str], list[float], float]:
     """Utility function for combining two sets of components
         
         components1 and components2 are lists of names of components
