@@ -121,7 +121,7 @@ class Rack:
 @dataclass
 class LHBed:
     """Class representing a general LH bed layout"""
-    racks: dict = field(default_factory=dict)
+    racks: dict[str, Rack] = field(default_factory=dict)
 
     def get_well_and_rack(self, well_specification) -> Tuple[Well, Rack]:
         """Get well using the GUI well specification"""
