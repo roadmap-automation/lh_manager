@@ -2,15 +2,15 @@ from attr import asdict
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
 from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
-from bedlayout import layout
+from layoutmap import racks
+from bedlayout import LHBedLayout
 from dataclasses import asdict
 from copy import copy, deepcopy
 
 app = Flask(__name__)
 api = Api(app)
 
-# master containers of sample lists (could also use status field)
-# key can be either 'id' or 'name'
+# ====== Define state variables: samples, layout =========
 
 # TODO: Refactor so samples (which contains state) is imported from a separate state.py;
 # this allows each module that will interact with samples to import the same object separately
@@ -20,6 +20,10 @@ samples = SampleContainer()
 
 for example_sample in example_sample_list:
     samples.addSample(example_sample)
+
+layout = LHBedLayout(racks={})
+for name, rack in racks.items():
+    layout.add_rack_from_dict(name, rack)
 
 class GetListofSampleLists(Resource):
     def get(self):

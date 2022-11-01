@@ -2,21 +2,6 @@
 from dataclasses import dataclass, field
 from typing import Tuple
 
-def ServerWell2GUIWell(rack_id: str, well_number: int):
-    """Translates internal server well specification to the GUI well ID"""
-    
-    well_specification = rack_id, well_number
-
-    return well_specification
-
-def GUIWell2ServerWell(well_specification) -> Tuple[str, int]:
-    """Translates GUI well specification to internal server specification"""
-    
-    rack_id, well_number = well_specification
-
-    return rack_id, well_number
-
-
 @dataclass
 class Solvent:
     name: str
@@ -34,14 +19,11 @@ class Composition:
     solvents: list[Solvent] = field(default_factory=list)
     solutes: list[Solute] = field(default_factory=list)
 
-#    def __init__(self, solvents: list[Solvent], solutes: list[Solute]) -> None:
-#        self.solvents = solvents
-#        self.solutes = solutes
+    @classmethod
+    def from_list(cls, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
 
-    def from_list(self, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
-
-        self.solvents = [Solvent(name, fraction) for name, fraction in zip(solvent_names, solvent_fractions)]
-        self.solutes = [Solute(name, conc) for name, conc in zip(solute_names, solute_concentrations)]
+        return cls([Solvent(name, fraction) for name, fraction in zip(solvent_names, solvent_fractions)],
+                   [Solute(name, conc) for name, conc in zip(solute_names, solute_concentrations)])
 
     def get_solvent_fractions(self) -> Tuple[list[str], list[float]]:
         """Returns lists of solvent names and volume fractions"""
@@ -107,7 +89,7 @@ class Well:
                                                              solutes2, concentrations2, volume)
 
         self.volume = new_volume
-        self.composition.from_list(new_solvents, new_fractions, new_solutes, new_concentrations)
+        self.composition = Composition.from_list(new_solvents, new_fractions, new_solutes, new_concentrations)
 
 @dataclass
 class Rack:
@@ -119,19 +101,17 @@ class Rack:
     style: str = 'grid' # grid | staggered
 
 @dataclass
-class LHBed:
+class LHBedLayout:
     """Class representing a general LH bed layout"""
     racks: dict[str, Rack] = field(default_factory=dict)
 
-    def get_well_and_rack(self, well_specification) -> Tuple[Well, Rack]:
-        """Get well using the GUI well specification"""
-        rack_id, well_number = GUIWell2ServerWell(well_specification)
+    def add_rack_from_dict(self, name, d: dict):
+
+        if 'wells' not in d.keys():
+            d['wells'] = []
+
+        self.racks[name] = Rack(**d)
+
+    def get_well_and_rack(self, rack_id: str, well_number: int) -> Tuple[Well, Rack]:
+        """Get well using the GUI (rack, well) specification"""
         return self.racks[rack_id][well_number], self.racks[rack_id]
-
-layout = LHBed(racks={'Solvent': Rack(3, 1, 700.0, []),
-                      'Samples': Rack(4, 15, 2, []),
-                      'Stock': Rack(2, 7, 20, []),
-                      'Mix': Rack(4, 20, 9, [], 'staggered'),
-                      'MTPlateTop': Rack(8, 12, 0.5, []),
-                      'MTPlateBottom': Rack(8, 12, 0.5, [])})
-

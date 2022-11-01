@@ -1,7 +1,8 @@
 from dataclasses import dataclass, asdict, fields
-from enum import Enum, EnumMeta
-from typing import Literal, Tuple
-from bedlayout import LHBed, Well, ServerWell2GUIWell, GUIWell2ServerWell
+from enum import EnumMeta
+from typing import Literal
+from bedlayout import LHBedLayout
+from layoutmap import Zone, ZoneWell2LayoutWell
 import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -9,20 +10,13 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 ## ========== Methods specification =============
 # methods must also be added to lh_methods list to be used
 
-class Zone(str, Enum):
-    SOLVENT = 'Solvent Zone'
-    SAMPLE = 'Sample Zone'
-    STOCK = 'Stock Zone'
-    MIX = 'Mix Zone'
-    INJECT = 'Injection Zone'
-
 @dataclass
 class BaseMethod:
     """Base class for LH methods"""
     SAMPLENAME: str
     SAMPLEDESCRIPTION: str
 
-    def execute(self, layout: LHBed) -> None:
+    def execute(self, layout: LHBedLayout) -> None:
         """Actions to be taken upon executing method. Default is nothing changes"""
         pass
 
@@ -41,9 +35,9 @@ class TransferWithRinse(BaseMethod):
     Target_Well: str
     METHODNAME: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
-    def execute(self, layout: LHBed) -> None:
-        source_well, _ = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
-        target_well, target_rack = layout.get_well_and_rack((self.Target_Zone, int(self.Target_Well)))
+    def execute(self, layout: LHBedLayout) -> None:
+        source_well, _ = layout.get_well_and_rack(*ZoneWell2LayoutWell(self.Source_Zone, self.Source_Well))
+        target_well, target_rack = layout.get_well_and_rack(*ZoneWell2LayoutWell(self.Target_Zone, self.Target_Well))
         
         # TODO: real error reporting
         assert source_well.volume > self.Volume, f"{self.Source_Well} in {self.Source_Zone} rack contains {source_well.volume} but needs {self.Volume}"
@@ -80,8 +74,8 @@ class InjectWithRinse(BaseMethod):
     Flow_Rate: str
     METHODNAME: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
-    def execute(self, layout: LHBed) -> None:
-        well, _ = layout.get_well_and_rack((self.Source_Zone, int(self.Source_Well)))
+    def execute(self, layout: LHBedLayout) -> None:
+        well, _ = layout.get_well_and_rack(ZoneWell2LayoutWell(self.Source_Zone, self.Source_Well))
         well.volume -= float(self.Volume)
 
     def estimated_time(self) -> float:
