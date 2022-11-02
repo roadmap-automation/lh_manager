@@ -1,8 +1,8 @@
-from dataclasses import dataclass, asdict, fields
+from dataclasses import InitVar, dataclass, asdict, fields
 from enum import EnumMeta
 from typing import Literal
-from bedlayout import LHBedLayout
-from layoutmap import Zone, ZoneWell2LayoutWell
+from bedlayout import Well, LHBedLayout
+from layoutmap import LayoutWell2ZoneWell, Zone, ZoneWell2LayoutWell
 import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -13,8 +13,24 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 @dataclass
 class BaseMethod:
     """Base class for LH methods"""
-    SAMPLENAME: str
-    SAMPLEDESCRIPTION: str
+
+    sample_name: InitVar[str]
+    sample_description: InitVar[str]
+    #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
+
+    @dataclass
+    class lh_method:
+        """Base class for representation in Trilution LH sample lists"""
+        SAMPLENAME: str
+        SAMPLEDESCRIPTION: str
+        METHODNAME: str
+
+    def __post_init__(self, sample_name, sample_description):
+        """Used to create self.method from instantiating parent class
+        
+            self.method_name must be defined in parent class with the exact name of the Trilution method"""
+
+        # self.method = self.lh_method(sample_name, sample_description, self.method_name)
 
     def execute(self, layout: LHBedLayout) -> None:
         """Actions to be taken upon executing method. Default is nothing changes"""
@@ -27,80 +43,132 @@ class BaseMethod:
 @dataclass
 class TransferWithRinse(BaseMethod):
     """Transfer with rinse"""
-    Source_Zone: Zone
-    Source_Well: str
-    Volume: str
-    Flow_Rate: str
-    Target_Zone: Zone
-    Target_Well: str
-    METHODNAME: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
+
+    Source: Well
+    Target: Well
+    Volume: float
+    Flow_Rate: float
+    display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
+    method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
+
+    @dataclass
+    class lh_method(BaseMethod.lh_method):
+        Source_Zone: Zone
+        Source_Well: str
+        Volume: str
+        Flow_Rate: str
+        Target_Zone: Zone
+        Target_Well: str
+
+    def __post_init__(self, sample_name: str, sample_description: str) -> None:
+
+        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
+        self.method = self.lh_method(sample_name, sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Flow_Rate}', target_zone, target_well)
 
     def execute(self, layout: LHBedLayout) -> None:
-        source_well, _ = layout.get_well_and_rack(*ZoneWell2LayoutWell(self.Source_Zone, self.Source_Well))
-        target_well, target_rack = layout.get_well_and_rack(*ZoneWell2LayoutWell(self.Target_Zone, self.Target_Well))
+        # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
+        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        target_well, target_rack = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
         
         # TODO: real error reporting
-        assert source_well.volume > self.Volume, f"{self.Source_Well} in {self.Source_Zone} rack contains {source_well.volume} but needs {self.Volume}"
-        source_well.volume -= float(self.Volume)
+        assert source_well.volume > self.Volume, f"{source_well.well_number} in {source_well.rack_id} rack contains {source_well.volume} but needs {self.Volume}"
+        source_well.volume -= self.Volume
 
-        assert (target_well.volume + float(self.Volume)) < target_rack.max_volume, f"{self.Source_Well} in {self.Source_Zone} rack contains {source_well.volume} but needs {self.Volume}"
+        assert (target_well.volume + self.Volume) < target_rack.max_volume, f"{source_well.well_number} in {source_well.rack_id} rack contains {source_well.volume} but needs {self.Volume}"
 
         # Perform mix. Note that target_well volume is also changed by this operation
-        target_well.mix_with(float(self.Volume), source_well.composition)
+        target_well.mix_with(self.Volume, source_well.composition)
 
     def estimated_time(self) -> float:
-        return float(self.Volume) / float(self.Flow_Rate)
+        return self.Volume / self.Flow_Rate
 
 @dataclass
 class MixWithRinse(BaseMethod):
     """Inject with rinse"""
-    Target_Zone: Zone
-    Target_Well: str
-    Volume: str
-    Flow_Rate: str
-    Number_of_Mixes: str
-    METHODNAME: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
+    Target: Well
+    Volume: float
+    Flow_Rate: float
+    Number_of_Mixes: int
+    display_name: Literal['Mix With Rinse'] = 'Mix With Rinse'
+    method_name: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
+
+    @dataclass
+    class lh_method(BaseMethod.lh_method):
+        Volume: str
+        Flow_Rate: str
+        Number_of_Mixes: str
+        Target_Zone: Zone
+        Target_Well: str
+
+    def __post_init__(self, sample_name: str, sample_description: str) -> None:
+
+        target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
+        self.method = self.lh_method(sample_name, sample_description, self.method_name, f'{self.Volume}', f'{self.Flow_Rate}', f'{self.Number_of_Mixes}', target_zone, target_well)
 
     def estimated_time(self) -> float:
-        return 2 * float(self.Number_of_Mixes) * float(self.Volume) / float(self.Flow_Rate)
+        return 2 * self.Number_of_Mixes * self.Volume / self.Flow_Rate
 
 @dataclass
 class InjectWithRinse(BaseMethod):
     """Inject with rinse"""
-    Source_Zone: Zone
-    Source_Well: str
-    Volume: str
-    Aspirate_Flow_Rate: str
-    Flow_Rate: str
-    METHODNAME: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
+    Source: Well
+    Volume: float
+    Aspirate_Flow_Rate: float
+    Flow_Rate: float
+    display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'
+    method_name: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
+
+    @dataclass
+    class lh_method(BaseMethod.lh_method):
+        Source_Zone: Zone
+        Source_Well: str
+        Volume: str
+        Aspirate_Flow_Rate: str
+        Flow_Rate: str
+
+    def __post_init__(self, sample_name: str, sample_description: str):
+
+        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        self.method = self.lh_method(sample_name, sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Aspirate_Flow_Rate}', f'{self.Flow_Rate}')
 
     def execute(self, layout: LHBedLayout) -> None:
-        well, _ = layout.get_well_and_rack(*ZoneWell2LayoutWell(self.Source_Zone, self.Source_Well))
-        well.volume -= float(self.Volume)
+        # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
+        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        source_well.volume -= self.Volume
 
     def estimated_time(self) -> float:
-        return float(self.Volume) / float(self.Aspirate_Flow_Rate) + float(self.Volume) / float(self.Flow_Rate)
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
 
 @dataclass
 class Sleep(BaseMethod):
     """Sleep"""
     Time: str
-    METHODNAME: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
+    display_name: Literal['Sleep'] = 'Sleep'
+    method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
+
+    @dataclass
+    class lh_method(BaseMethod.lh_method):
+        Time: str
+
+    def __post_init__(self, sample_name: str, sample_description: str):
+
+        self.method = self.lh_method(sample_name, sample_description, self.method_name, f'{self.Time}')
 
     def estimated_time(self) -> float:
         return float(self.Time)
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
-lh_methods = {v.METHODNAME: v for v in method_list}
+lh_methods = {v.method_name: v.lh_method for v in method_list}
 lh_method_fields = {'enums': {'Zone': [v for v in Zone]}, 'methods': {}}
 for method in method_list:
     fieldlist = []
-    for fi in fields(method):
+    for fi in fields(method.lh_method):
         if fi.name != 'METHODNAME':
             fieldlist.append(fi.name)
         else:
-            key = fi.default
+            key = method.method_name
     lh_method_fields['methods'][key] = fieldlist    
 
 # =============== Sample list handling =================
@@ -149,7 +217,7 @@ class Sample:
 
         current_time = datetime.datetime.now().strftime(DATE_FORMAT)
         self.createdDate = current_time if self.createdDate is None else self.createdDate
-        expose_methods = None if entry else self.methods
+        expose_methods = None if entry else [m.method for m in self.methods]
         return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, current_time, current_time, expose_methods))
 
 class SampleContainer:

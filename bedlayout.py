@@ -71,7 +71,7 @@ class Well:
     rack_id: str
     well_number: int
     composition: Composition
-    volume: float = None
+    volume: float
 
     def mix_with(self, volume: float, composition: Composition) -> None:
         """Update volume and composition from mixing with new solution"""
@@ -106,11 +106,20 @@ class LHBedLayout:
     racks: dict[str, Rack] = field(default_factory=dict)
 
     def add_rack_from_dict(self, name, d: dict):
-
+        """ Add a rack from dictionary definition (i.e. config file)"""
         if 'wells' not in d.keys():
             d['wells'] = []
 
         self.racks[name] = Rack(**d)
+
+    def add_well_to_rack(self, rack_id: str, well: Well) -> None:
+        """Add a well to a rack in this layout"""
+
+        # associate well with rack
+        well.rack_id = rack_id
+
+        # add well to appropriate rack
+        self.racks[rack_id].wells.append(well)
 
     def get_well_and_rack(self, rack_id: str, well_number: int) -> Tuple[Well, Rack]:
         """Get well using the GUI (rack, well) specification"""
