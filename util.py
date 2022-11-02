@@ -1,5 +1,4 @@
 """Utilities for web server"""
-from typing import Any, obj
 
 def reinstantiate(obj, target_class):
     """Used in dataclass.__post_init__ to reinstantiate nested dataclasses"""
