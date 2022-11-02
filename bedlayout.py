@@ -112,7 +112,7 @@ class Rack:
 
     def __post_init__(self):
 
-        wells = reinstantiate_list(wells, Well)
+        self.wells = reinstantiate_list(self.wells, Well)
 
 @dataclass
 class LHBedLayout:
