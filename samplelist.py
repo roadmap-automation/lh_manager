@@ -1,9 +1,11 @@
-from dataclasses import InitVar, dataclass, asdict, fields
+from dataclasses import InitVar, dataclass, asdict, fields, field
 from enum import EnumMeta
 from typing import Literal
 from bedlayout import Well, LHBedLayout
 from layoutmap import LayoutWell2ZoneWell, Zone, ZoneWell2LayoutWell
 import datetime
+
+from util import reinstantiate_list
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
@@ -160,7 +162,7 @@ class Sleep(BaseMethod):
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
-lh_methods = {v.method_name: v.lh_method for v in method_list}
+lh_methods = {v.method_name: v for v in method_list}
 lh_method_fields = {'enums': {'Zone': [v for v in Zone]}, 'methods': {}}
 for method in method_list:
     fieldlist = []
@@ -191,18 +193,25 @@ class SampleList:
     endDate: str
     columns: list[dict]
 
+@dataclass
 class Sample:
     """Class representing a sample to be created by Gilson LH"""
+    id: int
+    name: str
+    description: str
+    methods: list = field(default_factory=list)
+    methods_complete: list = field(default_factory=list)
+    createdDate: str | None = None
+    status: SampleStatus = SampleStatus.PENDING
 
-    def __init__(self, id: int, name: str, description: str, methods: list = []) -> None:
-        self.id = id
-        self.name = name
-        self.description = description
-        self.methods = methods
-        self.methods_complete = [False] * len(methods)
-        self.createdDate = None
-        self.status = SampleStatus.PENDING
+    def __post_init__(self):
 
+        for i, method in enumerate(self.methods):
+            if isinstance(method, dict):
+                method['sample_name'] = self.name
+                method['sample_description'] = self.description
+                self.methods[i] = lh_methods[method['method_name']](**method)
+            
     def addMethod(self, method) -> None:
         """Adds new method and flag for completion"""
         self.methods.append(method)
