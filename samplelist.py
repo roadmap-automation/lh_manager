@@ -229,26 +229,40 @@ class Sample:
         expose_methods = None if entry else [m.method for m in self.methods]
         return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, current_time, current_time, expose_methods))
 
+@dataclass
 class SampleContainer:
     """Specialized sample dictionary allowing convenient referencing by sample ID or sample name"""
 
-    def __init__(self) -> None:
-        # lists of sample IDs and sample names (can be expanded to other values as well)
-        self.index = {'id': [], 'name': []}
+    samples: list[Sample] = field(default_factory=list)
 
-        # list of sample objects
-        self.samples: list[Sample] = []
+    def __post_init__(self) -> None:
 
-    def getSample(self, key: str, value: str, status: SampleStatus = None) -> Sample:
-        # TODO: add error handler
-        assert key in self.index.keys(), "Wrong index reference!"
-        try:
-            sample = self.samples[self.index[key].index(value)]
+        self.samples = reinstantiate_list(self.samples, Sample)
+
+    def _getIDs(self) -> list[int]:
+
+        return [s.id for s in self.samples]
+
+    def _getNames(self) -> list[int]:
+
+        return [s.name for s in self.samples]
+
+    def getSamplebyID(self, id: int, status: SampleStatus = None) -> Sample:
+        """Return sample with specific id"""
+        ids = self._getIDs()
+        if id in ids:
+            sample = self.samples[ids.index[id]]
             return sample if (sample.status == status) | (status is None) else None
-        except ValueError:
-            # if sample not found
-            print('Warning: ValueError raised; sample not found')
-            return None
+        else:
+            raise ValueError(f"Sample ID {id} not found!")
+
+    def getSamplebyName(self, name: str, status: SampleStatus = None) -> Sample:
+        names = self._getNames()
+        if name in names:
+            sample = self.samples[names.index[name]]
+            return sample if (sample.status == status) | (status is None) else None
+        else:
+            raise ValueError(f"Sample name {name} not found!")
 
     def addSample(self, sample: Sample) -> None:
         """Special appender that also updates index object"""

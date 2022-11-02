@@ -35,7 +35,7 @@ class GetListofSampleLists(Resource):
 
 class GetSampleList(Resource):
     def get(self, sample_list_id):
-        return {'sampleList': samples.getSample('id', sample_list_id, status=SampleStatus.ACTIVE).toSampleList()}, 200
+        return {'sampleList': samples.getSamplebyID(sample_list_id, status=SampleStatus.ACTIVE).toSampleList()}, 200
 
 class PutSampleListValidation(Resource):
     def post(self, sample_list_id):
@@ -54,7 +54,7 @@ class PutSampleData(Resource):
         data = request.get_json(force=True)
 
         # Get ID, method number, and method name from returned data
-        sample_id = data['sampleData']['runData'][0]['sampleListID']
+        sample_id = int(data['sampleData']['runData'][0]['sampleListID'])
         method_number = int(data['sampleData']['runData'][0]['iteration']) - 1
         method_name = data['sampleData']['runData'][0]['methodName']
 
@@ -66,7 +66,7 @@ class PutSampleData(Resource):
         
         if successful:
             # find relevant sample by ID
-            sample = samples.getSample('id', sample_id)
+            sample = samples.getSamplebyID(sample_id)
 
             # double check that correct method is being referenced
             assert method_name == sample.methods[method_number].METHODNAME, f'Wrong method name {method_name} in result, expected {sample.methods[method_number].METHODNAME}, full output ' + data
@@ -104,7 +104,7 @@ class RunSample(Resource):
     """Runs a sample """
     # TODO: Use POST to change status; might be useful for pausing, stopping; as coded this is best as a PUT
     def get(self, sample_name):
-        sample = samples.getSample('name', sample_name)
+        sample = samples.getSamplebyName(sample_name)
         if sample is not None:
             sample.status = SampleStatus.ACTIVE
             return {}, 200
