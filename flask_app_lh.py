@@ -59,12 +59,7 @@ class PutSampleData(Resource):
         method_name = data['sampleData']['runData'][0]['methodName']
 
         # check that run was successful
-        successful = False
-        for notification in data['sampleData']['resultNotifications']['notifications'].values():
-            if "completed successfully" in notification:
-                successful = True
-        
-        if successful:
+        if any([('completed successfully' in notification) for notification in data['sampleData']['resultNotifications']['notifications'].values()]):
             # find relevant sample by ID
             sample = samples.getSamplebyID(sample_id)
 
@@ -90,7 +85,7 @@ class AddSample(Resource):
     def post(self):
         data = request.get_json(force=True)
         new_method = lh_methods[data['METHODNAME']](**data)
-        new_sample = Sample(id=f'{samples.getMaxIndex("id") + 1}', name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
+        new_sample = Sample(id=samples.getMaxID() + 1, name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
         samples.addSample(new_sample)
 
         # dry run (testing only)

@@ -265,24 +265,22 @@ class SampleContainer:
             raise ValueError(f"Sample name {name} not found!")
 
     def addSample(self, sample: Sample) -> None:
-        """Special appender that also updates index object"""
+        """Sample appender that checks for proper ID value"""
+        if sample.id in self._getIDs():
+            new_id = self.getMaxID() + 1
+            print(f'Warning: id {sample.id} already taken. Changing to id {new_id}')
+            sample.id = new_id
         self.samples.append(sample)
-        for key in self.index.keys():
-            self.index[key].append(getattr(sample, key))
-
+        
     def deleteSample(self, sample: Sample) -> None:
-        """Special remover that also updates index object
-            
-            Can use, e.g. deleteSample(getSample('id', 1))"""
-        idx = self.samples.index(sample)
-        self.samples.pop(idx)
-        for key in self.index.keys():
-            self.index[key].pop(idx)
+        """Special remover that also updates index object"""
+        
+        self.samples.pop(self.samples.index(sample))
 
-    def getMaxIndex(self, key: str) -> int:
+    def getMaxID(self) -> int:
         """ Returns maximum index value for desired index"""
 
-        return max([int(idx) for idx in self.index[key]])
+        return max([self._getIDs])
 
 def moveSample(container1: SampleContainer, container2: SampleContainer, key: str, value) -> None:
     """Utility for moving a sample from one SampleContainer to another
