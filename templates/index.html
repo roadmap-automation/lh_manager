@@ -47,6 +47,11 @@
             }
         }
 
+        function clear_form() {
+            form_counter = 0
+            $("#subforms").empty()
+        }
+
         function send_sample() {
             var data = {}
             data['id'] = 0
@@ -131,5 +136,6 @@
         <div id="subforms"></div>
         <hr>
         <button id="send_sample" onclick="send_sample()">Send Sample</button>
+        <button id="clear_form" onclick="clear_form()">Clear Form</button>
     </div>
 </body>
