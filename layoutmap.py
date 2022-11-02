@@ -25,7 +25,7 @@ zone2rack = {Zone.SOLVENT: 'Solvent',
              Zone.MIX: 'Mix',
              Zone.INJECT: 'Inject'}
 
-rack2zone = {(v, k) for k, v in zone2rack.items()}
+rack2zone = {v: k for k, v in zone2rack.items()}
 
 def ZoneWell2LayoutWell(zone: Zone, well_number: str) -> Tuple[str, int]:
     """Translates Trilution (zone, well) specification to the GUI (rack, well) specification"""

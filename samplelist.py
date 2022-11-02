@@ -2,10 +2,10 @@ from dataclasses import InitVar, dataclass, asdict, fields, field
 from enum import EnumMeta
 from typing import Literal
 from bedlayout import Well, LHBedLayout
-from layoutmap import LayoutWell2ZoneWell, Zone, ZoneWell2LayoutWell
+from layoutmap import LayoutWell2ZoneWell, Zone
 import datetime
 
-from util import reinstantiate_list
+from util import reinstantiate, reinstantiate_list
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
@@ -64,6 +64,11 @@ class TransferWithRinse(BaseMethod):
 
     def __post_init__(self, sample_name: str, sample_description: str) -> None:
 
+        self.Source = reinstantiate(self.Source, Well)
+        self.Target = reinstantiate(self.Target, Well)
+        self.Volume = float(self.Volume)
+        self.Flow_Rate = float(self.Flow_Rate)
+
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
         self.method = self.lh_method(sample_name, sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Flow_Rate}', target_zone, target_well)
@@ -105,6 +110,11 @@ class MixWithRinse(BaseMethod):
 
     def __post_init__(self, sample_name: str, sample_description: str) -> None:
 
+        self.Target = reinstantiate(self.Target, Well)
+        self.Volume = float(self.Volume)
+        self.Flow_Rate = float(self.Flow_Rate)
+        self.Number_of_Mixes = int(self.Number_of_Mixes)
+
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
         self.method = self.lh_method(sample_name, sample_description, self.method_name, f'{self.Volume}', f'{self.Flow_Rate}', f'{self.Number_of_Mixes}', target_zone, target_well)
 
@@ -130,6 +140,11 @@ class InjectWithRinse(BaseMethod):
         Flow_Rate: str
 
     def __post_init__(self, sample_name: str, sample_description: str):
+
+        self.Source = reinstantiate(self.Source, Well)
+        self.Volume = float(self.Volume)
+        self.Aspirate_Flow_Rate = float(self.Aspirate_Flow_Rate)
+        self.Flow_Rate = float(self.Flow_Rate)
 
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         self.method = self.lh_method(sample_name, sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Aspirate_Flow_Rate}', f'{self.Flow_Rate}')
@@ -163,15 +178,15 @@ class Sleep(BaseMethod):
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
 lh_methods = {v.method_name: v for v in method_list}
-lh_method_fields = {'enums': {'Zone': [v for v in Zone]}, 'methods': {}}
+lh_method_fields = {}
 for method in method_list:
     fieldlist = []
-    for fi in fields(method.lh_method):
-        if fi.name != 'METHODNAME':
+    for fi in fields(method):
+        if (fi.name != 'method_name') & (fi.name != 'display_name'):
             fieldlist.append(fi.name)
         else:
             key = method.method_name
-    lh_method_fields['methods'][key] = fieldlist    
+    lh_method_fields[key] = {'fields': fieldlist, 'display_name': method.display_name}
 
 # =============== Sample list handling =================
 
@@ -211,6 +226,9 @@ class Sample:
                 method['sample_name'] = self.name
                 method['sample_description'] = self.description
                 self.methods[i] = lh_methods[method['method_name']](**method)
+
+        if len(self.methods) > len(self.methods_complete):
+            self.methods_complete = [False] * len(self.methods)
             
     def addMethod(self, method) -> None:
         """Adds new method and flag for completion"""
@@ -251,7 +269,7 @@ class SampleContainer:
         """Return sample with specific id"""
         ids = self._getIDs()
         if id in ids:
-            sample = self.samples[ids.index[id]]
+            sample = self.samples[ids.index(id)]
             return sample if (sample.status == status) | (status is None) else None
         else:
             raise ValueError(f"Sample ID {id} not found!")
@@ -259,7 +277,7 @@ class SampleContainer:
     def getSamplebyName(self, name: str, status: SampleStatus = None) -> Sample:
         names = self._getNames()
         if name in names:
-            sample = self.samples[names.index[name]]
+            sample = self.samples[names.index(name)]
             return sample if (sample.status == status) | (status is None) else None
         else:
             raise ValueError(f"Sample name {name} not found!")
@@ -280,7 +298,7 @@ class SampleContainer:
     def getMaxID(self) -> int:
         """ Returns maximum index value for desired index"""
 
-        return max([self._getIDs])
+        return max(self._getIDs())
 
 def moveSample(container1: SampleContainer, container2: SampleContainer, key: str, value) -> None:
     """Utility for moving a sample from one SampleContainer to another
@@ -295,7 +313,7 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')
 example_sample_list = []
 for i in range(10):
-    example_sample = Sample(f'{i}', f'testsample{i}', 'test sample description', methods=[])
+    example_sample = Sample(i, f'testsample{i}', 'test sample description', methods=[])
     example_sample.addMethod(example_method)
     example_sample.addMethod(example_method)
     example_sample_list.append(example_sample)

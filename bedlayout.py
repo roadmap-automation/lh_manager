@@ -81,6 +81,8 @@ class Well:
 
     def __post_init__(self):
 
+        self.well_number = int(self.well_number)
+        self.volume = float(self.volume)
         self.composition = reinstantiate(self.composition, Composition)
 
     def mix_with(self, volume: float, composition: Composition) -> None:
@@ -112,6 +114,9 @@ class Rack:
 
     def __post_init__(self):
 
+        self.columns = int(self.columns)
+        self.rows = int(self.rows)
+        self.max_volume = float(self.max_volume)
         self.wells = reinstantiate_list(self.wells, Well)
 
 @dataclass
@@ -142,4 +147,21 @@ class LHBedLayout:
 
     def get_well_and_rack(self, rack_id: str, well_number: int) -> Tuple[Well, Rack]:
         """Get well using the GUI (rack, well) specification"""
-        return self.racks[rack_id][well_number], self.racks[rack_id]
+        rack = self.racks[rack_id]
+        well_numbers = [well.well_number for well in rack.wells]
+        return rack.wells[well_numbers.index(well_number)], rack
+
+d2o = Solvent('D2O', 1.0)
+kcl0 = Solute('KCl', 0.1)
+kcl1 = Solute('KCl', 1.0)
+h2o = Solvent('H2O', 1.0)
+
+dbuffer = Composition([d2o], [kcl0])
+hbuffer = Composition([h2o], [kcl1])
+empty = Composition([], [])
+
+example_wells = [Well('Stock', 1, dbuffer, 8.0),
+                 Well('Stock', 2, hbuffer, 8.0),
+                 Well('Mix', 1, empty, 0.0)]
+
+

@@ -3,7 +3,7 @@ from flask import Flask, render_template, request
 from flask_restful import Resource, Api
 from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
 from layoutmap import racks
-from bedlayout import LHBedLayout
+from bedlayout import LHBedLayout, example_wells
 from dataclasses import asdict
 from copy import copy, deepcopy
 
@@ -25,6 +25,9 @@ layout = LHBedLayout(racks={})
 for name, rack in racks.items():
     layout.add_rack_from_dict(name, rack)
 
+for well in example_wells:
+    layout.add_well_to_rack(well.rack_id, well)
+
 class GetListofSampleLists(Resource):
     def get(self):
         sample_list = [sample.toSampleList(entry=True) for sample in samples.samples if sample.status==SampleStatus.ACTIVE]
@@ -35,7 +38,7 @@ class GetListofSampleLists(Resource):
 
 class GetSampleList(Resource):
     def get(self, sample_list_id):
-        return {'sampleList': samples.getSamplebyID(sample_list_id, status=SampleStatus.ACTIVE).toSampleList()}, 200
+        return {'sampleList': samples.getSamplebyID(int(sample_list_id), status=SampleStatus.ACTIVE).toSampleList()}, 200
 
 class PutSampleListValidation(Resource):
     def post(self, sample_list_id):
@@ -64,7 +67,7 @@ class PutSampleData(Resource):
             sample = samples.getSamplebyID(sample_id)
 
             # double check that correct method is being referenced
-            assert method_name == sample.methods[method_number].METHODNAME, f'Wrong method name {method_name} in result, expected {sample.methods[method_number].METHODNAME}, full output ' + data
+            assert method_name == sample.methods[method_number].method_name, f'Wrong method name {method_name} in result, expected {sample.methods[method_number].method_name}, full output ' + data
 
             # mark method complete
             sample.methods_complete[method_number] = True
@@ -84,8 +87,9 @@ class AddSample(Resource):
     """Adds a single-method sample to the sample list (testing only)"""
     def post(self):
         data = request.get_json(force=True)
-        new_method = lh_methods[data['METHODNAME']](**data)
-        new_sample = Sample(id=samples.getMaxID() + 1, name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
+        #new_sample = Sample(id=samples.getMaxID() + 1, name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
+        new_sample = Sample(**data)
+        print(asdict(new_sample))
         samples.addSample(new_sample)
 
         # dry run (testing only)
@@ -110,15 +114,13 @@ class GetSamples(Resource):
     """Gets list of sample names, IDs, and status"""
     def get(self):
 
-        sample_list = []
-        for sample in samples.samples:
-            sample_list.append(dict({
-                'id': sample.id,
-                'name': sample.name,
-                'status': sample.status
-            }))
-        
-        return {'samples': sample_list}, 200
+        return {'methods': lh_method_fields, 'samples': asdict(samples)}, 200
+
+class GetLayout(Resource):
+    """Gets list of sample names, IDs, and status"""
+    def get(self):
+
+        return {'layout': asdict(layout)}, 200
 
 # LH URIs
 api.add_resource(GetListofSampleLists, '/LH/GetListofSampleLists')
@@ -128,15 +130,11 @@ api.add_resource(PutSampleListValidation, '/LH/PutSampleListValidation/<sample_l
 
 # Should these be LH endpoints, or NICE endpoints, or general API?
 api.add_resource(RunSample, '/test/RunSample/<sample_name>')
-api.add_resource(GetSamples, '/test/GetSamples/')
 api.add_resource(AddSample, '/test/AddSample')
 
-class GetLHMethods(Resource):
-    def get(self):
-        return lh_method_fields, 200
-
 # GUI URIs
-api.add_resource(GetLHMethods, '/GUI/GetLHMethods/')
+api.add_resource(GetSamples, '/GUI/GetSamples/')
+api.add_resource(GetLayout, '/GUI/GetLayout/')
 
 @app.route('/')
 def root():
