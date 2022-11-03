@@ -5,6 +5,7 @@
         methoddata = {}
         wells = {}
         var form_counter = 0
+        var sample_counter = 0
 
         function add_form() {
             //var key = $("#method_select").options[$("#method_select").selectedIndex]
@@ -54,7 +55,8 @@
 
         function send_sample() {
             var data = {}
-            data['id'] = 0
+            data['id'] = sample_counter
+            sample_counter += 1
             data['name'] = $('#sample_name').val()
             data['description'] = $('#sample_description').val()
 
@@ -64,6 +66,8 @@
                 var formtag = '#form' + i
                 var key = $(formtag).attr('tag')
                 subdata['method_name'] = key
+                subdata['sample_name'] = data['name']
+                subdata['sample_description'] = data['description']
                 $('*[tag=form' + i + '_element]').each(function() {
                     if (this.value.includes('Well:')) {
                         subdata[this.name] = wells[this.value]
@@ -76,6 +80,7 @@
             }
     
             data['methods'] = methods
+            data['methods_complete'] = Array(methods.length).fill(false)
             console.log(data)
             
             fetch('/test/AddSample', {
@@ -100,7 +105,14 @@
                 }).then(function (data) {
                     //console.log(data['methods'])
                     //console.log(Object.keys(data['methods']))
-                    
+                    var ids = Array()
+                    for (const s of data['samples']['samples']) {
+                        ids.push(parseInt(s.id))
+                    }
+                    sample_counter = ids.reduce((a, b) => Math.max(a, b), -Infinity); // get max of ids array
+                    sample_counter += 1
+                    console.log(ids)
+                    console.log(sample_counter)
                     for (const k of Object.keys(data['methods'])) {
                         //console.log(data['methods'][k])
                         $('<option>').text(data['methods'][k]['display_name']).attr({
