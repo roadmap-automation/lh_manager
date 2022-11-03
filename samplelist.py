@@ -1,11 +1,10 @@
-from dataclasses import InitVar, dataclass, asdict, fields, field
-from enum import EnumMeta
-from typing import Literal
+from dataclasses import InitVar, asdict, fields, field
+from pydantic.dataclasses import dataclass
+from enum import Enum
+from typing import Literal, Union
 from bedlayout import Well, LHBedLayout
 from layoutmap import LayoutWell2ZoneWell, Zone
 import datetime
-
-from util import reinstantiate, reinstantiate_list
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
@@ -28,11 +27,10 @@ class BaseMethod:
         METHODNAME: str
 
     def __post_init__(self, sample_name, sample_description):
-        """Used to create self.method from instantiating parent class
+        """Used to store sample_name and sample_description"""
         
-            self.method_name must be defined in parent class with the exact name of the Trilution method"""
-
-        # self.method = self.lh_method(sample_name, sample_description, self.method_name)
+        self.sample_name = sample_name  # type: ignore
+        self.sample_description = sample_description  # type: ignore
 
     def execute(self, layout: LHBedLayout) -> None:
         """Actions to be taken upon executing method. Default is nothing changes"""
@@ -62,16 +60,11 @@ class TransferWithRinse(BaseMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def __post_init__(self, sample_name: str, sample_description: str) -> None:
-
-        self.Source = reinstantiate(self.Source, Well)
-        self.Target = reinstantiate(self.Target, Well)
-        self.Volume = float(self.Volume)
-        self.Flow_Rate = float(self.Flow_Rate)
+    def render_lh_method(self) -> BaseMethod.lh_method:
 
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        self.method = self.lh_method(sample_name, sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Flow_Rate}', target_zone, target_well)
+        return self.lh_method(self.sample_name, self.sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Flow_Rate}', target_zone, target_well)
 
     def execute(self, layout: LHBedLayout) -> None:
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
@@ -108,15 +101,10 @@ class MixWithRinse(BaseMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def __post_init__(self, sample_name: str, sample_description: str) -> None:
-
-        self.Target = reinstantiate(self.Target, Well)
-        self.Volume = float(self.Volume)
-        self.Flow_Rate = float(self.Flow_Rate)
-        self.Number_of_Mixes = int(self.Number_of_Mixes)
+    def render_lh_method(self) -> BaseMethod.lh_method:
 
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        self.method = self.lh_method(sample_name, sample_description, self.method_name, f'{self.Volume}', f'{self.Flow_Rate}', f'{self.Number_of_Mixes}', target_zone, target_well)
+        return self.lh_method(self.sample_name, self.sample_description, self.method_name, f'{self.Volume}', f'{self.Flow_Rate}', f'{self.Number_of_Mixes}', target_zone, target_well)
 
     def estimated_time(self) -> float:
         return 2 * self.Number_of_Mixes * self.Volume / self.Flow_Rate
@@ -139,15 +127,10 @@ class InjectWithRinse(BaseMethod):
         Aspirate_Flow_Rate: str
         Flow_Rate: str
 
-    def __post_init__(self, sample_name: str, sample_description: str):
-
-        self.Source = reinstantiate(self.Source, Well)
-        self.Volume = float(self.Volume)
-        self.Aspirate_Flow_Rate = float(self.Aspirate_Flow_Rate)
-        self.Flow_Rate = float(self.Flow_Rate)
+    def render_lh_method(self) -> BaseMethod.lh_method:
 
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
-        self.method = self.lh_method(sample_name, sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Aspirate_Flow_Rate}', f'{self.Flow_Rate}')
+        return self.lh_method(self.sample_name, self.sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Aspirate_Flow_Rate}', f'{self.Flow_Rate}')
 
     def execute(self, layout: LHBedLayout) -> None:
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
@@ -168,9 +151,9 @@ class Sleep(BaseMethod):
     class lh_method(BaseMethod.lh_method):
         Time: str
 
-    def __post_init__(self, sample_name: str, sample_description: str):
+    def render_lh_method(self) -> BaseMethod.lh_method:
 
-        self.method = self.lh_method(sample_name, sample_description, self.method_name, f'{self.Time}')
+        return self.lh_method(self.sample_name, self.sample_description, self.method_name, f'{self.Time}')
 
     def estimated_time(self) -> float:
         return float(self.Time)
@@ -184,13 +167,11 @@ for method in method_list:
     for fi in fields(method):
         if (fi.name != 'method_name') & (fi.name != 'display_name'):
             fieldlist.append(fi.name)
-        else:
-            key = method.method_name
-    lh_method_fields[key] = {'fields': fieldlist, 'display_name': method.display_name}
+    lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name}
 
 # =============== Sample list handling =================
 
-class SampleStatus(EnumMeta):
+class SampleStatus(str, Enum):
     PENDING = 'pending'
     ACTIVE = 'active'
     COMPLETED = 'completed'
@@ -206,7 +187,7 @@ class SampleList:
     createDate: str
     startDate: str
     endDate: str
-    columns: list[dict]
+    columns: list[BaseMethod.lh_method] | None
 
 @dataclass
 class Sample:
@@ -215,7 +196,7 @@ class Sample:
     name: str
     description: str
     methods: list = field(default_factory=list)
-    methods_complete: list = field(default_factory=list)
+    methods_complete: list[bool] = field(default_factory=list)
     createdDate: str | None = None
     status: SampleStatus = SampleStatus.PENDING
 
@@ -223,13 +204,8 @@ class Sample:
 
         for i, method in enumerate(self.methods):
             if isinstance(method, dict):
-                method['sample_name'] = self.name
-                method['sample_description'] = self.description
                 self.methods[i] = lh_methods[method['method_name']](**method)
 
-        if len(self.methods) > len(self.methods_complete):
-            self.methods_complete = [False] * len(self.methods)
-            
     def addMethod(self, method) -> None:
         """Adds new method and flag for completion"""
         self.methods.append(method)
@@ -244,7 +220,7 @@ class Sample:
 
         current_time = datetime.datetime.now().strftime(DATE_FORMAT)
         self.createdDate = current_time if self.createdDate is None else self.createdDate
-        expose_methods = None if entry else [m.method for m in self.methods]
+        expose_methods = None if entry else [m.render_lh_method() for m in self.methods]
         return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, current_time, current_time, expose_methods))
 
 @dataclass
@@ -253,19 +229,15 @@ class SampleContainer:
 
     samples: list[Sample] = field(default_factory=list)
 
-    def __post_init__(self) -> None:
-
-        self.samples = reinstantiate_list(self.samples, Sample)
-
     def _getIDs(self) -> list[int]:
 
         return [s.id for s in self.samples]
 
-    def _getNames(self) -> list[int]:
+    def _getNames(self) -> list[str]:
 
         return [s.name for s in self.samples]
 
-    def getSamplebyID(self, id: int, status: SampleStatus = None) -> Sample:
+    def getSamplebyID(self, id: int, status: SampleStatus | None = None) -> Sample | None:
         """Return sample with specific id"""
         ids = self._getIDs()
         if id in ids:
@@ -274,7 +246,7 @@ class SampleContainer:
         else:
             raise ValueError(f"Sample ID {id} not found!")
 
-    def getSamplebyName(self, name: str, status: SampleStatus = None) -> Sample:
+    def getSamplebyName(self, name: str, status: SampleStatus | None = None) -> Sample | None:
         names = self._getNames()
         if name in names:
             sample = self.samples[names.index(name)]
@@ -310,7 +282,8 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
-example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')
+Sample.__pydantic_model__.update_forward_refs()  # type: ignore
+example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')  # type: ignore
 example_sample_list = []
 for i in range(10):
     example_sample = Sample(i, f'testsample{i}', 'test sample description', methods=[])

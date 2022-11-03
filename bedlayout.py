@@ -1,6 +1,6 @@
 """Class definitions for bed layout, wells, and compositions"""
-from dataclasses import dataclass, field
-from util import reinstantiate, reinstantiate_list
+from dataclasses import field
+from pydantic.dataclasses import dataclass
 from typing import Tuple
 
 @dataclass
@@ -19,11 +19,6 @@ class Composition:
     """Class representing a solution composition"""
     solvents: list[Solvent] = field(default_factory=list)
     solutes: list[Solute] = field(default_factory=list)
-
-    def __post_init__(self):
-
-        self.solvents = reinstantiate_list(self.solvents, Solvent)
-        self.solutes = reinstantiate_list(self.solutes, Solute)
 
     @classmethod
     def from_list(cls, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
@@ -79,12 +74,6 @@ class Well:
     composition: Composition
     volume: float
 
-    def __post_init__(self):
-
-        self.well_number = int(self.well_number)
-        self.volume = float(self.volume)
-        self.composition = reinstantiate(self.composition, Composition)
-
     def mix_with(self, volume: float, composition: Composition) -> None:
         """Update volume and composition from mixing with new solution"""
 
@@ -112,22 +101,10 @@ class Rack:
     wells: list[Well]
     style: str = 'grid' # grid | staggered
 
-    def __post_init__(self):
-
-        self.columns = int(self.columns)
-        self.rows = int(self.rows)
-        self.max_volume = float(self.max_volume)
-        self.wells = reinstantiate_list(self.wells, Well)
-
 @dataclass
 class LHBedLayout:
     """Class representing a general LH bed layout"""
     racks: dict[str, Rack] = field(default_factory=dict)
-
-    def __post_init__(self):
-
-        for (k, v) in self.racks.items():
-            self.racks[k] = reinstantiate(v, Rack)
 
     def add_rack_from_dict(self, name, d: dict):
         """ Add a rack from dictionary definition (i.e. config file)"""

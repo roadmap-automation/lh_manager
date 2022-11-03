@@ -2,7 +2,7 @@ from attr import asdict
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
 #from flask_socketio import SocketIO
-from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
+from samplelist import SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
 from layoutmap import racks
 from bedlayout import LHBedLayout, example_wells
 from dataclasses import asdict
@@ -91,7 +91,6 @@ class AddSample(Resource):
         data = request.get_json(force=True)
         #new_sample = Sample(id=samples.getMaxID() + 1, name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
         new_sample = Sample(**data)
-        print(asdict(new_sample))
         samples.addSample(new_sample)
 
         # dry run (testing only)
