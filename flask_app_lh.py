@@ -1,6 +1,7 @@
 from attr import asdict
 from flask import Flask, render_template, request
 from flask_restful import Resource, Api
+#from flask_socketio import SocketIO
 from samplelist import lh_methods, SampleContainer, SampleStatus, example_sample_list, lh_method_fields, Sample
 from layoutmap import racks
 from bedlayout import LHBedLayout, example_wells
@@ -9,6 +10,7 @@ from copy import copy, deepcopy
 
 app = Flask(__name__)
 api = Api(app)
+#socketio = SocketIO(app)
 
 # ====== Define state variables: samples, layout =========
 
@@ -141,4 +143,5 @@ def root():
     return render_template('index.html')
 
 if __name__ == '__main__':
+    #socketio.run(app, host='127.0.0.1', port=5001, debug=True)
     app.run(host='127.0.0.1', port=5001, debug=True)
