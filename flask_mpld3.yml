@@ -87,6 +87,7 @@ dependencies:
   - priority=2.0.0
   - pthread-stubs=0.4
   - pycparser=2.21
+  - pydantic=1.10.2
   - pyparsing=3.0.9
   - pyqt=5.15.4
   - pyqt5-sip=12.9.0
@@ -110,6 +111,7 @@ dependencies:
   - toml=0.10.2
   - tornado=6.2
   - trio=0.21.0
+  - typing-extensions=4.3.0
   - typing_extensions=4.3.0
   - tzdata=2022b
   - ucrt=10.0.20348.0
