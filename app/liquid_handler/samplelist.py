@@ -2,8 +2,8 @@ from dataclasses import InitVar, asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
 from typing import Literal, Union
-from bedlayout import Well, LHBedLayout
-from layoutmap import LayoutWell2ZoneWell, Zone
+from .bedlayout import Well, LHBedLayout
+from .layoutmap import LayoutWell2ZoneWell, Zone
 import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
