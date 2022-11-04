@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-from gui_api import gui_blueprint, events
+from gui_api import gui_blueprint
 from lh_api import lh_blueprint
 from sio import socketio
 
@@ -16,7 +16,6 @@ def root():
 @app.route('/test_emit/')
 def test_emit():
     return render_template('test_emit.html')
-
 
 if __name__ == '__main__':
     socketio.run(app, host='127.0.0.1', port=5001, debug=True)
