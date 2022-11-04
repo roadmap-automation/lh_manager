@@ -1,13 +1,11 @@
 from flask import Flask, render_template
 from gui_api import gui_blueprint
 from lh_api import lh_blueprint
-from state import state_blueprint
 
 app = Flask(__name__)
 
 app.register_blueprint(gui_blueprint)
 app.register_blueprint(lh_blueprint)
-app.register_blueprint(state_blueprint)
 #socketio = SocketIO(app)
 
 @app.route('/')
