@@ -4,8 +4,10 @@ from state.state import samples, layout
 from liquid_handler.samplelist import Sample, SampleStatus, lh_method_fields
 from dataclasses import asdict
 from copy import deepcopy
+from .events import trigger_layout_update, trigger_samples_update
 
 @gui_blueprint.route('/webform/AddSample/', methods=['POST'])
+@trigger_samples_update
 def AddSample() -> Response:
     """Adds a single-method sample to the sample list (testing only)"""
     data = request.get_json(force=True)
@@ -20,8 +22,9 @@ def AddSample() -> Response:
 
     return make_response({'new sample': new_sample.toSampleList(), 'layout': asdict(test_layout)}, 200)
 
-# Should these be LH endpoints, or NICE endpoints, or general API?
+# TODO: Make NICE endpoint
 @gui_blueprint.route('/test/RunSample/<sample_name>', methods=['GET'])
+@trigger_samples_update
 def RunSample(sample_name) -> Response:
     """Runs a sample """
     # TODO: Use POST to change status; might be useful for pausing, stopping; as coded this is best as a PUT

@@ -1,7 +1,8 @@
 from flask import make_response, Response, request
 from . import lh_blueprint
-from state.state import samples
+from state.state import samples, layout
 from liquid_handler.samplelist import SampleStatus
+from gui_api.events import trigger_samples_update, trigger_layout_update
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:
@@ -27,6 +28,8 @@ def PutSampleListValidation(sample_list_id):
     return make_response({sample_list_id: validation}, 200)
 
 @lh_blueprint.route('/LH/PutSampleData/', methods=['POST'])
+@trigger_samples_update
+@trigger_layout_update
 def PutSampleData():
     data = request.get_json(force=True)
 
@@ -46,8 +49,8 @@ def PutSampleData():
         # mark method complete
         sample.methods_complete[method_number] = True
 
-        # TODO: implement change of layout state as follows:
-        #sample.methods[method_number].execute(layout)
+        # Change layout state:
+        sample.methods[method_number].execute(layout)
 
         # if all methods complete, change status of sample to completed
         if all(sample.methods_complete):
