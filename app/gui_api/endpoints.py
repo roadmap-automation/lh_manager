@@ -1,5 +1,5 @@
 from flask import make_response, request, jsonify, Response
-from gui import gui_blueprint
+from . import gui_blueprint
 from state.state import samples, layout
 from liquid_handler.samplelist import Sample, SampleStatus, lh_method_fields
 from dataclasses import asdict

@@ -1,5 +1,5 @@
 from flask import make_response, Response, request
-from lh_api import lh_blueprint
+from . import lh_blueprint
 from state.state import samples
 from liquid_handler.samplelist import SampleStatus
 

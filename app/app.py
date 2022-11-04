@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-from gui import gui_blueprint
+from gui_api import gui_blueprint
 from lh_api import lh_blueprint
 from state import state_blueprint
 
