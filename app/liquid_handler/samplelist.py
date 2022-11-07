@@ -218,10 +218,9 @@ class Sample:
                     if a full sample list, expose all methods 
         """
 
-        current_time = datetime.datetime.now().strftime(DATE_FORMAT)
-        self.createdDate = current_time if self.createdDate is None else self.createdDate
+        self.createdDate = datetime.datetime.now().strftime(DATE_FORMAT) if self.createdDate is None else self.createdDate
         expose_methods = None if entry else [m.render_lh_method() for m in self.methods]
-        return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, current_time, current_time, expose_methods))
+        return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, self.createdDate, self.createdDate, expose_methods))
 
 @dataclass
 class SampleContainer:
