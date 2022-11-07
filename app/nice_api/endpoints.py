@@ -63,7 +63,7 @@ def GetSampleMetaData(sample_name) -> Response:
     else:
         return make_response({'result': 'error', 'message': 'sample not found'}, 404)
 
-@nice_blueprint.route('/NICE/GetSampleStatus/<sample_name>', methods=['GET'])
+@nice_blueprint.route('/NICE/GetSampleTimeEstimate/<sample_name>', methods=['GET'])
 def GetSampleTimeEstimate(sample_name) -> Response:
     """Gets time estimate for a given sample"""
 
