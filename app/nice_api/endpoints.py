@@ -1,6 +1,4 @@
 from flask import make_response, Response, request
-
-from app.liquid_handler.samplelist import Sample
 from . import nice_blueprint
 from state.state import samples
 from liquid_handler.samplelist import SampleStatus, DATE_FORMAT
