@@ -4,7 +4,16 @@ from lh_api import lh_blueprint
 from nice_api import nice_blueprint
 from sio import socketio
 
-app = Flask(__name__)
+import mimetypes
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("text/html", ".html")
+mimetypes.add_type("application/json", ".json")
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/javascript", ".mjs")
+mimetypes.add_type("image/png", ".png")
+mimetypes.add_type("image/svg+xml", ".svg")
+
+app = Flask(__name__, static_folder='static')
 
 app.register_blueprint(gui_blueprint)
 app.register_blueprint(nice_blueprint)
