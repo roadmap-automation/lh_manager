@@ -2,7 +2,41 @@
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import LiquidHandler from './components/LiquidHandler.vue';
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
+import { io } from 'socket.io-client';
+
+const connected = ref(false);
+const layout = ref(null);
+
+const socket = io('', {
+  // this is mostly here to test what happens on server fail:
+});
+
+socket.on('connect', () => {
+  console.log("connected: ", socket.id);
+  connected.value = true;
+  refreshLayout();
+});
+
+socket.on('disconnect', (payload) => {
+  console.log("disconnected!", payload);
+  connected.value = false;
+})
+
+socket.on('update_samples', () => {
+  console.log("it's time to update samples...");
+  // go fetch from the endpoint...
+})
+
+socket.on('update_layout', () => {
+  console.log("it's time to update the layout...");
+})
+
+async function refreshLayout() {
+  const new_layout = await (await fetch("/GUI/GetLayout")).json();
+  layout.value = new_layout;
+}
+
 </script>
 
 <template>
@@ -16,7 +50,7 @@ import { onMounted } from 'vue';
         </div>
       </div>
     </nav>
-    <LiquidHandler />
+    <LiquidHandler :layout="layout"/>
   </div>
 </template>
 

@@ -7,7 +7,8 @@ import Mixture from './Mixture.vue';
 import Bed from './Bed.vue';
 
 defineProps({
-  msg: String
+  msg: String,
+  layout: Object
 })
 
 const chemical_components = [
@@ -19,10 +20,10 @@ const chemical_components = [
 const mixture_parts = [];
 
 onMounted(() => {
-
+  
 });
 
-const layout = {
+const default_layout = {
   "racks": {
     "MTPlateBottom": {
       "columns": 8,
@@ -172,7 +173,7 @@ function openMixture() {
         </g>
       </svg>
       </div> -->
-      <svg viewBox="0 0 1500 1000" x="0" y="0" preserveAspectRatio="xMinyMin meet" style="width:100%;height:100%;">
+      <svg v-if="layout != null" viewBox="0 0 1500 1000" x="0" y="0" preserveAspectRatio="xMinyMin meet" style="width:100%;height:100%;">
         <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
         <g transform="translate(0,0)">
           <rect class="solvents" width="900" height="200"></rect>
