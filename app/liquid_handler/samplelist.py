@@ -167,7 +167,7 @@ for method in method_list:
     for fi in fields(method):
         if (fi.name != 'method_name') & (fi.name != 'display_name'):
             fieldlist.append(fi.name)
-    lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name}
+    lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name, 'schema': method.__pydantic_model__.schema()}
 
 # =============== Sample list handling =================
 
