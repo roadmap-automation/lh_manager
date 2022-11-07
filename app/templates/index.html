@@ -20,10 +20,10 @@
             $('<hr>').appendTo(newform)
             $('<label>').text(key).appendTo(newform)
             $('<br>').text(key).appendTo(newform)
-            console.log(key)
-            console.log(methoddata)
+            //console.log(key)
+            //console.log(methoddata)
             for (const field of methoddata[method_name]['fields']) {
-                console.log(field)
+                //console.log(field)
                 var lbl = $("<label>").text(field)
                 if (field.includes('Source') | field.includes('Target')) {
                     newsel = $("<select>").attr({
@@ -81,7 +81,7 @@
     
             data['methods'] = methods
             data['methods_complete'] = Array(methods.length).fill(false)
-            console.log(data)
+            //console.log(data)
             
             fetch('/webform/AddSample', {
                 method: 'POST',
@@ -92,10 +92,7 @@
                 })
                 .then(function (response) {
                     return response.json()            
-                }).then(function (return_data) {
-                    console.log(return_data)
-                })
-            
+                })            
         }
 
         window.onload = function() {
@@ -111,8 +108,11 @@
                     }
                     sample_counter = ids.reduce((a, b) => Math.max(a, b), -Infinity); // get max of ids array
                     sample_counter += 1
-                    console.log(ids)
-                    console.log(sample_counter)
+                });
+            fetch('/GUI/GetAllMethods/')
+                .then(function (response) {
+                    return response.json();
+                }).then(function (data) {
                     for (const k of Object.keys(data['methods'])) {
                         //console.log(data['methods'][k])
                         $('<option>').text(data['methods'][k]['display_name']).attr({
@@ -126,16 +126,16 @@
                 .then(function(response) {
                     return response.json();
                 }).then(function(data) {
-                    console.log(data['layout'])
+                    //console.log(data['layout'])
                     for (const [rack_name, rack] of Object.entries(data['layout']['racks'])) {
-                        console.log(rack)
+                        //console.log(rack)
                         for (const well of rack['wells']) {
                             well_id = 'Well: ' + well['rack_id'] + ' ' + well['well_number']
                             wells[well_id] = well
                         }
                     }
                 })
-            console.log(wells)
+            //console.log(wells)
         }
     </script>
 </head>
