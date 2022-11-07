@@ -244,7 +244,8 @@ class SampleContainer:
             sample = self.samples[ids.index(id)]
             return sample if (sample.status == status) | (status is None) else None
         else:
-            raise ValueError(f"Sample ID {id} not found!")
+            return None
+            #raise ValueError(f"Sample ID {id} not found!")
 
     def getSamplebyName(self, name: str, status: SampleStatus | None = None) -> Sample | None:
         names = self._getNames()
@@ -252,7 +253,8 @@ class SampleContainer:
             sample = self.samples[names.index(name)]
             return sample if (sample.status == status) | (status is None) else None
         else:
-            raise ValueError(f"Sample name {name} not found!")
+            return None
+            #raise ValueError(f"Sample name {name} not found!")
 
     def addSample(self, sample: Sample) -> None:
         """Sample appender that checks for proper ID value"""
