@@ -38,5 +38,5 @@ def GetAllMethodSchema() -> Response:
 def GetLayout() -> Response:
     """Gets list of sample names, IDs, and status"""
 
-    return make_response({'layout': asdict(layout)}, 200)
+    return make_response(asdict(layout), 200)
 
