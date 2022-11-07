@@ -22,12 +22,17 @@ def AddSample() -> Response:
 
     return make_response({'new sample': new_sample.toSampleList(), 'layout': asdict(test_layout)}, 200)
 
-# GUI URIs
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:
-    """Gets list of sample names, IDs, and status"""
+    """Gets sample list as dict"""
 
-    return make_response({'methods': lh_method_fields, 'samples': asdict(samples)}, 200)
+    return make_response({'samples': asdict(samples)}, 200)
+
+@gui_blueprint.route('/GUI/GetAllMethods/', methods=['GET'])
+def GetAllMethodSchema() -> Response:
+    """Gets method fields and pydantic schema of all methods"""
+
+    return make_response({'methods': lh_method_fields}, 200)
 
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:
