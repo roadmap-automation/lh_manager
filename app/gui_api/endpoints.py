@@ -31,9 +31,9 @@ def RunSample(sample_name) -> Response:
     sample = samples.getSamplebyName(sample_name)
     if sample is not None:
         sample.status = SampleStatus.ACTIVE
-        return make_response(asdict(sample), 200)
+        return make_response({'result': 'success', 'message': 'success'}, 200)
     else:
-        return make_response({}, 404)
+        return make_response({'result': 'error', 'message': 'sample not found'}, 404)
 
 # GUI URIs
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
