@@ -198,6 +198,7 @@ class Sample:
     methods: list = field(default_factory=list)
     methods_complete: list[bool] = field(default_factory=list)
     createdDate: str | None = None
+    NICE_uuid: str | None = None    
     status: SampleStatus = SampleStatus.PENDING
 
     def __post_init__(self):
@@ -247,6 +248,7 @@ class SampleContainer:
             #raise ValueError(f"Sample ID {id} not found!")
 
     def getSamplebyName(self, name: str, status: SampleStatus | None = None) -> Sample | None:
+        """Return sample with specific name"""
         names = self._getNames()
         if name in names:
             sample = self.samples[names.index(name)]

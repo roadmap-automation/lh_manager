@@ -1,4 +1,6 @@
-from flask import make_response, Response
+from flask import make_response, Response, request
+
+from app.liquid_handler.samplelist import Sample
 from . import nice_blueprint
 from state.state import samples
 from liquid_handler.samplelist import SampleStatus, DATE_FORMAT
@@ -10,14 +12,33 @@ from gui_api.events import trigger_samples_update
 @trigger_samples_update
 def RunSample(sample_name) -> Response:
     """Runs a sample by name"""
-    # TODO: Use POST to change status; might be useful for pausing, stopping; as coded this is best as a PUT
-    sample = samples.getSamplebyName(sample_name)
+    sample = samples.getSamplebyName(sample_name, status=SampleStatus.PENDING)
     if sample is not None:
         sample.status = SampleStatus.ACTIVE
         sample.createdDate = datetime.now().strftime(DATE_FORMAT)
         return make_response({'result': 'success', 'message': 'success'}, 200)
     else:
-        return make_response({'result': 'error', 'message': 'sample not found'}, 404)
+        return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+
+@nice_blueprint.route('/NICE/RunSamplewithUUID', methods=['POST'])
+@trigger_samples_update
+def RunSamplewithUUID() -> Response:
+    """Runs a sample by name, giving it a UUID. Returns error if sample not found or sample is already active or completed."""
+    data = request.get_json(force=True)
+
+    if ('name' in data.keys()) & ('uuid' in data.keys()):
+
+        sample = samples.getSamplebyName(data['name'], status=SampleStatus.PENDING)
+        if sample is not None:
+            sample.status = SampleStatus.ACTIVE
+            sample.createdDate = datetime.now().strftime(DATE_FORMAT)
+            sample.NICE_uuid = data['uuid']
+            return make_response({'result': 'success', 'message': 'success'}, 200)
+        else:
+            return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+    
+    else:
+        return make_response({'result': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>"}, 400)
 
 def _getActiveSample() -> str:
     """Gets the currently active sample with the earliest createdDate."""
@@ -50,22 +71,24 @@ def GetSampleStatus(sample_name) -> Response:
     if sample is not None:
         return make_response({'name': sample_name, 'status': sample.status}, 200)
     else:
-        return make_response({'result': 'error', 'message': 'sample not found'}, 404)
+        return make_response({'result': 'error', 'message': 'sample not found'}, 400)
 
-@nice_blueprint.route('/NICE/GetSampleMetaData/<sample_name>', methods=['GET'])
-def GetSampleMetaData(sample_name) -> Response:
-    """Gets status of a sample by name"""
+@nice_blueprint.route('/NICE/GetMetaData/<uuid>', methods=['GET'])
+def GetMetaData(uuid) -> Response:
+    """Gets metadata from all samples with UUID.
+        Responses are sorted by createdDate"""
 
-    sample = samples.getSamplebyName(sample_name)
+    samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
     
-    if sample is not None:
-        return make_response({'name': sample_name, 'metadata': asdict(sample)}, 200)
+    if len(samples_uuid):
+        samples_uuid.sort(key=lambda sample: datetime.strptime(sample.createdDate, DATE_FORMAT))
+        return make_response({'metadata': [asdict(sample) for sample in samples_uuid]}, 200)
     else:
-        return make_response({'result': 'error', 'message': 'sample not found'}, 404)
+        return make_response({}, 200)
 
 @nice_blueprint.route('/NICE/GetSampleTimeEstimate/<sample_name>', methods=['GET'])
 def GetSampleTimeEstimate(sample_name) -> Response:
-    """Gets time estimate for a given sample"""
+    """Gets time estimate for a given sample."""
 
     sample = samples.getSamplebyName(sample_name)
     
@@ -75,7 +98,7 @@ def GetSampleTimeEstimate(sample_name) -> Response:
 
         return make_response({'name': sample_name, 'time estimate': totaltime}, 200)
     else:
-        return make_response({'result': 'error', 'message': 'sample not found'}, 404)
+        return make_response({'result': 'error', 'message': 'sample not found'}, 400)
 
 @nice_blueprint.route('/NICE/GetInstrumentStatus/', methods=['GET'])
 def GetInstrumentStatus() -> Response:
