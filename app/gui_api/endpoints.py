@@ -22,19 +22,6 @@ def AddSample() -> Response:
 
     return make_response({'new sample': new_sample.toSampleList(), 'layout': asdict(test_layout)}, 200)
 
-# TODO: Make NICE endpoint
-@gui_blueprint.route('/test/RunSample/<sample_name>', methods=['GET'])
-@trigger_samples_update
-def RunSample(sample_name) -> Response:
-    """Runs a sample """
-    # TODO: Use POST to change status; might be useful for pausing, stopping; as coded this is best as a PUT
-    sample = samples.getSamplebyName(sample_name)
-    if sample is not None:
-        sample.status = SampleStatus.ACTIVE
-        return make_response({'result': 'success', 'message': 'success'}, 200)
-    else:
-        return make_response({'result': 'error', 'message': 'sample not found'}, 404)
-
 # GUI URIs
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:
