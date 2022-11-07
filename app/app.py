@@ -1,11 +1,13 @@
 from flask import Flask, render_template
 from gui_api import gui_blueprint
 from lh_api import lh_blueprint
+from nice_api import nice_blueprint
 from sio import socketio
 
 app = Flask(__name__)
 
 app.register_blueprint(gui_blueprint)
+app.register_blueprint(nice_blueprint)
 app.register_blueprint(lh_blueprint)
 socketio.init_app(app)
 
