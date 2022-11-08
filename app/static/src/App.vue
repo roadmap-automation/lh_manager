@@ -7,6 +7,7 @@ import { io } from 'socket.io-client';
 
 const connected = ref(false);
 const layout = ref(null);
+const samples = ref([]);
 
 const socket = io('', {
   // this is mostly here to test what happens on server fail:
@@ -16,6 +17,7 @@ socket.on('connect', () => {
   console.log("connected: ", socket.id);
   connected.value = true;
   refreshLayout();
+  refreshSamples();
 });
 
 socket.on('disconnect', (payload) => {
@@ -37,11 +39,31 @@ async function refreshLayout() {
   layout.value = new_layout;
 }
 
+async function refreshSamples() {
+  const { samples: { samples: new_samples } } = await (await fetch('/GUI/GetSamples/')).json();
+  const sample_ids = new_samples.map((s) => s.id);
+  const max_id = Math.max(...sample_ids);
+  samples.value = new_samples;
+  console.log(new_samples);
+}
+
+function remove_sample(id) {
+  const idx_to_remove = samples.value.findIndex((s) => s.id == id);
+  if (idx_to_remove != null) {
+    samples.value.splice(idx_to_remove, 1);
+  }
+}
+
+function add_sample() {
+  const ids = samples.value.map((s) => s.id);
+  samples.value.push({name: 'new', description: '', id: Math.max(...ids) + 1})
+}
+
 </script>
 
 <template>
-  <div class="h-100 d-flex flex-column">
-    <nav class="navbar navbar-light bg-light p-2">
+  <div class="h-100 d-flex flex-column overflow-hidden">
+    <nav class="navbar navbar-light bg-light py-0">
       <div class="container-fluid">
         <div class="navbar-brand">
           <img src="./assets/f_nist-logo-centerforneutronresearch-black_nist-logo-centerforneutronresearch-black.png"
@@ -50,7 +72,7 @@ async function refreshLayout() {
         </div>
       </div>
     </nav>
-    <LiquidHandler :layout="layout"/>
+    <LiquidHandler :layout="layout" :samples="samples" @remove_sample="remove_sample" @add_sample="add_sample"/>
   </div>
 </template>
 
