@@ -1,15 +1,20 @@
 <script setup>
 import { ref } from 'vue'
-// import { Modal } from 'bootstrap';
 import { Modal } from 'bootstrap';
 import { onMounted } from 'vue';
 import Mixture from './Mixture.vue';
-import Bed from './Bed.vue';
+import BedLayout from './BedLayout.vue';
+import { Emitter } from '@socket.io/component-emitter';
 
 defineProps({
   msg: String,
-  layout: Object
+  layout: Object,
+  samples: Object
 })
+
+const emit = defineEmits(['remove_sample', 'add_sample']);
+
+const active_sample = ref(0);
 
 const chemical_components = [
   "D2O",
@@ -20,111 +25,23 @@ const chemical_components = [
 const mixture_parts = [];
 
 onMounted(() => {
-  
+
 });
-
-const default_layout = {
-  "racks": {
-    "MTPlateBottom": {
-      "columns": 8,
-      "max_volume": 0.28,
-      "rows": 12,
-      "style": "grid",
-      "wells": []
-    },
-    "MTPlateTop": {
-      "columns": 8,
-      "max_volume": 0.28,
-      "rows": 12,
-      "style": "grid",
-      "wells": []
-    },
-    "Mix": {
-      "columns": 4,
-      "max_volume": 9.0,
-      "rows": 20,
-      "style": "staggered",
-      "wells": [
-        {
-          "composition": {
-            "solutes": [],
-            "solvents": []
-          },
-          "rack_id": "Mix",
-          "volume": 0.0,
-          "well_number": 1
-        }
-      ]
-    },
-    "Samples": {
-      "columns": 4,
-      "max_volume": 2.0,
-      "rows": 15,
-      "style": "grid",
-      "wells": []
-    },
-    "Solvent": {
-      "columns": 3,
-      "max_volume": 700.0,
-      "rows": 1,
-      "style": "grid",
-      "wells": []
-    },
-    "Stock": {
-      "columns": 2,
-      "max_volume": 20.0,
-      "rows": 7,
-      "style": "grid",
-      "wells": [
-        {
-          "composition": {
-            "solutes": [
-              {
-                "concentration": 0.1,
-                "name": "KCl",
-                "units": "M"
-              }
-            ],
-            "solvents": [
-              {
-                "fraction": 1.0,
-                "name": "D2O"
-              }
-            ]
-          },
-          "rack_id": "Stock",
-          "volume": 8.0,
-          "well_number": 1
-        },
-        {
-          "composition": {
-            "solutes": [
-              {
-                "concentration": 1.0,
-                "name": "KCl",
-                "units": "M"
-              }
-            ],
-            "solvents": [
-              {
-                "fraction": 1.0,
-                "name": "H2O"
-              }
-            ]
-          },
-          "rack_id": "Stock",
-          "volume": 8.0,
-          "well_number": 2
-        }
-      ]
-    }
-  }
-}
-
-
 
 function clicked(bed, vial) {
   console.log(bed, vial);
+}
+
+function sample_clicked(id) {
+  active_sample.value = id;
+}
+
+function remove_sample(id) {
+  emit('remove_sample', id);
+}
+
+function add_sample(id) {
+  emit('add_sample');
 }
 
 const mixtureIsOpen = ref(false);
@@ -162,48 +79,33 @@ function openMixture() {
       <Mixture @close="mixtureIsOpen = false" :show="mixtureIsOpen" :chemical_components="chemical_components" />
 
     </div>
-    <div class="tab-pane show active d-flex flex-column flex-grow-1" id="Layout" role="tabpanel"
-      aria-labelledby="layout-tab">
-      <!-- <div style="height:calc(100%);width:auto;background-color:blue;">
-        <svg viewBox="0 0 150 100" width="150" height="100" preserveAspectRatio="xMinyMin" x="0" y="0" style="height:calc(100% - 1em);width:calc(100% - 1em);">
-        <rect width="150" height="100" fill="green"></rect>
-        <g v-for="vial in vials" :key="vial.target">
-          <circle class="vial-button" :cx="vial.x" :cy="vial.y" r="4" @click="clicked(vial)" />
-          <text class="vial-label" :x="vial.x" :y="vial.y" text-anchor="middle" dy=".3em">{{vial.label}}</text>
-        </g>
-      </svg>
-      </div> -->
-      <svg v-if="layout != null" viewBox="0 0 1500 1000" x="0" y="0" preserveAspectRatio="xMinyMin meet" style="width:100%;height:100%;">
-        <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
-        <g transform="translate(0,0)">
-          <rect class="solvents" width="900" height="200"></rect>
-          <g v-for="s in 3" :index="s">
-            <!-- <ellipse class="solvent" v-for="s in 3" rx="125" ry="70" :cx="s * 300 - 150" :cy="80"></ellipse> -->
-            <rect class="vial-button" width="250" height="140" :x="(s - 1) * 300 + 25" :y="25"></rect>
-            <text class="vial-label" :x="(s - 1) * 300 + 150" :y="95" text-anchor="middle">{{ s }}</text>
-          </g>
-          <text class="title" :y="192" :x="450">Solvents</text>
-        </g>
-        <g transform="translate(0,200)">
-          <Bed width="300" height="800" title="Samples" :rows="layout.racks.Samples.rows"
-            :columns="layout.racks.Samples.columns" :style="layout.racks.Samples.style"
-            :wells="layout.racks.Samples.wells" @clicked="clicked" />
-        </g>
-        <g transform="translate(300,200)">
-          <Bed width="300" height="800" title="Stock" :rows="layout.racks.Stock.rows"
-            :columns="layout.racks.Stock.columns" :style="layout.racks.Stock.style" :wells="layout.racks.Stock.wells"
-            @clicked="clicked" />
-        </g>
-        <g transform="translate(600,200)">
-          <Bed width="300" height="800" title="Mix" :rows="layout.racks.Mix.rows" :columns="layout.racks.Mix.columns"
-            :style="layout.racks.Mix.style" :wells="layout.racks.Mix.wells" @clicked="clicked" />
-
-        </g>
-        <!-- <g v-for="vial in vials" :key="vial.target">
-          <circle class="vial-button" :cx="vial.x" :cy="vial.y" r="4" @click="clicked(vial)" />
-          <text class="vial-label" :x="vial.x" :y="vial.y" text-anchor="middle" dy=".3em">{{vial.label}}</text>
-        </g> -->
-      </svg>
+    <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
+      role="tabpanel" aria-labelledby="layout-tab">
+      <div class="overflow-auto">
+        <div class="card m-3">
+          <div class="card-body">
+            <h5 class="card-title">Samples
+              <button class="btn btn-outline-primary" @click="add_sample">Add</button>
+            </h5>
+          </div>
+          <!-- <ol class="list-group list-group-flush list-group-numbered overflow-auto"> -->
+            <transition-group  class="list-group list-group-flush list-group-numbered overflow-auto" name="list" tag="ol">
+              <li class="list-group-item d-flex justify-content-between list-group-item-action list-complete-item"
+                :class="{ active: sample.id === active_sample }" v-for="sample of samples" :key="sample.id"
+                @click="sample_clicked(sample.id)">
+                <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
+                <span class="align-middle px-2"> {{ sample.description }}</span>
+                <button type="button" class="btn-close btn-sm align-middle text-align-right side-btn" aria-label="Close"
+                  @click="remove_sample(sample.id)"></button>
+              </li>
+            </transition-group>
+            <!-- <button class="btn btn-outline-primary" @click="add_sample">Add</button> -->
+          <!-- </ol> -->
+        </div>
+      </div>
+      <div class="flex-grow-1">
+        <BedLayout :layout="layout" />
+      </div>
     </div>
 
   </div>
@@ -217,32 +119,23 @@ function openMixture() {
 .flex-column {
   min-height: 0;
 }
+.list-move,
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.5s;
+}
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
 
-.vial-button {
+.list-leave-active {
+  position: absolute;
+}
+
+.list-group-item-action {
   cursor: pointer;
-  fill: orange;
-  stroke: black;
-  stroke-width: 1px;
-}
-
-.vial-label {
-  font: normal 20px sans-serif;
-  pointer-events: none;
-  dominant-baseline: central;
-  fill: darkgreen;
-}
-
-svg rect {
-  stroke-width: 0.2px;
-  stroke: black;
-  clip-path: rect();
-  fill: #a0a0a0;
-}
-
-.title {
-  fill: white;
-  font: normal 30px sans-serif;
-  text-anchor: middle;
 }
 
 .tab-pane:not(.active) {
