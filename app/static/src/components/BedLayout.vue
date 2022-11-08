@@ -119,7 +119,7 @@ function clicked(bed, vial) {
           <rect class="solvents" width="900" height="200"></rect>
           <g v-for="s in 3" :index="s">
             <!-- <ellipse class="solvent" v-for="s in 3" rx="125" ry="70" :cx="s * 300 - 150" :cy="80"></ellipse> -->
-            <rect class="vial-button" width="250" height="140" :x="(s - 1) * 300 + 25" :y="25"></rect>
+            <rect class="vial-button" width="250" height="140" :x="(s - 1) * 300 + 25" :y="25" @click="clicked('Solvents', s)"></rect>
             <text class="vial-label" :x="(s - 1) * 300 + 150" :y="95" text-anchor="middle">{{ s }}</text>
           </g>
           <text class="title" :y="192" :x="450">Solvents</text>
