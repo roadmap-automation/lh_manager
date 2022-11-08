@@ -1,0 +1,113 @@
+<html>
+
+<body>
+    <div id="app">
+        <div id="form">
+            Sample name: <input id="sample_name" v-model="sample.name"><br>
+            Sample description: <input id="sample_description" v-model="sample.description"><br>
+            <select id="method_select" v-model="selected_method_name">
+                <option v-for="(method_def, method_name) of method_defs" :value="method_name">
+                    {{method_def.display_name}}</option>
+            </select>
+            <button id="add_form" @click="add_form">Add form</button>
+            <div id="subforms">
+                <div v-for="(method, index) in sample.methods" :key="index">
+                    <hr>
+                    <h2>{{method.display_name}}</h2>
+                    <div v-for="field of method.fields" :key="field">
+                        <label>{{field.name}}
+                            <select v-if="field.type === 'well'" v-model="field.value">
+                                <option v-for="(well, well_name) of wells" :value="well">{{well_name}}</option>
+                            </select>
+                            <input v-else v-model="field.value" />
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <hr>
+            <button @click="refresh_samples">Refresh Samples</button>
+            <button @click="send_sample">Send Sample</button>
+            <button @click="clear_form">Clear Form</button>
+        </div>
+    </div>
+</body>
+<script type="module">
+    import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+
+    createApp({
+        data() {
+            return {
+                method_defs: {},
+                wells: {},
+                selected_method_name: "",
+                sample: {
+                    name: "test",
+                    description: "test sample description",
+                    id: 0,
+                    methods: [],
+                }
+            }
+        },
+        methods: {
+            add_form() {
+                const name = this.selected_method_name;
+                const method_def = this.method_defs[name];
+                const new_method = { name, display_name: method_def.display_name };
+                new_method.fields = method_def.fields.map((field) => {
+                    let new_field = { name: field };
+                    if (field === 'Source' || field === 'Target') {
+                        new_field.type = 'well';
+                        new_field.value = null;
+                    }
+                    else {
+                        new_field.type = 'value';
+                        new_field.value = 0;
+                    }
+                    return new_field
+                });
+                console.log(new_method);
+                this.sample.methods.push(new_method);
+            },
+
+            send_sample() { 
+                const to_send = {...this.sample};
+                to_send.methods_complete = to_send.methods.map((m) => false);
+                console.log(JSON.stringify(to_send, null, 2));
+            },
+            async refresh_methods() {
+                const methoddata = await (await fetch("/GUI/GetAllMethods/")).json();
+                this.method_defs = methoddata.methods;
+                if (this.selected_method_name === '') {
+                    this.selected_method_name = Object.keys(this.method_defs)[0];
+                }
+
+            },
+            async refresh_layout() {
+                const layout = await (await fetch('/GUI/GetLayout/')).json();
+                for (const [rack_name, rack] of Object.entries(layout.racks)) {
+                    for (const well of rack['wells']) {
+                        const well_id = `Well: ${well['rack_id']} ${well['well_number']}`;
+                        this.wells[well_id] = well;
+                    }
+                }
+            },
+            async refresh_samples() {
+                // unpack the nested samples.samples object...
+                const { samples: {samples} } = await (await fetch('/GUI/GetSamples/')).json();
+                const sample_ids = samples.map((s) => s.id);
+                const max_id = Math.max(...sample_ids);
+                this.sample.id = max_id + 1;
+            },
+            clear_form() { 
+                this.sample.methods.splice(0);
+            }
+        },
+        async mounted() {
+            await this.refresh_samples();
+            await this.refresh_methods();
+            await this.refresh_layout();
+        }
+    }).mount('#app')
+</script>
+
+</html>
