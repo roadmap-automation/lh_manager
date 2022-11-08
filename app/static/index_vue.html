@@ -75,10 +75,11 @@
                 console.log(JSON.stringify(to_send, null, 2));
             },
             async refresh_methods() {
-                const methoddata = await (await fetch("/GUI/GetAllMethods/")).json();
-                this.method_defs = methoddata.methods;
+                const { methods } = await (await fetch("/GUI/GetAllMethods/")).json();
+                this.method_defs = methods;
+                console.log(methods);
                 if (this.selected_method_name === '') {
-                    this.selected_method_name = Object.keys(this.method_defs)[0];
+                    this.selected_method_name = Object.keys(methods)[0];
                 }
 
             },
