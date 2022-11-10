@@ -1,15 +1,16 @@
 <script setup>
 import { ref } from 'vue'
-import { Modal } from 'bootstrap';
 import { onMounted } from 'vue';
 import Mixture from './Mixture.vue';
 import BedLayout from './BedLayout.vue';
-import { Emitter } from '@socket.io/component-emitter';
+import SampleList from './SampleList.vue';
 
-defineProps({
+const props = defineProps({
   msg: String,
   layout: Object,
-  samples: Object
+  samples: Array,
+  sample_status: Object,
+  method_defs: Object,
 })
 
 const emit = defineEmits(['remove_sample', 'add_sample']);
@@ -25,7 +26,7 @@ const chemical_components = [
 const mixture_parts = [];
 
 onMounted(() => {
-
+  console.log(props.sample_status);
 });
 
 function clicked(bed, vial) {
@@ -82,27 +83,38 @@ function openMixture() {
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
       role="tabpanel" aria-labelledby="layout-tab">
       <div class="overflow-auto">
-        <div class="card m-3">
+        <div v-if="false" class="card m-3">
           <div class="card-body">
             <h5 class="card-title">Samples
               <button class="btn btn-outline-primary" @click="add_sample">Add</button>
             </h5>
           </div>
           <!-- <ol class="list-group list-group-flush list-group-numbered overflow-auto"> -->
-            <transition-group  class="list-group list-group-flush list-group-numbered overflow-auto" name="list" tag="ol">
-              <li class="list-group-item d-flex justify-content-between list-group-item-action list-complete-item"
-                :class="{ active: sample.id === active_sample }" v-for="sample of samples" :key="sample.id"
-                @click="sample_clicked(sample.id)">
-                <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
-                <span class="align-middle px-2"> {{ sample.description }}</span>
-                <button type="button" class="btn-close btn-sm align-middle text-align-right side-btn" aria-label="Close"
-                  @click="remove_sample(sample.id)"></button>
-              </li>
-            </transition-group>
-            <!-- <button class="btn btn-outline-primary" @click="add_sample">Add</button> -->
+          <transition-group class="list-group list-group-flush list-group-numbered overflow-auto" name="list" tag="ol">
+            <li class="list-group-item d-flex justify-content-between list-group-item-action list-complete-item"
+              :class="{ active: sample.id === active_sample }" v-for="sample of samples" :key="sample.id"
+              @click="sample_clicked(sample.id)">
+              <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
+              <span class="align-middle px-2"> {{ sample.description }}</span>
+              <button type="button" class="btn-close btn-sm align-middle edit" aria-label="Edit"
+                @click="remove_sample(sample.id)"></button>
+              <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
+                @click="remove_sample(sample.id)"></button>
+            </li>
+          </transition-group>
+          <!-- <button class="btn btn-outline-primary" @click="add_sample">Add</button> -->
           <!-- </ol> -->
         </div>
+        <div class="card m-3">
+          <div class="card-body">
+            <h5 class="card-title">Samples
+              <button class="btn btn-outline-primary btn-sm float-end" @click="add_sample">Add</button>
+            </h5>
+          </div>
+          <SampleList :samples="samples" :method_defs="method_defs" :sample_status="sample_status"/>
+        </div>
       </div>
+
       <div class="flex-grow-1">
         <BedLayout :layout="layout" />
       </div>
@@ -119,11 +131,13 @@ function openMixture() {
 .flex-column {
   min-height: 0;
 }
+
 .list-move,
 .list-enter-active,
 .list-leave-active {
   transition: all 0.5s;
 }
+
 .list-enter-from,
 .list-leave-to {
   opacity: 0;
@@ -140,5 +154,9 @@ function openMixture() {
 
 .tab-pane:not(.active) {
   display: none !important;
+}
+
+.btn-close.edit {
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-pencil-square' viewBox='0 0 16 16'><path d='M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z'/><path fill-rule='evenodd' d='M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z'/></svg>")
 }
 </style>
