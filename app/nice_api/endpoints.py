@@ -4,10 +4,10 @@ from state.state import samples
 from liquid_handler.samplelist import SampleStatus, DATE_FORMAT
 from datetime import datetime
 from dataclasses import asdict
-from gui_api.events import trigger_samples_update
+from gui_api.events import trigger_sample_status_update
 
 @nice_blueprint.route('/NICE/RunSample/<sample_name>', methods=['GET'])
-@trigger_samples_update
+@trigger_sample_status_update
 def RunSample(sample_name) -> Response:
     """Runs a sample by name. Deprecated in favor of RunSamplewithUUID"""
     sample = samples.getSamplebyName(sample_name, status=SampleStatus.PENDING)
@@ -19,7 +19,7 @@ def RunSample(sample_name) -> Response:
         return make_response({'result': 'error', 'message': 'sample not found'}, 400)
 
 @nice_blueprint.route('/NICE/RunSamplewithUUID', methods=['POST'])
-@trigger_samples_update
+@trigger_sample_status_update
 def RunSamplewithUUID() -> Response:
     """Runs a sample by name, giving it a UUID. Returns error if sample not found or sample is already active or completed."""
     data = request.get_json(force=True)
