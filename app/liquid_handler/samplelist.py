@@ -364,10 +364,14 @@ for i in range(10):
 
 # throw some new statuses in the mix:
 example_sample_list[0].stages[StageName.PREP].status = SampleStatus.ACTIVE
-example_sample_list[0].stages[StageName.PREP].methods_complete[0] = True
+example_sample_list[0].stages[StageName.PREP].methods_complete[0] = False
 example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
+example_sample_list[1].stages[StageName.PREP].methods_complete = [True for m in example_sample_list[1].stages[StageName.PREP].methods_complete]
 example_sample_list[1].stages[StageName.INJECT].methods_complete = [True for m in example_sample_list[1].stages[StageName.INJECT].methods_complete]
+example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
+example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.PENDING
+example_sample_list[2].stages[StageName.PREP].methods_complete = [True for m in example_sample_list[2].stages[StageName.PREP].methods_complete]
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)
 #print(methods)
