@@ -1,7 +1,7 @@
 from dataclasses import InitVar, asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Union, Tuple
+from typing import Dict, List, Literal, Union, Tuple
 from .bedlayout import Well, LHBedLayout
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from datetime import datetime
@@ -189,7 +189,7 @@ class SampleList:
     endDate: str
     columns: list[BaseMethod.lh_method] | None
 
-class MethodListRole(str, Enum):
+class StageName(str, Enum):
     PREP = 'prep'
     INJECT = 'inject'
 
@@ -197,9 +197,8 @@ class MethodListRole(str, Enum):
 class MethodList:
     """Class representing a list of methods representing one LH job. Allows dividing
         prep and inject operations for a single sample."""
-    role: MethodListRole
     LH_id: int | None = None
-    createdDate: str | None = None
+    createdDate: str = field(default_factory = lambda: datetime.now().isoformat())
     methods: list = field(default_factory=list)
     methods_complete: list[bool] = field(default_factory=list)
     status: SampleStatus = SampleStatus.PENDING
@@ -221,29 +220,22 @@ class Sample:
     id: str
     name: str
     description: str
-    prep_methods: MethodList
-    inject_methods: MethodList
+    stages: Dict[StageName, MethodList] = field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
 
-    def __post_init__(self):
-        """Define mapping between method list roles and method lists. Designed to allow more than two method lists if necessary."""
-
-        self.rolemap = {MethodListRole.PREP: self.prep_methods,
-                        MethodListRole.INJECT : self.inject_methods}
-
     def get_LH_ids(self) -> list[int | None]:
 
-        return [methodlist.LH_id for methodlist in self.rolemap.values()]
+        return [methodlist.LH_id for methodlist in self.stages.values()]
 
-    def getMethodListbyID(self, id: int) -> MethodList:
+    def getMethodListbyID(self, id: int) -> Union[MethodList, None]:
 
-        return [methodlist for methodlist in self.rolemap.values() if methodlist.LH_id == id]
+        return next((methodlist for methodlist in self.stages.values() if methodlist.LH_id == id), None)
 
     def get_created_dates(self) -> list[datetime]:
         """Returns list of MethodList.createdDates from the sample"""
 
-        return [datetime.strptime(methodlist.createdDate, DATE_FORMAT) for methodlist in self.rolemap.values() if methodlist.createdDate is not None]
+        return [datetime.strptime(methodlist.createdDate, DATE_FORMAT) for methodlist in self.stages.values() if methodlist.createdDate is not None]
 
     def get_earliest_date(self) -> datetime | None:
         """Gets earliest createdDate in the sample"""
@@ -254,7 +246,7 @@ class Sample:
 
     def get_status(self) -> SampleStatus:
 
-        method_status = [methodlist.status for methodlist in self.rolemap.values()]
+        method_status = [methodlist.status for methodlist in self.stages.values()]
 
         # all are pending
         if all([ms == SampleStatus.PENDING for ms in method_status]):
@@ -276,7 +268,7 @@ class Sample:
             print('Warning: undefined sample status. This should never happen!')
             return None
 
-    def toSampleList(self, select: list(MethodListRole), entry=False) -> dict:
+    def toSampleList(self, select: List[StageName], entry=False) -> dict:
         """Generates dictionary for LH sample list
         
             select: list of roles ('prep', 'inject') to turn into LH sample lists. Typical values are ['prep'], ['inject'], or ['prep', 'inject']
@@ -286,10 +278,11 @@ class Sample:
 
             Note that before calling this, MethodList.LH_id and Methodlist.createdDate must be set.
         """
-        for role in select:
-            methodlist = self.rolemap[role]
-            expose_methods = None if entry else [m.render_lh_method() for m in methodlist.methods]
-            return asdict(SampleList(self.name, f'{methodlist.LH_id}', 'System', self.description, methodlist.createdDate, methodlist.createdDate, methodlist.createdDate, expose_methods))
+        for stage in select:
+            methodlist = self.stages[stage]
+            expose_methods = None if entry else [
+                m.render_lh_method() for m in methodlist.methods]
+            return asdict(SampleList(name=self.name, id=f'{methodlist.LH_id}', createdBy='System', description=self.description, createDate=methodlist.createdDate, startDate=methodlist.createdDate, endDate=methodlist.createdDate, columns=expose_methods))
 
 @dataclass
 class SampleContainer:
@@ -360,12 +353,19 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')  # type: ignore
-example_sample_list = []
+example_sample_list: List[Sample] = []
 for i in range(10):
-    example_sample = Sample(i, f'testsample{i}', 'test sample description', prep_methods=MethodList(MethodListRole.PREP), inject_methods=MethodList(MethodListRole.INJECT))
-    example_sample.prep_methods.addMethod(example_method)
-    example_sample.inject_methods.addMethod(example_method)
+    example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
+    example_sample.stages[StageName.PREP].addMethod(example_method)
+    example_sample.stages[StageName.INJECT].addMethod(example_method)
     example_sample_list.append(example_sample)
+
+# throw some new statuses in the mix:
+example_sample_list[0].stages[StageName.PREP].status = SampleStatus.ACTIVE
+example_sample_list[0].stages[StageName.PREP].methods_complete[0] = True
+example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
+example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
+example_sample_list[1].stages[StageName.INJECT].methods_complete = [True for m in example_sample_list[1].stages[StageName.INJECT].methods_complete]
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)
 #print(methods)
