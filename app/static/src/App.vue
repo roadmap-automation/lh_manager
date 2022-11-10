@@ -8,6 +8,8 @@ import { io } from 'socket.io-client';
 const connected = ref(false);
 const layout = ref(null);
 const samples = ref([]);
+const sample_status = ref({});
+const method_defs = ref({});
 
 const socket = io('', {
   // this is mostly here to test what happens on server fail:
@@ -18,6 +20,8 @@ socket.on('connect', () => {
   connected.value = true;
   refreshLayout();
   refreshSamples();
+  refreshSampleStatus();
+  refreshMethodDefs();
 });
 
 socket.on('disconnect', (payload) => {
@@ -40,11 +44,29 @@ async function refreshLayout() {
 }
 
 async function refreshSamples() {
-  const { samples: { samples: new_samples } } = await (await fetch('/GUI/GetSamples/')).json();
-  const sample_ids = new_samples.map((s) => s.id);
-  const max_id = Math.max(...sample_ids);
+  const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json();
+  // filter samples to extract only what the GUI will edit:
+  const new_samples = new_samples_in.map((s) => {
+    const { description, methods, name, id } = s;
+    return { description, methods, name, id }
+  });
   samples.value = new_samples;
   console.log(new_samples);
+}
+
+async function refreshSampleStatus() {
+  const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json();
+  const new_sample_status = Object.fromEntries(new_samples_in.map((s) => {
+    const { methods_complete, status, id } = s;
+    return [id, { methods_complete, status }];
+  }));
+  sample_status.value = new_sample_status;
+  console.log(new_sample_status);
+}
+
+async function refreshMethodDefs() {
+  const { methods } = await (await fetch("/GUI/GetAllMethods/")).json();
+  method_defs.value = methods;
 }
 
 function remove_sample(id) {
@@ -56,7 +78,7 @@ function remove_sample(id) {
 
 function add_sample() {
   const ids = samples.value.map((s) => s.id);
-  samples.value.push({name: 'new', description: '', id: Math.max(...ids) + 1})
+  samples.value.push({ name: 'new', description: '', id: Math.max(...ids) + 1 })
 }
 
 </script>
@@ -72,7 +94,8 @@ function add_sample() {
         </div>
       </div>
     </nav>
-    <LiquidHandler :layout="layout" :samples="samples" @remove_sample="remove_sample" @add_sample="add_sample"/>
+    <LiquidHandler :layout="layout" :samples="samples" :sample_status="sample_status" :method_defs="method_defs" @remove_sample="remove_sample"
+      @add_sample="add_sample" />
   </div>
 </template>
 
