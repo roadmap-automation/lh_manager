@@ -47,21 +47,23 @@ async function refreshSamples() {
   const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json();
   // filter samples to extract only what the GUI will edit:
   const new_samples = new_samples_in.map((s) => {
-    const { description, methods, name, id } = s;
-    return { description, methods, name, id }
+    const { description, stages: unfiltered_stages, name, id } = s;
+    const stages = Object.fromEntries(Object.entries(unfiltered_stages).map(([stage, { methods }]) => [stage, { methods }]));
+    return { description, name, id, stages };
   });
   samples.value = new_samples;
-  console.log(new_samples);
 }
 
 async function refreshSampleStatus() {
   const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json();
   const new_sample_status = Object.fromEntries(new_samples_in.map((s) => {
-    const { methods_complete, status, id } = s;
-    return [id, { methods_complete, status }];
+    const { stages: unfiltered_stages, id } = s;
+    const stages = Object.fromEntries(Object.entries(unfiltered_stages).map(([stage, { methods_complete, status }]) => [stage, { methods_complete, status }]));
+
+    return [id, stages];
   }));
   sample_status.value = new_sample_status;
-  console.log(new_sample_status);
+  console.log(new_sample_status, new_samples_in);
 }
 
 async function refreshMethodDefs() {
@@ -94,8 +96,8 @@ function add_sample() {
         </div>
       </div>
     </nav>
-    <LiquidHandler :layout="layout" :samples="samples" :sample_status="sample_status" :method_defs="method_defs" @remove_sample="remove_sample"
-      @add_sample="add_sample" />
+    <LiquidHandler :layout="layout" :samples="samples" :sample_status="sample_status" :method_defs="method_defs"
+      @remove_sample="remove_sample" @add_sample="add_sample" />
   </div>
 </template>
 
