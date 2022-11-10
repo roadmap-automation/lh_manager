@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import Bed from './Bed.vue';
+import { source_well, target_well } from '../store';
 
 defineProps({
   layout: Object
