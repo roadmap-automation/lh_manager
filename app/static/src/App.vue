@@ -4,12 +4,12 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
+import { method_defs } from './store';
 
 const connected = ref(false);
 const layout = ref(null);
 const samples = ref([]);
 const sample_status = ref({});
-const method_defs = ref({});
 
 const socket = io('', {
   // this is mostly here to test what happens on server fail:
@@ -96,8 +96,8 @@ function add_sample() {
         </div>
       </div>
     </nav>
-    <LiquidHandler :layout="layout" :samples="samples" :sample_status="sample_status" :method_defs="method_defs"
-      @remove_sample="remove_sample" @add_sample="add_sample" />
+    <LiquidHandler :layout="layout" :samples="samples" :sample_status="sample_status" @remove_sample="remove_sample"
+      @add_sample="add_sample" />
   </div>
 </template>
 

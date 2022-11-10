@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue';
+import { method_defs } from '../store';
 
 const props = defineProps({
   methods: Object,
-  method_defs: Object,
   status: Object
 });
 

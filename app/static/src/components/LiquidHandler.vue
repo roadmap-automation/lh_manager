@@ -10,7 +10,6 @@ const props = defineProps({
   layout: Object,
   samples: Array,
   sample_status: Object,
-  method_defs: Object,
 })
 
 const emit = defineEmits(['remove_sample', 'add_sample']);
@@ -111,7 +110,7 @@ function openMixture() {
               <button class="btn btn-outline-primary btn-sm float-end" @click="add_sample">Add</button>
             </h5>
           </div>
-          <SampleList :samples="samples" :method_defs="method_defs" :sample_status="sample_status"/>
+          <SampleList :samples="samples" :sample_status="sample_status"/>
         </div>
       </div>
 
