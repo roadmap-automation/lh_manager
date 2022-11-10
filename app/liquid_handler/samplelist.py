@@ -1,10 +1,10 @@
 from dataclasses import InitVar, asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Union
+from typing import Literal, Union, Tuple
 from .bedlayout import Well, LHBedLayout
 from .layoutmap import LayoutWell2ZoneWell, Zone
-import datetime
+from datetime import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
@@ -189,16 +189,19 @@ class SampleList:
     endDate: str
     columns: list[BaseMethod.lh_method] | None
 
+class MethodListRole(str, Enum):
+    PREP = 'prep'
+    INJECT = 'inject'
+
 @dataclass
-class Sample:
-    """Class representing a sample to be created by Gilson LH"""
-    id: int
-    name: str
-    description: str
+class MethodList:
+    """Class representing a list of methods representing one LH job. Allows dividing
+        prep and inject operations for a single sample."""
+    role: MethodListRole
+    LH_id: int | None = None
+    createdDate: str | None = None
     methods: list = field(default_factory=list)
     methods_complete: list[bool] = field(default_factory=list)
-    createdDate: str | None = None
-    NICE_uuid: str | None = None    
     status: SampleStatus = SampleStatus.PENDING
 
     def __post_init__(self):
@@ -212,16 +215,81 @@ class Sample:
         self.methods.append(method)
         self.methods_complete.append(False)
 
-    def toSampleList(self, entry=False) -> dict:
+@dataclass
+class Sample:
+    """Class representing a sample to be created by Gilson LH"""
+    id: str
+    name: str
+    description: str
+    prep_methods: MethodList
+    inject_methods: MethodList
+    NICE_uuid: str | None = None
+    NICE_slotID: int | None = None
+
+    def __post_init__(self):
+        """Define mapping between method list roles and method lists. Designed to allow more than two method lists if necessary."""
+
+        self.rolemap = {MethodListRole.PREP: self.prep_methods,
+                        MethodListRole.INJECT : self.inject_methods}
+
+    def get_LH_ids(self) -> list[int | None]:
+
+        return [methodlist.LH_id for methodlist in self.rolemap.values()]
+
+    def getMethodListbyID(self, id: int) -> MethodList:
+
+        return [methodlist for methodlist in self.rolemap.values() if methodlist.LH_id == id]
+
+    def get_created_dates(self) -> list[datetime]:
+        """Returns list of MethodList.createdDates from the sample"""
+
+        return [datetime.strptime(methodlist.createdDate, DATE_FORMAT) for methodlist in self.rolemap.values() if methodlist.createdDate is not None]
+
+    def get_earliest_date(self) -> datetime | None:
+        """Gets earliest createdDate in the sample"""
+
+        datelist = self.get_created_dates()
+
+        return None if len(datelist) < 1 else min(datelist)
+
+    def get_status(self) -> SampleStatus:
+
+        method_status = [methodlist.status for methodlist in self.rolemap.values()]
+
+        # all are pending
+        if all([ms == SampleStatus.PENDING for ms in method_status]):
+
+            return SampleStatus.PENDING
+
+        # any are active
+        elif any([ms == SampleStatus.ACTIVE for ms in method_status]):
+
+            return SampleStatus.ACTIVE
+
+        # all are completed
+        elif all([ms == SampleStatus.COMPLETED for ms in method_status]):
+
+            return SampleStatus.COMPLETED
+
+        else:
+
+            print('Warning: undefined sample status. This should never happen!')
+            return None
+
+    def toSampleList(self, select: list(MethodListRole), entry=False) -> dict:
         """Generates dictionary for LH sample list
         
+            select: list of roles ('prep', 'inject') to turn into LH sample lists. Typical values are ['prep'], ['inject'], or ['prep', 'inject']
+
             entry: if a list of sample lists entry, SampleList columns field is null; otherwise,
                     if a full sample list, expose all methods 
-        """
 
-        self.createdDate = datetime.datetime.now().strftime(DATE_FORMAT) if self.createdDate is None else self.createdDate
-        expose_methods = None if entry else [m.render_lh_method() for m in self.methods]
-        return asdict(SampleList(self.name, f'{self.id}', 'System', self.description, self.createdDate, self.createdDate, self.createdDate, expose_methods))
+            Note that before calling this, MethodList.LH_id and Methodlist.createdDate must be set.
+        """
+        for role in select:
+            methodlist = self.rolemap[role]
+            expose_methods = None if entry else [m.render_lh_method() for m in methodlist.methods]
+            return asdict(SampleList(self.name, f'{methodlist.LH_id}', 'System', self.description, methodlist.createdDate, methodlist.createdDate, methodlist.createdDate, expose_methods))
 
 @dataclass
 class SampleContainer:
@@ -229,7 +297,7 @@ class SampleContainer:
 
     samples: list[Sample] = field(default_factory=list)
 
-    def _getIDs(self) -> list[int]:
+    def _getIDs(self) -> list[str]:
 
         return [s.id for s in self.samples]
 
@@ -237,22 +305,22 @@ class SampleContainer:
 
         return [s.name for s in self.samples]
 
-    def getSamplebyID(self, id: int, status: SampleStatus | None = None) -> Sample | None:
+    def getSamplebyLH_ID(self, id: int) -> Tuple[Sample | None, MethodList | None]:
         """Return sample with specific id"""
-        ids = self._getIDs()
-        if id in ids:
-            sample = self.samples[ids.index(id)]
-            return sample if (sample.status == status) | (status is None) else None
-        else:
-            return None
-            #raise ValueError(f"Sample ID {id} not found!")
+
+        for sample in self.samples:
+            if id in sample.get_LH_ids():
+                return sample, sample.getMethodListbyID(id)
+
+        return None, None
+        #raise ValueError(f"Sample ID {id} not found!")
 
     def getSamplebyName(self, name: str, status: SampleStatus | None = None) -> Sample | None:
         """Return sample with specific name"""
         names = self._getNames()
         if name in names:
             sample = self.samples[names.index(name)]
-            return sample if (sample.status == status) | (status is None) else None
+            return sample if (sample.get_status() == status) | (status is None) else None
         else:
             return None
             #raise ValueError(f"Sample name {name} not found!")
@@ -260,20 +328,25 @@ class SampleContainer:
     def addSample(self, sample: Sample) -> None:
         """Sample appender that checks for proper ID value"""
         if sample.id in self._getIDs():
-            new_id = self.getMaxID() + 1
-            print(f'Warning: id {sample.id} already taken. Changing to id {new_id}')
-            sample.id = new_id
-        self.samples.append(sample)
+            print(f'Warning: id {sample.id} already taken. Sample not added.')
+        else:
+            self.samples.append(sample)
         
     def deleteSample(self, sample: Sample) -> None:
         """Special remover that also updates index object"""
         
         self.samples.pop(self.samples.index(sample))
 
-    def getMaxID(self) -> int:
-        """ Returns maximum index value for desired index"""
+    def getMaxLH_id(self) -> int:
+        """ Returns maximum index value for Sample.MethodList.LH_id. If no LH_ids are defined,
+            returns -1."""
+        
+        lh_ids = []
+        for sample in self.samples:
+            for lh_id in sample.get_LH_ids():
+                lh_ids.append(lh_id)
 
-        return max(self._getIDs())
+        return max([lh_id if lh_id is not None else -1 for lh_id in lh_ids])
 
 def moveSample(container1: SampleContainer, container2: SampleContainer, key: str, value) -> None:
     """Utility for moving a sample from one SampleContainer to another
@@ -289,9 +362,9 @@ Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')  # type: ignore
 example_sample_list = []
 for i in range(10):
-    example_sample = Sample(i, f'testsample{i}', 'test sample description', methods=[])
-    example_sample.addMethod(example_method)
-    example_sample.addMethod(example_method)
+    example_sample = Sample(i, f'testsample{i}', 'test sample description', prep_methods=MethodList(MethodListRole.PREP), inject_methods=MethodList(MethodListRole.INJECT))
+    example_sample.prep_methods.addMethod(example_method)
+    example_sample.inject_methods.addMethod(example_method)
     example_sample_list.append(example_sample)
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)

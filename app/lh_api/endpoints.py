@@ -41,20 +41,20 @@ def PutSampleData():
     # check that run was successful
     if any([('completed successfully' in notification) for notification in data['sampleData']['resultNotifications']['notifications'].values()]):
         # find relevant sample by ID
-        sample = samples.getSamplebyID(sample_id)
+        _, methodlist = samples.getSamplebyLH_ID(sample_id)
 
         # double check that correct method is being referenced
-        assert method_name == sample.methods[method_number].method_name, f'Wrong method name {method_name} in result, expected {sample.methods[method_number].method_name}, full output ' + data
+        assert method_name == methodlist.methods[method_number].method_name, f'Wrong method name {method_name} in result, expected {methodlist.methods[method_number].method_name}, full output ' + data
 
         # mark method complete
-        sample.methods_complete[method_number] = True
+        methodlist.methods_complete[method_number] = True
 
         # Change layout state:
-        sample.methods[method_number].execute(layout)
+        methodlist.methods[method_number].execute(layout)
 
         # if all methods complete, change status of sample to completed
-        if all(sample.methods_complete):
-            sample.status = SampleStatus.COMPLETED
+        if all(methodlist.methods_complete):
+            methodlist.status = SampleStatus.COMPLETED
 
     # TODO: ELSE: Throw error
 
