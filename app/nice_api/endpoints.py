@@ -31,7 +31,7 @@ def RunSamplewithUUID() -> Response:
             sample.NICE_uuid = data['uuid']
             sample.NICE_slotID = int(data['slotID'])
             for role in data['role']:
-                methodlist = sample.rolemap[role]
+                methodlist = sample.stages[role]
                 methodlist.status = SampleStatus.ACTIVE
                 methodlist.createdDate = datetime.now().strftime(DATE_FORMAT)
                 methodlist.LH_id = samples.getMaxLH_id() + 1
@@ -99,7 +99,7 @@ def DryRunSamplewithUUID() -> Response:
         if sample is not None:
             totaltime = 0.0
             for role in data['role']:
-                methodlist = sample.rolemap[role]
+                methodlist = sample.stages[role]
                 if methodlist.status == SampleStatus.PENDING:
                     totaltime += sum([method.estimated_time() if not complete else 0.0
                         for method, complete in zip(methodlist.methods, methodlist.methods_complete)])
