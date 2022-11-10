@@ -6,14 +6,16 @@ from gui_api.events import trigger_sample_status_update, trigger_layout_update
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:
-    sample_list = [sample.toSampleList(entry=True) for sample in samples.samples if sample.status==SampleStatus.ACTIVE]
+    sample_list = [sample.toSampleList(methodlist, entry=True) for sample in samples.samples for methodlist in sample.stages.values() if methodlist.status==SampleStatus.ACTIVE]
 
     return make_response({'sampleLists': sample_list}, 200)
 
 @lh_blueprint.route('/LH/GetSampleList/<sample_list_id>', methods=['GET'])
 def GetSampleList(sample_list_id) -> Response:
     
-    return make_response({'sampleList': samples.getSamplebyID(int(sample_list_id), status=SampleStatus.ACTIVE).toSampleList()}, 200)
+    sample, methodlist = samples.getSamplebyLH_ID(int(sample_list_id))
+
+    return make_response({'sampleList': sample.toSampleList(methodlist)}, 200)
 
 @lh_blueprint.route('/LH/PutSampleListValidation/<sample_list_id>', methods=['POST'])
 def PutSampleListValidation(sample_list_id):
