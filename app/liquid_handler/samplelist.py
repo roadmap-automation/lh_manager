@@ -198,7 +198,7 @@ class MethodList:
     """Class representing a list of methods representing one LH job. Allows dividing
         prep and inject operations for a single sample."""
     LH_id: int | None = None
-    createdDate: str = field(default_factory = lambda: datetime.now().isoformat())
+    createdDate: str | None = None
     methods: list = field(default_factory=list)
     methods_complete: list[bool] = field(default_factory=list)
     status: SampleStatus = SampleStatus.PENDING
@@ -268,21 +268,23 @@ class Sample:
             print('Warning: undefined sample status. This should never happen!')
             return None
 
-    def toSampleList(self, select: List[StageName], entry=False) -> dict:
+    def toSampleList(self, methodlist: MethodList, entry=False) -> dict:
         """Generates dictionary for LH sample list
         
-            select: list of roles ('prep', 'inject') to turn into LH sample lists. Typical values are ['prep'], ['inject'], or ['prep', 'inject']
+            methodlist: MethodList containing methods to be included
 
             entry: if a list of sample lists entry, SampleList columns field is null; otherwise,
                     if a full sample list, expose all methods 
 
-            Note that before calling this, MethodList.LH_id and Methodlist.createdDate must be set.
+            Note:
+            1. Before calling this, MethodList.LH_id and Methodlist.createdDate must be set.
         """
-        for stage in select:
-            methodlist = self.stages[stage]
-            expose_methods = None if entry else [
-                m.render_lh_method() for m in methodlist.methods]
-            return asdict(SampleList(name=self.name, id=f'{methodlist.LH_id}', createdBy='System', description=self.description, createDate=methodlist.createdDate, startDate=methodlist.createdDate, endDate=methodlist.createdDate, columns=expose_methods))
+
+        assert methodlist in self.stages.values(), "Must use method list from calling sample!"
+
+        expose_methods = None if entry else [
+            m.render_lh_method() for m in methodlist.methods]
+        return asdict(SampleList(name=self.name, id=f'{methodlist.LH_id}', createdBy='System', description=self.description, createDate=methodlist.createdDate, startDate=methodlist.createdDate, endDate=methodlist.createdDate, columns=expose_methods))
 
 @dataclass
 class SampleContainer:
