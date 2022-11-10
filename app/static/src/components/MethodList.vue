@@ -44,7 +44,7 @@ function add_method(event) {
       <h2 class="accordion-header">
         <button class="accordion-button p-1" :class="{ collapsed: index !== active_item }" type="button"
           @click="toggleItem(index)" :aria-expanded="index === active_item">
-          <span class="align-middle px-2" :class="{status_completed: status?.methods_complete?.[index]}"> {{ method_string(method) }}</span>
+          <span class="align-middle px-2" :class="{'text-danger': status?.methods_complete?.[index]}"> {{ method_string(method) }}</span>
         </button>
       </h2>
       <div class="accordion-collapse collapse" :class="{ show: index === active_item }">
@@ -60,7 +60,7 @@ function add_method(event) {
         </div>
       </div>
     </div>
-    <select v-if="status?.status === 'pending'" class="form-select btn-outline-primary btn-sm" @change="add_method" value="null">
+    <select v-if="status?.status === 'pending'" class="form-select form-select-sm text-primary outline-primary" @change="add_method" value="null">
       <option class="disabled" disabled selected value="null">+ Add method</option>
       <option v-for="(mdef, mname) of method_defs" :value="mname">{{ mdef.display_name }}</option>
     </select>
@@ -81,7 +81,4 @@ input {
   border-color: #0d6efd ;
 }
 
-.status_completed {
-  color: orange;
-}
 </style>

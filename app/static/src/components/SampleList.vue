@@ -32,6 +32,34 @@ onMounted(() => {
   modal.value = new Modal(modal_node.value);
 });
 
+function get_sample_status_class(sample_id) {
+  const status = props.sample_status[sample_id] ?? {};
+  const stage_status = Object.values(status).map((stage) => stage?.status);
+  console.log(stage_status);
+  if (stage_status.every(s => s === 'pending')) {
+    return '';
+  }
+  else if (stage_status.some((s) => s === 'active')) {
+    return 'text-success';
+  }
+  else if (stage_status.every((s) => s === 'completed')) {
+    return 'text-danger';
+  }
+  else if (stage_status.some((s) => s === 'completed')) {
+    return 'text-warning';
+  }
+  else {
+    console.warn(`unexpected status: ${status}`);
+    return null;
+  }
+
+}
+
+const status_class_map = {
+  'pending': '',
+  'active': 'text-success',
+  'completed': 'text-danger',
+}
 
 </script>
 
@@ -39,7 +67,8 @@ onMounted(() => {
   <div class="accordion">
     <div class="accordion-item" v-for="(sample, sindex) of samples" :key="sample.id">
       <div class="accordion-header">
-        <button class="accordion-button p-1" :class="{ collapsed: sindex !== active_item, [`status_${sample_status[sample.id]?.status ?? 'pending'}`]: true }" type="button"
+        <button class="accordion-button p-1"
+          :class="{ collapsed: sindex !== active_item, [get_sample_status_class(sample.id)]: true }" type="button"
           @click="toggleItem(sindex)" :aria-expanded="sindex === active_item">
           <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
           <span class="align-middle px-2"> {{ sample.description }}</span>
@@ -49,7 +78,12 @@ onMounted(() => {
       </div>
       <div class="accordion-collapse collapse" :class="{ show: sindex === active_item }">
         <div class="accordion-body py-0">
-          <MethodList :methods="sample.methods" :method_defs="method_defs" :status="sample_status[sample.id]" />
+          <h6 :class="status_class_map[sample_status?.[sample.id]?.prep?.status ?? 'pending']">Prep:</h6>
+          <MethodList :methods="sample.stages.prep.methods" :method_defs="method_defs"
+            :status="sample_status?.[sample.id]?.prep" />
+          <h6 :class="status_class_map[sample_status?.[sample.id]?.inject?.status ?? 'pending']">Inject:</h6>
+          <MethodList :methods="sample.stages.inject.methods" :method_defs="method_defs"
+            :status="sample_status?.[sample.id]?.inject" />
         </div>
       </div>
     </div>
@@ -63,15 +97,15 @@ onMounted(() => {
         </div>
         <div class="modal-body">
           <table class="table">
-          <tr>
-            <td><label for="sample_name">name:</label></td>
-            <td><input type="text" :value="sample_to_edit.name" name="sample_name" /></td>
-          </tr>
-          <tr>
-            <td><label for="sample_description">description:</label></td>
-            <td><input type="text" :value="sample_to_edit.description" name="sample_description" /></td>
-          </tr>
-        </table>
+            <tr>
+              <td><label for="sample_name">name:</label></td>
+              <td><input type="text" :value="sample_to_edit.name" name="sample_name" /></td>
+            </tr>
+            <tr>
+              <td><label for="sample_description">description:</label></td>
+              <td><input type="text" :value="sample_to_edit.description" name="sample_description" /></td>
+            </tr>
+          </table>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="close_modal">Close</button>
@@ -87,13 +121,4 @@ onMounted(() => {
   background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-pencil-square' viewBox='0 0 16 16'><path d='M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z'/><path fill-rule='evenodd' d='M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z'/></svg>")
 }
 
-.status_pending span {
-  color: grey;
-}
-.status_completed span {
-  color: orange;
-}
-.status_active span {
-  color: green;
-}
 </style>
