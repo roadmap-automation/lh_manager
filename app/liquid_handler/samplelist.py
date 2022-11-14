@@ -1,7 +1,7 @@
 from dataclasses import InitVar, asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Literal, Union, Tuple
+from typing import Dict, List, Literal, Optional, Union, Tuple
 from .bedlayout import Well, LHBedLayout
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from datetime import datetime
@@ -15,8 +15,6 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 class BaseMethod:
     """Base class for LH methods"""
 
-    sample_name: InitVar[str]
-    sample_description: InitVar[str]
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
     @dataclass
@@ -25,12 +23,6 @@ class BaseMethod:
         SAMPLENAME: str
         SAMPLEDESCRIPTION: str
         METHODNAME: str
-
-    def __post_init__(self, sample_name, sample_description):
-        """Used to store sample_name and sample_description"""
-        
-        self.sample_name = sample_name  # type: ignore
-        self.sample_description = sample_description  # type: ignore
 
     def execute(self, layout: LHBedLayout) -> None:
         """Actions to be taken upon executing method. Default is nothing changes"""
@@ -60,11 +52,21 @@ class TransferWithRinse(BaseMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_lh_method(self) -> BaseMethod.lh_method:
+    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
 
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        return self.lh_method(self.sample_name, self.sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Flow_Rate}', target_zone, target_well)
+        return self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Source_Zone=source_zone,
+            Source_Well=source_well,
+            Volume=f'{self.Volume}',
+            Flow_Rate=f'{self.Flow_Rate}',
+            Target_Zone=target_zone,
+            Target_Well=target_well
+        )
 
     def execute(self, layout: LHBedLayout) -> None:
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
@@ -101,10 +103,19 @@ class MixWithRinse(BaseMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_lh_method(self) -> BaseMethod.lh_method:
+    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
 
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        return self.lh_method(self.sample_name, self.sample_description, self.method_name, f'{self.Volume}', f'{self.Flow_Rate}', f'{self.Number_of_Mixes}', target_zone, target_well)
+        return self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Volume=f'{self.Volume}',
+            Flow_Rate=f'{self.Flow_Rate}',
+            Number_of_Mixes=f'{self.Number_of_Mixes}',
+            Target_Zone=target_zone,
+            Target_Well=target_well
+        )
 
     def estimated_time(self) -> float:
         return 2 * self.Number_of_Mixes * self.Volume / self.Flow_Rate
@@ -127,10 +138,19 @@ class InjectWithRinse(BaseMethod):
         Aspirate_Flow_Rate: str
         Flow_Rate: str
 
-    def render_lh_method(self) -> BaseMethod.lh_method:
+    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
 
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
-        return self.lh_method(self.sample_name, self.sample_description, self.method_name, source_zone, source_well, f'{self.Volume}', f'{self.Aspirate_Flow_Rate}', f'{self.Flow_Rate}')
+        return self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Source_Zone=source_zone,
+            Source_Well=source_well,
+            Volume=f'{self.Volume}',
+            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
+            Flow_Rate=f'{self.Flow_Rate}'
+        )
 
     def execute(self, layout: LHBedLayout) -> None:
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
@@ -143,7 +163,7 @@ class InjectWithRinse(BaseMethod):
 @dataclass
 class Sleep(BaseMethod):
     """Sleep"""
-    Time: str
+    Time: float
     display_name: Literal['Sleep'] = 'Sleep'
     method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
 
@@ -151,15 +171,21 @@ class Sleep(BaseMethod):
     class lh_method(BaseMethod.lh_method):
         Time: str
 
-    def render_lh_method(self) -> BaseMethod.lh_method:
+    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
 
-        return self.lh_method(self.sample_name, self.sample_description, self.method_name, f'{self.Time}')
+        return self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Time=f'{self.Time}'
+        )
 
     def estimated_time(self) -> float:
         return float(self.Time)
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
+MethodsType = Union[TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
 lh_methods = {v.method_name: v for v in method_list}
 lh_method_fields = {}
 for method in method_list:
@@ -199,8 +225,8 @@ class MethodList:
         prep and inject operations for a single sample."""
     LH_id: int | None = None
     createdDate: str | None = None
-    methods: list = field(default_factory=list)
-    methods_complete: list[bool] = field(default_factory=list)
+    methods: List[MethodsType] = field(default_factory=list)
+    methods_complete: List[bool] = field(default_factory=list)
     status: SampleStatus = SampleStatus.PENDING
 
     def __post_init__(self):
@@ -231,6 +257,9 @@ class Sample:
     def getMethodListbyID(self, id: int) -> Union[MethodList, None]:
 
         return next((methodlist for methodlist in self.stages.values() if methodlist.LH_id == id), None)
+
+    def getStageByID(self, id: int) -> StageName | None:
+        return next((stage_name for (stage_name, methodlist) in self.stages.items() if methodlist.LH_id == id), None)
 
     def get_created_dates(self) -> list[datetime]:
         """Returns list of MethodList.createdDates from the sample"""
@@ -268,7 +297,7 @@ class Sample:
             print('Warning: undefined sample status. This should never happen!')
             return None
 
-    def toSampleList(self, methodlist: MethodList, entry=False) -> dict:
+    def toSampleList(self, stage_name: StageName, entry=False) -> dict:
         """Generates dictionary for LH sample list
         
             methodlist: MethodList containing methods to be included
@@ -280,11 +309,21 @@ class Sample:
             1. Before calling this, MethodList.LH_id and Methodlist.createdDate must be set.
         """
 
-        assert methodlist in self.stages.values(), "Must use method list from calling sample!"
+        assert stage_name in self.stages, "Must use stage from calling sample!"
 
+        stage = self.stages[stage_name]
         expose_methods = None if entry else [
-            m.render_lh_method() for m in methodlist.methods]
-        return asdict(SampleList(name=self.name, id=f'{methodlist.LH_id}', createdBy='System', description=self.description, createDate=methodlist.createdDate, startDate=methodlist.createdDate, endDate=methodlist.createdDate, columns=expose_methods))
+            m.render_lh_method(self.name, self.description) for m in stage.methods]
+        return asdict(SampleList(
+            name=self.name,
+            id=f'{stage.LH_id}',
+            createdBy='System',
+            description=self.description,
+            createDate=str(stage.createdDate),
+            startDate=str(stage.createdDate),
+            endDate=str(stage.createdDate),
+            columns=expose_methods
+        ))
 
 @dataclass
 class SampleContainer:
@@ -300,15 +339,18 @@ class SampleContainer:
 
         return [s.name for s in self.samples]
 
-    def getSamplebyLH_ID(self, id: int) -> Tuple[Sample | None, MethodList | None]:
+    def getSampleStagebyLH_ID(self, id: int) -> Tuple[Sample | None, StageName | None]:
         """Return sample with specific id"""
 
         for sample in self.samples:
             if id in sample.get_LH_ids():
-                return sample, sample.getMethodListbyID(id)
+                return sample, sample.getStageByID(id)
 
         return None, None
         #raise ValueError(f"Sample ID {id} not found!")
+
+    def getSampleById(self, id: str) -> Tuple[int, Sample] | Tuple[None, None]:
+        return next(((i,s) for i,s in enumerate(self.samples) if s.id == id), (None, None))
 
     def getSamplebyName(self, name: str, status: SampleStatus | None = None) -> Sample | None:
         """Return sample with specific name"""
@@ -354,7 +396,7 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
-example_method = Sleep('Test_sample', 'Description of a test sample', '0.1')  # type: ignore
+example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
 for i in range(10):
     example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
