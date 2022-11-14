@@ -1,8 +1,9 @@
+import warnings
 from flask import make_response, request, jsonify, Response
 from . import gui_blueprint
 from state.state import samples, layout
-from liquid_handler.samplelist import Sample, SampleStatus, lh_method_fields
-from dataclasses import asdict
+from liquid_handler.samplelist import Sample, SampleStatus, lh_method_fields, StageName
+from dataclasses import asdict, replace
 from copy import deepcopy
 from .events import trigger_layout_update, trigger_samples_update
 
@@ -11,16 +12,43 @@ from .events import trigger_layout_update, trigger_samples_update
 def AddSample() -> Response:
     """Adds a single-method sample to the sample list (testing only)"""
     data = request.get_json(force=True)
+    assert isinstance(data, dict)
     #new_sample = Sample(id=samples.getMaxID() + 1, name=data['SAMPLENAME'], description=data['SAMPLEDESCRIPTION'], methods=[new_method])
     new_sample = Sample(**data)
     samples.addSample(new_sample)
 
     # dry run (testing only)
     test_layout = deepcopy(layout)
-    for method in new_sample.methods:
+    for method in new_sample.stages[StageName.PREP].methods:
         method.execute(test_layout)
 
-    return make_response({'new sample': new_sample.toSampleList(), 'layout': asdict(test_layout)}, 200)
+    return make_response({'new sample': new_sample.toSampleList(StageName.PREP), 'layout': asdict(test_layout)}, 200)
+
+@gui_blueprint.route('/webform/UpdateSample/', methods=['POST'])
+@trigger_samples_update
+def UpdateSample() -> Response:
+    """Modifies an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't update or add")
+        return make_response({'error': "no id in sample, can't update or add"}, 200)
+
+    sample_index, sample = samples.getSampleById(id)
+    print(data, sample)
+    if sample is None or sample_index is None:
+        """ adding a new sample """
+        new_sample = Sample(**data)
+        samples.addSample(new_sample)
+        return make_response({'sample added': id}, 200)
+    else:
+        """ replacing sample """
+        new_sample = replace(sample, **data)
+        samples.samples[sample_index] = new_sample
+        return make_response({'sample updated': id}, 200)
+
+    
 
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:
