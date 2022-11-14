@@ -6,16 +6,17 @@ from gui_api.events import trigger_sample_status_update, trigger_layout_update
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:
-    sample_list = [sample.toSampleList(methodlist, entry=True) for sample in samples.samples for methodlist in sample.stages.values() if methodlist.status==SampleStatus.ACTIVE]
+    sample_list = [sample.toSampleList(stage_name, entry=True) for sample in samples.samples for stage_name in sample.stages if sample.stages[stage_name].status==SampleStatus.ACTIVE]
 
     return make_response({'sampleLists': sample_list}, 200)
 
 @lh_blueprint.route('/LH/GetSampleList/<sample_list_id>', methods=['GET'])
 def GetSampleList(sample_list_id) -> Response:
     
-    sample, methodlist = samples.getSamplebyLH_ID(int(sample_list_id))
+    sample, stage_name = samples.getSampleStagebyLH_ID(int(sample_list_id))
+    sampleList = sample.toSampleList(stage_name) if sample is not None and stage_name is not None else []
 
-    return make_response({'sampleList': sample.toSampleList(methodlist)}, 200)
+    return make_response({'sampleList': sampleList}, 200)
 
 @lh_blueprint.route('/LH/PutSampleListValidation/<sample_list_id>', methods=['POST'])
 def PutSampleListValidation(sample_list_id):
@@ -34,6 +35,7 @@ def PutSampleListValidation(sample_list_id):
 @trigger_layout_update
 def PutSampleData():
     data = request.get_json(force=True)
+    assert isinstance(data, dict)
 
     # Get ID, method number, and method name from returned data
     sample_id = int(data['sampleData']['runData'][0]['sampleListID'])
@@ -43,16 +45,19 @@ def PutSampleData():
     # check that run was successful
     if any([('completed successfully' in notification) for notification in data['sampleData']['resultNotifications']['notifications'].values()]):
         # find relevant sample by ID
-        _, methodlist = samples.getSamplebyLH_ID(sample_id)
+        sample, stage_name = samples.getSampleStagebyLH_ID(sample_id)
+        assert sample is not None and stage_name is not None, "unknown sample"
+        methodlist = sample.stages[stage_name]
+        method = methodlist.methods[method_number]
 
         # double check that correct method is being referenced
-        assert method_name == methodlist.methods[method_number].method_name, f'Wrong method name {method_name} in result, expected {methodlist.methods[method_number].method_name}, full output ' + data
+        assert method_name == method.method_name, f'Wrong method name {method_name} in result, expected {method.method_name}, full output {data}'
 
         # mark method complete
         methodlist.methods_complete[method_number] = True
 
         # Change layout state:
-        methodlist.methods[method_number].execute(layout)
+        method.execute(layout)
 
         # if all methods complete, change status of sample to completed
         if all(methodlist.methods_complete):
