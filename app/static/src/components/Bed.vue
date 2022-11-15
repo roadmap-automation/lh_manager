@@ -1,49 +1,83 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
+import { emitter, layout, samples, active_item, active_stage, active_method } from '../store';
 
 const props = defineProps<{
   height: number,
   width: number,
-  title: string,
-  columns: number,
-  rows: number,
-  wells: object,
-  style: 'grid' | 'staggered',
+  rack_id: string,
+  shape: 'circle' | 'rect'
 }>();
 
 const text_size = 30;
 const padding = 6;
 
-const row_array = computed(() => Array.from({length: props.rows}).map((_,i) => i))
-const col_array = computed(() => Array.from({length: props.columns}).map((_,i) => i));
-const cell_size = computed(() => {
-  const max_col_width = (props.width - text_size - 2*padding) / props.columns;
-  const max_row_height = (props.height - text_size - 2*padding) / props.rows;
-  return Math.min(max_row_height, max_col_width);
-})
-const r = computed(() => (cell_size.value / 2.0 - padding/2.0));
+const rack = layout.value.racks[props.rack_id] || {};
 
-function y_offset(col) {
-  return 2 * padding + (cell_size.value * (col + 0.5));
+const row_array = computed(() => Array.from({ length: rack.rows }).map((_, i) => i))
+const col_array = computed(() => Array.from({ length: rack.columns }).map((_, i) => i));
+const max_col_width = computed(() => (props.width - text_size - 2 * padding) / rack.columns);
+const row_height = computed(() => (props.height - text_size - 2 * padding) / rack.rows);
+// For square cells (circle shape vials):
+const cell_size = computed(() => {
+  return Math.min(row_height.value, max_col_width.value);
+})
+const r = computed(() => (cell_size.value / 2.0 - padding / 2.0));
+
+const col_width = computed(() => {
+  if (props.shape === 'rect') {
+    return props.width / rack.columns;
+  }
+  else if (props.shape === 'circle') {
+    return cell_size.value;
+  }
+});
+
+function y_offset(col: number, centered: boolean = true) {
+  const centering_offset = (centered) ? 0.5 : 0;
+  return 2 * padding + (cell_size.value * (col + centering_offset));
 }
 
-function x_offset(col, row) {
+function x_offset(col: number, row: number, centered: boolean = true) {
   let start: number;
-  if (props.style === 'staggered') {
-    start = (row % 2) * 0.5 + 0.25;
+  const centering_offset = (centered) ? 0.5 : 0;
+  if (rack.style === 'staggered') {
+    start = (row % 2) * 0.5 + centering_offset;
   }
   else {
-    start = 0.5;
+    start = centering_offset;
+  }  
+  return padding + (col_width.value * (col + start));
+}
+
+function clicked(row: number, col: number) {
+  const well_number = row * rack.columns + col + 1;
+  const rack_id = props.rack_id;
+  emitter.emit('well_picked', { rack_id, well_number });
+}
+
+const active_wells = computed(() => {
+  if (active_item.value == null || active_stage.value == null || active_method.value == null) {
+    return {target: null, source: null};
   }
+  const sample = samples.value[active_item.value];
+  const stage = sample?.stages?.[active_stage.value];
+  const method = stage?.methods?.[active_method.value];
+  return {target: method?.['Target'], source: method?.['Source']};
+})
 
-  return 2 * padding + (cell_size.value * (col + start));
+function highlight_class(col, row) {
+  const well_number = row * rack.columns + col + 1;
+  const classList: string[] = [];
+  const {target, source} = active_wells.value;
+  if (props.rack_id === target?.rack_id && well_number === target?.well_number) {
+    classList.push("target");
+  }
+  if (props.rack_id === source?.rack_id && well_number === source?.well_number) {
+    classList.push("source");
+  }
+  return classList.join(" ")
 }
-
-function clicked(vial) {
-  alert(`pressed: ${JSON.stringify(vial)}`)
-}
-
-const emit = defineEmits(['clicked']);
 
 onMounted(() => {
 })
@@ -52,14 +86,18 @@ onMounted(() => {
 
 <template>
   <rect :width="width" :height="height"></rect>
-    <g v-for="row of row_array" :index="row">
-      <g v-for="col of col_array" :index="col" :n="row * props.columns + col">
-        <title>{{row * props.columns + col + 1}}</title>
-        <circle class="vial-button" :cx="x_offset(col, row)" :cy="y_offset(row)" :r="r" @click="emit('clicked', props.title, (row * props.columns + col + 1))"></circle>
-        <text class="vial-label" :x="x_offset(col,row)" :y="y_offset(row)" text-anchor="middle">{{row * props.columns + col + 1}}</text>
-      </g>
+  <g v-for="row of row_array" :index="row">
+    <g v-for="col of col_array" :index="col" :n="row * rack.columns + col">
+      <title>{{ row * rack.columns + col + 1 }}</title>
+      <circle :class="highlight_class(col, row)" v-if="props.shape === 'circle'" class="vial-button" :cx="x_offset(col, row)" :cy="y_offset(row)" :r="r"
+        @click="clicked(row, col)"></circle>
+      <rect :class="highlight_class(col, row)" v-if="props.shape === 'rect'" class="vial-button" :width="col_width - 2*padding" :height="row_height - 2*padding"
+        :x="x_offset(col, row, false)" :y="y_offset(row, false)" @click="clicked(row, col)"></rect>
+      <text class="vial-label" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
+        {{ row * rack.columns + col + 1 }}</text>
     </g>
-    <text class="title" :y="height - padding" :x="width/2">{{props.title}}</text>
+  </g>
+  <text class="title" :y="height - padding" :x="width / 2">{{ props.rack_id }}</text>
 </template>
 
 <style scoped>
@@ -69,17 +107,20 @@ rect {
   clip-path: rect();
   fill: #a0a0a0;
 }
+
 .title {
   fill: white;
   font: normal 30px sans-serif;
   text-anchor: middle;
 }
+
 .vial-button {
   cursor: pointer;
   fill: orange;
   stroke: black;
   stroke-width: 1px;
 }
+
 .vial-label {
   font: normal 20px sans-serif;
   pointer-events: none;
@@ -87,4 +128,11 @@ rect {
   fill: darkgreen;
 }
 
+.source {
+  fill: lightgreen;
+}
+
+.target {
+  fill: pink;
+}
 </style>
