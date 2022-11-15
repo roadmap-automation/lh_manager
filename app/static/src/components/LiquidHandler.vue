@@ -7,7 +7,6 @@ import SampleList from './SampleList.vue';
 
 const props = defineProps({
   msg: String,
-  layout: Object,
   samples: Array,
   sample_status: Object,
 })
@@ -115,7 +114,7 @@ function openMixture() {
       </div>
 
       <div class="flex-grow-1">
-        <BedLayout :layout="layout" />
+        <BedLayout />
       </div>
     </div>
 
