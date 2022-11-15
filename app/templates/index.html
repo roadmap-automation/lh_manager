@@ -127,7 +127,7 @@
                     return response.json();
                 }).then(function(data) {
                     //console.log(data['layout'])
-                    for (const [rack_name, rack] of Object.entries(data['layout']['racks'])) {
+                    for (const [rack_name, rack] of Object.entries(data['racks'])) {
                         //console.log(rack)
                         for (const well of rack['wells']) {
                             well_id = 'Well: ' + well['rack_id'] + ' ' + well['well_number']
