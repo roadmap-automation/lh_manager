@@ -1,40 +1,101 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { Modal } from 'bootstrap';
+import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
+// import { socket_emit } from '../store.ts';
+import { update_sample, active_item, active_stage, active_method } from '../store';
 
 const props = defineProps({
   samples: Array,
   sample_status: Object,
 });
 
-const active_item = ref(null);
+const emit = defineEmits(['update_sample']);
+
 const editing_item = ref(null);
 const modal_node = ref(null);
 const modal = ref(null);
-const sample_to_edit = ref({});
+const name_input = ref(null);
+const modal_title = ref("Edit Sample Name and Description")
+const sample_to_edit = ref({ name: '', description: '', id: '' });
 
 function toggleItem(index) {
   active_item.value = (index === active_item.value) ? null : index;
+  active_method.value = null;
+  active_stage.value = null;
 }
 
-function edit_sample_name(index) {
-  sample_to_edit.value = props.samples[index];
+function add_sample() {
+  const id = uuidv4();
+  const name = "";
+  const description = "";
+  modal_title.value = "Create New Sample";
+  sample_to_edit.value = { id, name, description };
   modal.value?.show();
+}
+
+async function edit_sample_name(index) {
+  const s = props.samples[index];
+  const { id, name, description } = s;
+  modal_title.value = "Edit Sample Name and Description";
+  sample_to_edit.value = { id, name, description };
+  modal.value?.show();
+}
+
+function update_sample_name() {
+  update_sample(sample_to_edit.value);
+  close_modal();
 }
 
 function close_modal() {
   modal.value?.hide();
 }
 
+function add_method(method, sample, stage_name) {
+  const { id, stages } = sample;
+  // work with a copy
+  const stage = { ...stages[stage_name] };
+  const new_methods = [...stage.methods, method];
+  stage.methods = new_methods
+  const new_sample = { ...sample };
+  sample.stages[stage_name] = stage;
+  console.log('adding method', method, sample, stage, new_sample);
+  update_sample(new_sample);
+}
+
+function set_location(index, name, {rack_id, well_number}, sample, stage_name) {
+  const { id, stages } = sample;
+  // work with a copy
+  const stage = { ...stages[stage_name] };
+  const method = stage.methods[index];
+  method[name] = {rack_id, well_number};
+  const new_sample = { ...sample };
+  sample.stages[stage_name] = stage;
+  update_sample(new_sample);
+}
+
+function set_active_method(stage_name, method_index) {
+  if (active_stage.value === stage_name && active_method.value === method_index) {
+    active_method.value = null;
+    active_stage.value = null;
+  }
+  else {
+    active_stage.value = stage_name;
+    active_method.value = method_index;
+  }
+}
+
 onMounted(() => {
   modal.value = new Modal(modal_node.value);
+  modal_node.value.addEventListener('shown.bs.modal', function () {
+    name_input.value?.focus();
+  })
 });
 
 function get_sample_status_class(sample_id) {
   const status = props.sample_status[sample_id] ?? {};
   const stage_status = Object.values(status).map((stage) => stage?.status);
-  console.log(stage_status);
   if (stage_status.every(s => s === 'pending')) {
     return '';
   }
@@ -54,6 +115,12 @@ function get_sample_status_class(sample_id) {
 
 }
 
+const status_by_id = computed(() => {
+  return Object.fromEntries(props.samples.map((s) => {
+    return [s.id, get_sample_status_class(s.id)];
+  }));
+})
+
 const status_class_map = {
   'pending': '',
   'active': 'text-success',
@@ -63,11 +130,12 @@ const status_class_map = {
 </script>
 
 <template>
+  <button class="btn btn-outline-primary btn-sm" @click="add_sample">+ Add sample</button>
   <div class="accordion">
     <div class="accordion-item" v-for="(sample, sindex) of samples" :key="sample.id">
       <div class="accordion-header">
         <button class="accordion-button p-1"
-          :class="{ collapsed: sindex !== active_item, [get_sample_status_class(sample.id)]: true }" type="button"
+          :class="{ collapsed: sindex !== active_item, [status_by_id[sample.id]]: true }" type="button"
           @click="toggleItem(sindex)" :aria-expanded="sindex === active_item">
           <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
           <span class="align-middle px-2"> {{ sample.description }}</span>
@@ -77,10 +145,15 @@ const status_class_map = {
       </div>
       <div class="accordion-collapse collapse" :class="{ show: sindex === active_item }">
         <div class="accordion-body py-0">
-          <h6 :class="status_class_map[sample_status?.[sample.id]?.prep?.status ?? 'pending']">Prep:</h6>
-          <MethodList :methods="sample.stages.prep.methods" :status="sample_status?.[sample.id]?.prep" />
-          <h6 :class="status_class_map[sample_status?.[sample.id]?.inject?.status ?? 'pending']">Inject:</h6>
-          <MethodList :methods="sample.stages.inject.methods" :status="sample_status?.[sample.id]?.inject" />
+          <div v-for="(stage, stage_name) of sample.stages">
+            <h6 :class="status_class_map[sample_status?.[sample.id]?.[stage_name]?.status ?? 'pending']">{{ stage_name }}:
+            </h6>
+            <MethodList :methods="stage.methods" :status="sample_status?.[sample.id]?.prep" :collapsed="!(sindex === active_item && stage_name == active_stage)"
+              :active_item="(stage_name === active_stage) ? active_method : null"
+              @add_method="(m) => add_method(m, sample, stage_name)"
+              @set_location="(i, n, l) => set_location(i, n, l, sample, stage_name)"
+              @set_active="(index) => set_active_method(stage_name, index)" />
+          </div>
         </div>
       </div>
     </div>
@@ -89,24 +162,26 @@ const status_class_map = {
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Edit Sample Name and Description</h5>
+          <h5 class="modal-title">{{ modal_title }}</h5>
           <button type="button" class="btn-close" @click="close_modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <table class="table">
             <tr>
               <td><label for="sample_name">name:</label></td>
-              <td><input type="text" :value="sample_to_edit.name" name="sample_name" /></td>
+              <td><input ref="name_input" type="text" @keydown.enter="update_sample_name" v-model="sample_to_edit.name"
+                  name="sample_name" /></td>
             </tr>
             <tr>
               <td><label for="sample_description">description:</label></td>
-              <td><input type="text" :value="sample_to_edit.description" name="sample_description" /></td>
+              <td><input type="text" @keydown.enter="update_sample_name" v-model="sample_to_edit.description"
+                  name="sample_description" /></td>
             </tr>
           </table>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="close_modal">Close</button>
-          <button type="button" class="btn btn-primary" @click="">Save changes</button>
+          <button type="button" class="btn btn-primary" @click="update_sample_name">Save changes</button>
         </div>
       </div>
     </div>
