@@ -2,7 +2,7 @@ from dataclasses import InitVar, asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Literal, Optional, Union, Tuple
-from .bedlayout import Well, LHBedLayout
+from .bedlayout import Well, LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from datetime import datetime
 
@@ -36,10 +36,10 @@ class BaseMethod:
 class TransferWithRinse(BaseMethod):
     """Transfer with rinse"""
 
-    Source: Well
-    Target: Well
-    Volume: float
-    Flow_Rate: float
+    Source: Optional[WellLocation] = None
+    Target: Optional[WellLocation] = None
+    Volume: float = 1.0
+    Flow_Rate: float = 2.5
     display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
     method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
@@ -88,10 +88,10 @@ class TransferWithRinse(BaseMethod):
 @dataclass
 class MixWithRinse(BaseMethod):
     """Inject with rinse"""
-    Target: Well
-    Volume: float
-    Flow_Rate: float
-    Number_of_Mixes: int
+    Target: Optional[WellLocation] = None
+    Volume: float = 1.0
+    Flow_Rate: float = 2.5
+    Number_of_Mixes: int = 3
     display_name: Literal['Mix With Rinse'] = 'Mix With Rinse'
     method_name: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
 
@@ -123,10 +123,10 @@ class MixWithRinse(BaseMethod):
 @dataclass
 class InjectWithRinse(BaseMethod):
     """Inject with rinse"""
-    Source: Well
-    Volume: float
-    Aspirate_Flow_Rate: float
-    Flow_Rate: float
+    Source: Optional[WellLocation] = None
+    Volume: float = 1.0
+    Aspirate_Flow_Rate: float = 2.5
+    Flow_Rate: float = 2.5
     display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'
     method_name: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
@@ -163,7 +163,7 @@ class InjectWithRinse(BaseMethod):
 @dataclass
 class Sleep(BaseMethod):
     """Sleep"""
-    Time: float
+    Time: float = 1.0
     display_name: Literal['Sleep'] = 'Sleep'
     method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
 
