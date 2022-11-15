@@ -14,6 +14,7 @@ mimetypes.add_type("image/png", ".png")
 mimetypes.add_type("image/svg+xml", ".svg")
 
 app = Flask(__name__, static_folder='static')
+app.config['JSON_SORT_KEYS'] = False
 
 app.register_blueprint(gui_blueprint)
 app.register_blueprint(nice_blueprint)
