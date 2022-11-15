@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "bootstrap": "^5.2.1",
-    "vue": "^3.2.37",
-    "socket.io-client": "^4.5.2"
+    "mitt": "^3.0.0",
+    "socket.io-client": "^4.5.2",
+    "uuid": "^9.0.0",
+    "vue": "^3.2.37"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^3.1.0",
