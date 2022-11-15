@@ -24,7 +24,7 @@ def AddSample() -> Response:
 
     return make_response({'new sample': new_sample.toSampleList(StageName.PREP), 'layout': asdict(test_layout)}, 200)
 
-@gui_blueprint.route('/webform/UpdateSample/', methods=['POST'])
+@gui_blueprint.route('/GUI/UpdateSample/', methods=['POST'])
 @trigger_samples_update
 def UpdateSample() -> Response:
     """Modifies an existing sample"""
