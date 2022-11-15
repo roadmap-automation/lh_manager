@@ -60,6 +60,13 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 
     return new_components, new_concs, volume1 + volume2
 
+
+@dataclass
+class WellLocation:
+    rack_id: str
+    well_number: int
+
+
 @dataclass
 class Well:
     """Class representing the contents of a single well
