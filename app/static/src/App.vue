@@ -4,11 +4,9 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
-import { method_defs } from './store';
+import { method_defs, layout, samples } from './store';
 
 const connected = ref(false);
-const layout = ref(null);
-const samples = ref([]);
 const sample_status = ref({});
 
 const socket = io('', {
@@ -30,16 +28,17 @@ socket.on('disconnect', (payload) => {
 })
 
 socket.on('update_samples', () => {
-  console.log("it's time to update samples...");
   // go fetch from the endpoint...
+  refreshSamples();
 })
 
 socket.on('update_layout', () => {
-  console.log("it's time to update the layout...");
+  refreshLayout();
 })
 
 async function refreshLayout() {
   const new_layout = await (await fetch("/GUI/GetLayout")).json();
+  console.log({new_layout});
   layout.value = new_layout;
 }
 
@@ -78,11 +77,6 @@ function remove_sample(id) {
   }
 }
 
-function add_sample() {
-  const ids = samples.value.map((s) => s.id);
-  samples.value.push({ name: 'new', description: '', id: Math.max(...ids) + 1 })
-}
-
 </script>
 
 <template>
@@ -96,8 +90,7 @@ function add_sample() {
         </div>
       </div>
     </nav>
-    <LiquidHandler :layout="layout" :samples="samples" :sample_status="sample_status" @remove_sample="remove_sample"
-      @add_sample="add_sample" />
+    <LiquidHandler :samples="samples" :sample_status="sample_status" @remove_sample="remove_sample" />
   </div>
 </template>
 
