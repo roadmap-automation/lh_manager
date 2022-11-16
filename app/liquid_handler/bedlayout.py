@@ -1,7 +1,7 @@
 """Class definitions for bed layout, wells, and compositions"""
 from dataclasses import field
 from pydantic.dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 @dataclass
 class Solvent:
@@ -63,8 +63,8 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 
 @dataclass
 class WellLocation:
-    rack_id: str
-    well_number: int
+    rack_id: Optional[str] = None
+    well_number: Optional[int] = None
 
 
 @dataclass

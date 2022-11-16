@@ -36,8 +36,8 @@ class BaseMethod:
 class TransferWithRinse(BaseMethod):
     """Transfer with rinse"""
 
-    Source: Optional[WellLocation] = None
-    Target: Optional[WellLocation] = None
+    Source: WellLocation = field(default_factory=WellLocation)
+    Target: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
     Flow_Rate: float = 2.5
     display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
@@ -88,7 +88,7 @@ class TransferWithRinse(BaseMethod):
 @dataclass
 class MixWithRinse(BaseMethod):
     """Inject with rinse"""
-    Target: Optional[WellLocation] = None
+    Target: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
     Flow_Rate: float = 2.5
     Number_of_Mixes: int = 3
@@ -123,7 +123,7 @@ class MixWithRinse(BaseMethod):
 @dataclass
 class InjectWithRinse(BaseMethod):
     """Inject with rinse"""
-    Source: Optional[WellLocation] = None
+    Source: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
     Aspirate_Flow_Rate: float = 2.5
     Flow_Rate: float = 2.5
