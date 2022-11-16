@@ -64,6 +64,20 @@ function add_method(method, sample, stage_name) {
   update_sample(new_sample);
 }
 
+function update_method(sample, stage_name, index, field_name, field_value) {
+  const { id, stages } = sample;
+  // work with a copy
+  const stage = { ...stages[stage_name] };
+  const methods = stage.methods.slice();
+  const method = methods[index];
+  method[field_name] = field_value;
+  stage.methods = methods;
+  const new_sample = { ...sample };
+  sample.stages[stage_name] = stage;
+  console.log('updating method', method, sample, stage, new_sample);
+  update_sample(new_sample);
+}
+
 function set_location(index, name, {rack_id, well_number}, sample, stage_name) {
   const { id, stages } = sample;
   // work with a copy
@@ -152,7 +166,8 @@ const status_class_map = {
               :active_item="(stage_name === active_stage) ? active_method : null"
               @add_method="(m) => add_method(m, sample, stage_name)"
               @set_location="(i, n, l) => set_location(i, n, l, sample, stage_name)"
-              @set_active="(index) => set_active_method(stage_name, index)" />
+              @set_active="(index) => set_active_method(stage_name, index)"
+              @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />
           </div>
         </div>
       </div>

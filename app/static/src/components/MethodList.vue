@@ -14,7 +14,7 @@ const props = defineProps<{
   active_item: number | null
 }>();
 
-const emit = defineEmits(['add_method', 'set_location', 'set_active']);
+const emit = defineEmits(['add_method', 'set_location', 'set_active', 'update_method']);
 const active_well_field = ref<string | null>(null);
 
 function toggleItem(index) {
@@ -23,11 +23,11 @@ function toggleItem(index) {
 
 function method_string(method: Method) {
   const param_strings = get_parameters(method)
-    .map(([key, value]) => {
+    .map(({name, value}) => {
       if (value &&  typeof(value) === 'object') {
         value = Object.values(value).join(":")
       }
-      return `${key}=${value}`
+      return `${name}=${value}`
     });
 
   const output = `${method.display_name}: ${param_strings.join(',')}`;
@@ -43,11 +43,21 @@ function get_parameters(method: Method) {
   const { fields, schema: { properties } } = method_def;
   const params = fields.map((field_name) => {
     const p = properties[field_name];
-    const t = ('$ref' in p) ? p['$ref'] : p.type;
-    return [field_name, method[field_name], t, p];
+    const type = ('$ref' in p) ? p['$ref'] : p.type;
+    const value = clone(method[field_name]);
+    const original_value = clone(method[field_name]);
+    return {name: field_name, value, original_value, type };
   });
   return params
 }
+
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+const parameters = computed(() => {
+  return props.methods.map(get_parameters);
+})
 
 function add_method(event) {
   const method_name = event.target.value;
@@ -70,10 +80,15 @@ function pick_handler({rack_id, well_number}) {
 }
 
 
-function activateSelector(method_index, name, field_type) {
-  if (field_type === '#/definitions/WellLocation') {
+function activateSelector({name, type}) {
+  if (type === '#/definitions/WellLocation') {
     active_well_field.value = name;
   }
+}
+
+function send_changes(index, param) {
+  console.log('send changes', param.name, param.value);
+  emit('update_method', index, param.name, param.value);
 }
 
 watch(() => props.collapsed, (collapsed: boolean) => {
@@ -111,22 +126,30 @@ watch(() => props.collapsed, (collapsed: boolean) => {
         <div class="accordion-body p-2 border bg-light">
           <table class="table m-0 table-borderless" v-if="index === active_item">
             <fieldset :disabled="status.status != 'pending'">
-              <tr v-for="[name, value, ptype] of get_parameters(method)" @click="activateSelector(index, name, ptype)">
-                <td :class="{'selector-active': active_well_field === name}">
+              <tr v-for="param of parameters[index]" @click="activateSelector(param)">
+                <td :class="{'selector-active': active_well_field === param.name}">
                   <div class="form-check">
                   <label>
                     <!-- <input class="form-check-input" v-if="ptype === '#/definitions/Well'" type="radio" :name="`param_${name}`" /> -->
-                    {{ name }}:
+                    {{ param.name }}:
                   </label>
                   </div>
                 </td>
-                <td v-if="ptype === 'number' || ptype === 'integer'"><input class="number px-1 py-0" :value="value ?? 0" :name="`param_${name}`" /></td>
-                <td v-if="ptype === '#/definitions/WellLocation'">
-                  <select v-if="layout != null" :value="value?.rack_id">
+                <td v-if="param.type === 'number' || param.type === 'integer'">
+                  <input class="number px-1 py-0"
+                    v-model.number="param.value" :name="`param_${param.name}`"
+                    @keydown.enter="send_changes(index, param)"
+                    @blur="send_changes(index, param)" />
+                </td>
+                <td v-if="param.type === '#/definitions/WellLocation'">
+                  <select v-if="layout != null && param.value && 'rack_id' in param.value" v-model="param.value.rack_id" @change="send_changes(index, param)">
                     <option :value="null" disabled></option>
                     <option v-for="(rack_def, rack_name) of layout.racks">{{rack_name}}</option>
                   </select>
-                  <input class="number px-1 py-0" :value="value?.well_number" :name="`param_${name}_well`" />
+                  <input v-if="param.value && 'well_number' in param.value" class="number px-1 py-0" v-model="param.value.well_number"
+                    :name="`param_${param.name}_well`" 
+                    @keydown.enter="send_changes(index, param)"
+                    @blur="send_changes(index, param)" />
                 </td>
               </tr>
             </fieldset>
@@ -158,5 +181,9 @@ input.number {
 
 .selector-active {
   background-color: orange;
+}
+
+input.dirty {
+  color: red;
 }
 </style>
