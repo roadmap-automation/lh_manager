@@ -1,8 +1,11 @@
 from flask import make_response, Response, request
-from . import lh_blueprint
+
 from state.state import samples, layout
+from lhqueue import LHqueue
 from liquid_handler.samplelist import SampleStatus
 from gui_api.events import trigger_sample_status_update, trigger_layout_update
+
+from . import lh_blueprint
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:
@@ -59,9 +62,11 @@ def PutSampleData():
         # Change layout state:
         method.execute(layout)
 
-        # if all methods complete, change status of sample to completed
+        # if all methods complete, change status of sample to completed, flag LH as no longer busy, and run the next queue item
         if all(methodlist.methods_complete):
             methodlist.status = SampleStatus.COMPLETED
+            LHqueue.busy = False
+            LHqueue.run_next()
 
     # TODO: ELSE: Throw error
 

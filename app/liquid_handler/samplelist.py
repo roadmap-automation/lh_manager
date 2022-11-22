@@ -198,6 +198,7 @@ for method in method_list:
 # =============== Sample list handling =================
 
 class SampleStatus(str, Enum):
+    INACTIVE = 'inactive'
     PENDING = 'pending'
     ACTIVE = 'active'
     COMPLETED = 'completed'
@@ -227,7 +228,7 @@ class MethodList:
     createdDate: str | None = None
     methods: List[MethodsType] = field(default_factory=list)
     methods_complete: List[bool] = field(default_factory=list)
-    status: SampleStatus = SampleStatus.PENDING
+    status: SampleStatus = SampleStatus.INACTIVE
 
     def __post_init__(self):
 
@@ -277,18 +278,23 @@ class Sample:
 
         method_status = [methodlist.status for methodlist in self.stages.values()]
 
-        # all are pending
-        if all([ms == SampleStatus.PENDING for ms in method_status]):
+        # all are inactive
+        if all(ms == SampleStatus.INACTIVE for ms in method_status):
 
-            return SampleStatus.PENDING
+            return SampleStatus.INACTIVE
 
         # any are active
-        elif any([ms == SampleStatus.ACTIVE for ms in method_status]):
+        elif any(ms == SampleStatus.ACTIVE for ms in method_status):
 
             return SampleStatus.ACTIVE
 
+        # any are pending
+        elif any(ms == SampleStatus.PENDING for ms in method_status):
+
+            return SampleStatus.PENDING
+
         # all are completed
-        elif all([ms == SampleStatus.COMPLETED for ms in method_status]):
+        elif all(ms == SampleStatus.COMPLETED for ms in method_status):
 
             return SampleStatus.COMPLETED
 
@@ -393,7 +399,6 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
     container2.addSample(sample)
     container1.deleteSample(sample)
 
-
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep(Time=0.1)
@@ -412,7 +417,7 @@ example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
 example_sample_list[1].stages[StageName.PREP].methods_complete = [True for m in example_sample_list[1].stages[StageName.PREP].methods_complete]
 example_sample_list[1].stages[StageName.INJECT].methods_complete = [True for m in example_sample_list[1].stages[StageName.INJECT].methods_complete]
 example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
-example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.PENDING
+example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.INACTIVE
 example_sample_list[2].stages[StageName.PREP].methods_complete = [True for m in example_sample_list[2].stages[StageName.PREP].methods_complete]
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)

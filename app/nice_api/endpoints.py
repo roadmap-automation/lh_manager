@@ -1,22 +1,48 @@
-from flask import make_response, Response, request
-from . import nice_blueprint
-from state.state import samples
-from liquid_handler.samplelist import SampleStatus, DATE_FORMAT
 from datetime import datetime
 from dataclasses import asdict
+from flask import make_response, Response, request
+
+from lhqueue import LHqueue
+from state.state import samples
+from liquid_handler.samplelist import SampleStatus, DATE_FORMAT
 from gui_api.events import trigger_sample_status_update
 
-@nice_blueprint.route('/NICE/RunSample/<sample_name>', methods=['GET'])
-@trigger_sample_status_update
-def RunSample(sample_name) -> Response:
-    """Runs a sample by name. Deprecated in favor of RunSamplewithUUID"""
-    sample = samples.getSamplebyName(sample_name, status=SampleStatus.PENDING)
+from . import nice_blueprint
+
+def _run_sample(data) -> Response:
+    """ Generic function for processing a run request"""
+
+    # check that sample name exists
+    sample = samples.getSamplebyName(data['name'])
     if sample is not None:
-        sample.status = SampleStatus.ACTIVE
-        sample.createdDate = datetime.now().strftime(DATE_FORMAT)
+        # check that requested stages are inactive
+        for stage in data['stage']:
+            if sample.stages[stage].status != SampleStatus.INACTIVE:
+                return make_response({'result': 'error', 'message': f'stage {stage} of sample {data["name"]} is not inactive'}, 400)
+            
+            # create new run command specific to stage and add to queue
+            sample.stages[stage].status = SampleStatus.PENDING
+            stagedata = {**data, 'stage': [stage]}
+            LHqueue.put(stagedata)
+            LHqueue.run_next()
+
         return make_response({'result': 'success', 'message': 'success'}, 200)
+
+    return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+
+@nice_blueprint.route('/NICE/RunSample/<sample_name>/<uuid>/<slotID>/<stage>', methods=['GET'])
+@trigger_sample_status_update
+def RunSample(sample_name, uuid, slotID, stage) -> Response:
+    """Runs a sample by name and stage. For testing only"""
+
+    if stage == 'both':
+        stage = ['prep', 'inject']
     else:
-        return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+        stage = [stage]
+
+    data = {'name': sample_name, 'uuid': uuid, 'slotID': int(slotID), 'stage': stage}
+
+    return _run_sample(data)
 
 @nice_blueprint.route('/NICE/RunSamplewithUUID', methods=['POST'])
 @trigger_sample_status_update
@@ -24,23 +50,12 @@ def RunSamplewithUUID() -> Response:
     """Runs a sample by name, giving it a UUID. Returns error if sample not found or sample is already active or completed."""
     data = request.get_json(force=True)
 
-    if ('name' in data.keys()) & ('uuid' in data.keys() & ('slotID' in data.keys()) & ('role' in data.keys())):
+    # check for proper format
+    if ('name' in data.keys()) & ('uuid' in data.keys() & ('slotID' in data.keys()) & ('stage' in data.keys())):
 
-        sample = samples.getSamplebyName(data['name'], status=SampleStatus.PENDING)
-        if sample is not None:
-            sample.NICE_uuid = data['uuid']
-            sample.NICE_slotID = int(data['slotID'])
-            for role in data['role']:
-                methodlist = sample.stages[role]
-                methodlist.status = SampleStatus.ACTIVE
-                methodlist.createdDate = datetime.now().strftime(DATE_FORMAT)
-                methodlist.LH_id = samples.getMaxLH_id() + 1
-            return make_response({'result': 'success', 'message': 'success'}, 200)
-        else:
-            return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+        return _run_sample(data)
     
-    else:
-        return make_response({'result': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'role': ['prep' | 'inject']"}, 400)
+    return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
 
 def _getActiveSample() -> str:
     """Gets the currently active sample with the earliest createdDate."""
@@ -118,3 +133,21 @@ def GetInstrumentStatus() -> Response:
     status = 'busy' if any([sample.get_status() == SampleStatus.ACTIVE for sample in samples.samples]) else 'idle'
 
     return make_response({'status': status, 'active sample': _getActiveSample()}, 200)
+
+@nice_blueprint.route('/NICE/Stop/', methods=['GET'])
+def Stop() -> Response:
+    """Stops operation by emptying liquid handler queue"""
+
+    # empties queue and resets status of incomplete methods to INACTIVE
+    init_size = LHqueue.qsize()
+
+    while not LHqueue.empty():
+        data = LHqueue.get()
+        sample = samples.getSamplebyName(data['name'])
+        
+        # should only ever be one stage
+        for stage in data['stage']:
+            # reset status of sample stage to INACTIVE
+            sample.stages[stage].status = SampleStatus.INACTIVE
+
+    return make_response({'result': 'success', 'message': f'{init_size} pending LH operations canceled'}, 200)
