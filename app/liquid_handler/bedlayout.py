@@ -20,6 +20,22 @@ class Composition:
     solvents: list[Solvent] = field(default_factory=list)
     solutes: list[Solute] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """Custom representation of composition for metadata"""
+
+        if len(self.solvents) > 1:
+            sorted_solvents = sorted(self.solvents, key=lambda s: s.fraction, reverse=True)
+            solvent_ratios = ':'.join(f'{s.fraction * 100:0.0f}' for s in sorted_solvents)
+            solvent_names = ':'.join(s.name for s in sorted_solvents)
+            res = solvent_ratios + ' ' + solvent_names
+        else:
+            res = self.solvents[0].name
+
+        for solute in self.solutes:
+            res += f' + {solute.concentration:.4g} {solute.units} {solute.name}'
+
+        return res
+
     @classmethod
     def from_list(cls, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
 
