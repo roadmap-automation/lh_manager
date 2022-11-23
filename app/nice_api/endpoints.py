@@ -4,7 +4,7 @@ from flask import make_response, Response, request
 
 from lhqueue import LHqueue
 from state.state import samples
-from liquid_handler.samplelist import SampleStatus, DATE_FORMAT
+from liquid_handler.samplelist import SampleStatus
 from gui_api.events import trigger_sample_status_update
 
 from . import nice_blueprint
@@ -98,7 +98,7 @@ def GetMetaData(uuid) -> Response:
     samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
     
     if len(samples_uuid):
-        samples_uuid.sort(key=lambda sample: datetime.strptime(sample.get_earliest_date(), DATE_FORMAT))
+        samples_uuid.sort(key=lambda sample: sample.get_earliest_date())
         return make_response({'metadata': [asdict(sample) for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
     else:
         return make_response({}, 200)
