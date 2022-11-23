@@ -62,6 +62,11 @@ def PutSampleData():
         # Change layout state:
         method.execute(layout)
 
+        # Change sample state if the method does this:
+        new_state = method.new_sample_composition(layout)
+        if len(new_state):
+            sample.current_contents = new_state
+
         # if all methods complete, change status of sample to completed, flag LH as no longer busy, and run the next queue item
         if all(methodlist.methods_complete):
             methodlist.status = SampleStatus.COMPLETED

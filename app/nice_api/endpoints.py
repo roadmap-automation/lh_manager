@@ -99,7 +99,7 @@ def GetMetaData(uuid) -> Response:
     
     if len(samples_uuid):
         samples_uuid.sort(key=lambda sample: datetime.strptime(sample.get_earliest_date(), DATE_FORMAT))
-        return make_response({'metadata': [asdict(sample) for sample in samples_uuid]}, 200)
+        return make_response({'metadata': [asdict(sample) for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
     else:
         return make_response({}, 200)
 
@@ -115,9 +115,9 @@ def DryRunSamplewithUUID() -> Response:
             totaltime = 0.0
             for role in data['role']:
                 methodlist = sample.stages[role]
-                if methodlist.status == SampleStatus.PENDING:
-                    totaltime += sum([method.estimated_time() if not complete else 0.0
-                        for method, complete in zip(methodlist.methods, methodlist.methods_complete)])
+                if methodlist.status in (SampleStatus.PENDING, SampleStatus.INACTIVE):
+                    totaltime += sum(method.estimated_time() if not complete else 0.0
+                        for method, complete in zip(methodlist.methods, methodlist.methods_complete))
 
             return make_response({'result': 'success', 'time estimate': totaltime}, 200)
         else:

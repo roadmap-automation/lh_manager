@@ -28,9 +28,25 @@ class BaseMethod:
         """Actions to be taken upon executing method. Default is nothing changes"""
         pass
 
+    def new_sample_composition(self, layout: LHBedLayout) -> str:
+        """Returns new sample composition if applicable"""
+        
+        return ''
+
     def estimated_time(self) -> float:
         """Estimated time for method in default time units"""
         return 0.0
+
+@dataclass
+class InjectMethod(BaseMethod):
+    """Special class for methods that change the sample composition"""
+
+    Source: WellLocation = field(default_factory=WellLocation)
+
+    def new_sample_composition(self, layout: LHBedLayout) -> str:
+        """Returns string representation of source well composition"""
+        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        return repr(source_well.composition)
 
 @dataclass
 class TransferWithRinse(BaseMethod):
@@ -121,9 +137,9 @@ class MixWithRinse(BaseMethod):
         return 2 * self.Number_of_Mixes * self.Volume / self.Flow_Rate
 
 @dataclass
-class InjectWithRinse(BaseMethod):
+class InjectWithRinse(InjectMethod):
     """Inject with rinse"""
-    Source: WellLocation = field(default_factory=WellLocation)
+    #Source: WellLocation defined in InjectMethod
     Volume: float = 1.0
     Aspirate_Flow_Rate: float = 2.5
     Flow_Rate: float = 2.5
@@ -236,7 +252,7 @@ class MethodList:
             if isinstance(method, dict):
                 self.methods[i] = lh_methods[method['method_name']](**method)
 
-    def addMethod(self, method) -> None:
+    def addMethod(self, method: MethodsType) -> None:
         """Adds new method and flag for completion"""
         self.methods.append(method)
         self.methods_complete.append(False)
@@ -250,6 +266,7 @@ class Sample:
     stages: Dict[StageName, MethodList] = field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
+    current_contents: str = ''
 
     def get_LH_ids(self) -> list[int | None]:
 
