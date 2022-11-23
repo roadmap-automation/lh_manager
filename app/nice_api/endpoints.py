@@ -108,13 +108,13 @@ def DryRunSamplewithUUID() -> Response:
     """Dry runs a sample by name. UUID is ignored. Returns time estimate; otherwise error if sample not found."""
     data = request.get_json(force=True)
 
-    if ('name' in data.keys()) & ('uuid' in data.keys() & ('slotID' in data.keys()) & ('role' in data.keys())):
+    if ('name' in data.keys()) & ('uuid' in data.keys() & ('slotID' in data.keys()) & ('stage' in data.keys())):
 
         sample = samples.getSamplebyName(data['name'])
         if sample is not None:
             totaltime = 0.0
-            for role in data['role']:
-                methodlist = sample.stages[role]
+            for stage in data['stage']:
+                methodlist = sample.stages[stage]
                 if methodlist.status in (SampleStatus.PENDING, SampleStatus.INACTIVE):
                     totaltime += sum(method.estimated_time() if not complete else 0.0
                         for method, complete in zip(methodlist.methods, methodlist.methods_complete))
