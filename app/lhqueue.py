@@ -1,7 +1,7 @@
 from queue import SimpleQueue
 from datetime import datetime
 
-from liquid_handler.samplelist import SampleStatus, DATE_FORMAT, StageName
+from liquid_handler.samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
 from state.state import samples
 
 class LHSimpleQueue(SimpleQueue):
@@ -38,3 +38,8 @@ class LHSimpleQueue(SimpleQueue):
 ## ========== Liquid handler queue initialization ============
 
 LHqueue = LHSimpleQueue()
+
+# TODO: remove for production (though having a dummy method first 
+# might be useful before pushing "auto run" on Trilution)
+LHqueue.put({'name': example_sample_list[0].name, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
+LHqueue.run_next()

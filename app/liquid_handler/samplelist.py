@@ -422,12 +422,12 @@ example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
 for i in range(10):
     example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
-    example_sample.stages[StageName.PREP].addMethod(example_method)
-    example_sample.stages[StageName.INJECT].addMethod(example_method)
+    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.1*float(i)))
+    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.11*float(i)))
     example_sample_list.append(example_sample)
 
 # throw some new statuses in the mix:
-example_sample_list[0].stages[StageName.PREP].status = SampleStatus.ACTIVE
+example_sample_list[0].stages[StageName.PREP].status = SampleStatus.INACTIVE
 example_sample_list[0].stages[StageName.PREP].methods_complete[0] = False
 example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
