@@ -2,7 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from liquid_handler.lhqueue import LHqueue
+from liquid_handler.lhqueue import LHqueue, validate_format
 from liquid_handler.samplelist import SampleStatus
 from state.state import samples
 from gui_api.events import trigger_sample_status_update
@@ -51,7 +51,7 @@ def RunSamplewithUUID() -> Response:
     data = request.get_json(force=True)
 
     # check for proper format
-    if ('name' in data.keys()) & ('uuid' in data.keys() & ('slotID' in data.keys()) & ('stage' in data.keys())):
+    if validate_format(data):
 
         return _run_sample(data)
     
@@ -108,7 +108,7 @@ def DryRunSamplewithUUID() -> Response:
     """Dry runs a sample by name. UUID is ignored. Returns time estimate; otherwise error if sample not found."""
     data = request.get_json(force=True)
 
-    if ('name' in data.keys()) & ('uuid' in data.keys() & ('slotID' in data.keys()) & ('stage' in data.keys())):
+    if validate_format(data):
 
         sample = samples.getSamplebyName(data['name'])
         if sample is not None:
@@ -138,16 +138,8 @@ def GetInstrumentStatus() -> Response:
 def Stop() -> Response:
     """Stops operation by emptying liquid handler queue"""
 
-    # empties queue and resets status of incomplete methods to INACTIVE
     init_size = LHqueue.qsize()
 
-    while not LHqueue.empty():
-        data = LHqueue.get()
-        sample = samples.getSamplebyName(data['name'])
-        
-        # should only ever be one stage
-        for stage in data['stage']:
-            # reset status of sample stage to INACTIVE
-            sample.stages[stage].status = SampleStatus.INACTIVE
+    LHqueue.stop()
 
     return make_response({'result': 'success', 'message': f'{init_size} pending LH operations canceled'}, 200)

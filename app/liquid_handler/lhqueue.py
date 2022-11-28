@@ -6,9 +6,26 @@ from state.state import samples
 
 from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
 
+def validate_format(data: dict) -> bool:
+    """Checks format of data input"""
+
+    return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
+
 class LHSimpleQueue(SimpleQueue):
     """Derived queue class for keeping track of LH status"""
     busy = False
+
+    def stop(self) -> int:
+        """Empties queue and resets status of incomplete methods to INACTIVE"""
+
+        while not self.empty():
+            data = self.get()
+            sample = samples.getSamplebyName(data['name'])
+            
+            # should only ever be one stage
+            for stage in data['stage']:
+                # reset status of sample stage to INACTIVE
+                sample.stages[stage].status = SampleStatus.INACTIVE
 
     def run_next(self) -> None:
         """Runs next item in queue if queue is not busy and there are items to run.
