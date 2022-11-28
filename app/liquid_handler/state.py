@@ -1,6 +1,7 @@
-from liquid_handler.samplelist import SampleContainer, example_sample_list
-from liquid_handler.layoutmap import racks
-from liquid_handler.bedlayout import LHBedLayout, example_wells
+"""Liquid handler state initialization"""
+from .samplelist import SampleContainer, example_sample_list
+from .layoutmap import racks
+from .bedlayout import LHBedLayout, example_wells
 
 ## ======= Initialize samples =========
 samples = SampleContainer()

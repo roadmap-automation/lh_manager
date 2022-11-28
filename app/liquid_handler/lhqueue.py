@@ -2,8 +2,7 @@
 from queue import SimpleQueue
 from datetime import datetime
 
-from state.state import samples
-
+from .state import samples
 from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
 
 def validate_format(data: dict) -> bool:

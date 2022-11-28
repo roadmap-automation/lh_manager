@@ -4,7 +4,7 @@ from flask import make_response, Response, request
 
 from liquid_handler.lhqueue import LHqueue, validate_format
 from liquid_handler.samplelist import SampleStatus
-from state.state import samples
+from liquid_handler.state import samples
 from gui_api.events import trigger_sample_status_update
 
 from . import nice_blueprint

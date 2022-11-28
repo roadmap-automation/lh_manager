@@ -1,7 +1,7 @@
 """Gilson Trilution LH 4.0 Endpoints"""
 from flask import make_response, Response, request
 
-from state.state import samples, layout
+from liquid_handler.state import samples, layout
 from liquid_handler.lhqueue import LHqueue
 from liquid_handler.samplelist import SampleStatus
 from gui_api.events import trigger_sample_status_update, trigger_layout_update
