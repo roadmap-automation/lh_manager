@@ -1,8 +1,10 @@
+"""Internal queue for feeding LH operations one at a time"""
 from queue import SimpleQueue
 from datetime import datetime
 
-from liquid_handler.samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
 from state.state import samples
+
+from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
 
 class LHSimpleQueue(SimpleQueue):
     """Derived queue class for keeping track of LH status"""
