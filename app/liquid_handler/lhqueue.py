@@ -1,5 +1,5 @@
 """Internal queue for feeding LH operations one at a time"""
-from queue import SimpleQueue
+from queue import Queue
 from datetime import datetime
 
 from .state import samples
@@ -10,9 +10,17 @@ def validate_format(data: dict) -> bool:
 
     return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
 
-class LHSimpleQueue(SimpleQueue):
+class LHSimpleQueue(Queue):
     """Derived queue class for keeping track of LH status"""
     busy = False
+
+    def put_safe(self, data) -> None:
+        """Safe put that ignores duplicate requests.
+        
+            Important for handling NICE stop/pause/restart requests"""
+
+        if data not in self.queue:
+            self.put(data)
 
     def stop(self) -> int:
         """Empties queue and resets status of incomplete methods to INACTIVE"""
@@ -59,5 +67,5 @@ LHqueue = LHSimpleQueue()
 
 # TODO: remove for production (though having a dummy method first 
 # might be useful before pushing "auto run" on Trilution)
-LHqueue.put({'name': example_sample_list[0].name, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
+LHqueue.put_safe({'name': example_sample_list[0].name, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
 LHqueue.run_next()

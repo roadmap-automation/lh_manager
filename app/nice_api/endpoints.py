@@ -23,7 +23,7 @@ def _run_sample(data) -> Response:
             # create new run command specific to stage and add to queue
             sample.stages[stage].status = SampleStatus.PENDING
             stagedata = {**data, 'stage': [stage]}
-            LHqueue.put(stagedata)
+            LHqueue.put_safe(stagedata)
             LHqueue.run_next()
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
