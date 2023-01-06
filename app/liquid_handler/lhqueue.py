@@ -61,6 +61,11 @@ class LHSimpleQueue(Queue):
                     sample.NICE_uuid = data['uuid']
                     sample.NICE_slotID = int(data['slotID'])
 
+    def repr_queue(self):
+        """Provides a string representation of the queue"""
+
+        return '\n'.join(str(item) for item in self.queue)
+
 ## ========== Liquid handler queue initialization ============
 
 LHqueue = LHSimpleQueue()

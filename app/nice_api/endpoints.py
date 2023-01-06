@@ -134,11 +134,19 @@ def GetInstrumentStatus() -> Response:
 
     return make_response({'status': status, 'active sample': _getActiveSample()}, 200)
 
-@nice_blueprint.route('/NICE/Stop/', methods=['POST'])
+@nice_blueprint.route('/NICE/GetLHQueue/', methods=['GET'])
+def GetLHQueue() -> Response:
+    """Probes instrument status. Busy if any samples are active, otherwise idle"""
+
+    return make_response({'LHQueue': LHqueue.repr_queue()}, 200)
+
+@nice_blueprint.route('/NICE/Stop/', methods=['GET', 'POST'])
 def Stop() -> Response:
     """Stops operation by emptying liquid handler queue.
     
-        Ignores request data."""
+        Ignores request data.
+        
+        TODO: Remove GET for production"""
 
     init_size = LHqueue.qsize()
 
