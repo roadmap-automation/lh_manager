@@ -30,7 +30,7 @@ def _run_sample(data) -> Response:
 
     return make_response({'result': 'error', 'message': 'sample not found'}, 400)
 
-@nice_blueprint.route('/NICE/RunSample/<sample_name>/<uuid>/<slotID>/<stage>', methods=['GET'])
+@nice_blueprint.route('/NICE/RunSample/<sample_name>/<uuid>/<slotID>/<stage>/', methods=['GET'])
 @trigger_sample_status_update
 def RunSample(sample_name, uuid, slotID, stage) -> Response:
     """Runs a sample by name and stage. For testing only"""
@@ -44,7 +44,7 @@ def RunSample(sample_name, uuid, slotID, stage) -> Response:
 
     return _run_sample(data)
 
-@nice_blueprint.route('/NICE/RunSamplewithUUID', methods=['POST'])
+@nice_blueprint.route('/NICE/RunSamplewithUUID/', methods=['POST'])
 @trigger_sample_status_update
 def RunSamplewithUUID() -> Response:
     """Runs a sample by name, giving it a UUID. Returns error if sample not found or sample is already active or completed."""
@@ -79,7 +79,7 @@ def GetActiveSample() -> Response:
         
     return make_response({'name': _getActiveSample()}, 200)
 
-@nice_blueprint.route('/NICE/GetSampleStatus/<sample_name>', methods=['GET'])
+@nice_blueprint.route('/NICE/GetSampleStatus/<sample_name>/', methods=['GET'])
 def GetSampleStatus(sample_name) -> Response:
     """Gets status of a sample by name"""
 
@@ -90,7 +90,7 @@ def GetSampleStatus(sample_name) -> Response:
     else:
         return make_response({'result': 'error', 'message': 'sample not found'}, 400)
 
-@nice_blueprint.route('/NICE/GetMetaData/<uuid>', methods=['GET'])
+@nice_blueprint.route('/NICE/GetMetaData/<uuid>/', methods=['GET'])
 def GetMetaData(uuid) -> Response:
     """Gets metadata from all samples with UUID.
         Responses are sorted by createdDate"""
