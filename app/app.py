@@ -21,9 +21,9 @@ app.register_blueprint(nice_blueprint)
 app.register_blueprint(lh_blueprint)
 socketio.init_app(app)
 
-@app.route('/')
-def root():
-    return render_template('index.html')
+#@app.route('/')
+#def root():
+#    return render_template('index.html')
 
 @app.route('/test_emit/')
 def test_emit():
