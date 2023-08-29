@@ -53,6 +53,10 @@ def RunSamplewithUUID() -> Response:
     # check for proper format
     if validate_format(data):
 
+        # catch null UUID
+        if data['uuid'] == chr(0):
+            data['uuid'] = None
+
         return _run_sample(data)
     
     return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
@@ -92,16 +96,18 @@ def GetSampleStatus(sample_name) -> Response:
 
 @nice_blueprint.route('/NICE/GetMetaData/<uuid>/', methods=['GET'])
 def GetMetaData(uuid) -> Response:
-    """Gets metadata from all samples with UUID.
+    """Gets metadata from all samples with UUID. %00 (null character)
+        is interpreted as None.
         Responses are sorted by createdDate"""
 
-    samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
-    
-    if len(samples_uuid):
-        samples_uuid.sort(key=lambda sample: sample.get_earliest_date())
-        return make_response({'metadata': [asdict(sample) for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
-    else:
-        return make_response({}, 200)
+    if uuid != chr(0):
+        samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
+        
+        if len(samples_uuid):
+            samples_uuid.sort(key=lambda sample: sample.get_earliest_date())
+            return make_response({'metadata': [asdict(sample) for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
+
+    return make_response({}, 200)
 
 @nice_blueprint.route('/NICE/DryRunSamplewithUUID', methods=['POST'])
 def DryRunSamplewithUUID() -> Response:
