@@ -54,7 +54,7 @@ def RunSamplewithUUID() -> Response:
     if validate_format(data):
 
         # catch null UUID
-        if data['uuid'] == chr(0):
+        if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
             data['uuid'] = None
 
         return _run_sample(data)
@@ -136,8 +136,10 @@ def DryRunSamplewithUUID() -> Response:
 def GetInstrumentStatus() -> Response:
     """Probes instrument status. Busy if any samples are active, otherwise idle"""
 
-    status = 'busy' if any([sample.get_status() == SampleStatus.ACTIVE for sample in samples.samples]) else 'idle'
-
+    #all_method_statuses = [methodlist.status in (SampleStatus.ACTIVE, SampleStatus.PENDING) for sample in samples.samples for methodlist in sample.stages.values()]
+    #print(all_method_statuses)
+    status = 'busy' if any(methodlist.status in (SampleStatus.ACTIVE, SampleStatus.PENDING) for sample in samples.samples for methodlist in sample.stages.values()) else 'idle'
+    #print(status)
     return make_response({'status': status, 'active sample': _getActiveSample()}, 200)
 
 @nice_blueprint.route('/NICE/GetLHQueue/', methods=['GET'])

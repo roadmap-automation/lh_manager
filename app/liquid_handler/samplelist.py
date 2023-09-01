@@ -217,6 +217,7 @@ class SampleStatus(str, Enum):
     INACTIVE = 'inactive'
     PENDING = 'pending'
     ACTIVE = 'active'
+    PARTIAL = 'partially complete'
     COMPLETED = 'completed'
 
 @dataclass
@@ -314,6 +315,10 @@ class Sample:
         elif all(ms == SampleStatus.COMPLETED for ms in method_status):
 
             return SampleStatus.COMPLETED
+
+        elif any(ms == SampleStatus.COMPLETED for ms in method_status) & any(ms == SampleStatus.INACTIVE for ms in method_status):
+
+            return SampleStatus.PARTIAL
 
         else:
 
@@ -420,10 +425,10 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
-for i in range(10):
+for i in range(100):
     example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
-    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.1*float(i)))
-    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.11*float(i)))
+    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i)))
+    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i)))
     example_sample_list.append(example_sample)
 
 # throw some new statuses in the mix:
