@@ -1,10 +1,11 @@
-<script setup>
+<script setup lang="ts">
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
-import { method_defs, layout, samples } from './store';
+import { method_defs, layout, samples, SampleStatus } from './store';
+import type { MethodDef } from './store';
 
 const connected = ref(false);
 const sample_status = ref({});
@@ -66,8 +67,9 @@ async function refreshSampleStatus() {
 }
 
 async function refreshMethodDefs() {
-  const { methods } = await (await fetch("/GUI/GetAllMethods/")).json();
+  const { methods } = await (await fetch("/GUI/GetAllMethods/")).json() as {methods: Record<string, MethodDef>};
   method_defs.value = methods;
+  console.log({methods});
 }
 
 function remove_sample(id) {

@@ -1,15 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
 import { Modal } from 'bootstrap';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
 // import { socket_emit } from '../store.ts';
 import { update_sample, active_item, active_stage, active_method } from '../store';
+import type { SampleStatus, StatusType, Sample } from '../store';
 
-const props = defineProps({
-  samples: Array,
-  sample_status: Object,
-});
+const props = defineProps<{
+  samples: Sample[],
+  sample_status: SampleStatus
+}>();
 
 const emit = defineEmits(['update_sample']);
 
@@ -57,11 +58,12 @@ function add_method(method, sample, stage_name) {
   // work with a copy
   const stage = { ...stages[stage_name] };
   const new_methods = [...stage.methods, method];
-  stage.methods = new_methods
+  stage.methods = new_methods;
+  const method_index = new_methods.length - 1;
   const new_sample = { ...sample };
   sample.stages[stage_name] = stage;
-  console.log('adding method', method, sample, stage, new_sample);
   update_sample(new_sample);
+  set_active_method(stage_name, method_index);
 }
 
 function update_method(sample, stage_name, index, field_name, field_value) {
@@ -110,8 +112,11 @@ onMounted(() => {
 function get_sample_status_class(sample_id) {
   const status = props.sample_status[sample_id] ?? {};
   const stage_status = Object.values(status).map((stage) => stage?.status);
-  if (stage_status.every(s => s === 'pending')) {
+  if (stage_status.every(s => s === 'inactive')) {
     return '';
+  }
+  else if (stage_status.some((s) => s === 'pending')) {
+    return 'text-primary';
   }
   else if (stage_status.some((s) => s === 'active')) {
     return 'text-success';
@@ -123,7 +128,7 @@ function get_sample_status_class(sample_id) {
     return 'text-warning';
   }
   else {
-    console.warn(`unexpected status: ${status}`);
+    console.warn(`unexpected status: ${JSON.stringify(status)}`);
     return null;
   }
 

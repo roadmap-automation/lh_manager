@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { method_defs, source_well, target_well, layout, emitter } from '../store';
+import type { SampleStatus, WellLocation } from '../store';
 
 type Method = {
   display_name: string,
   method_name: string,
+  Source?: WellLocation,
+  Target?: WellLocation,
+  [fieldname: string]: string | number | WellLocation | null | undefined,
 }
 
 const props = defineProps<{
   methods: Method[],
-  status: object,
+  status: SampleStatus,
   collapsed: boolean,
   active_item: number | null
 }>();
@@ -52,12 +56,16 @@ function get_parameters(method: Method) {
 }
 
 function clone(obj) {
-  return JSON.parse(JSON.stringify(obj));
+  return (obj === undefined) ? undefined : JSON.parse(JSON.stringify(obj));
 }
 
 const parameters = computed(() => {
   return props.methods.map(get_parameters);
-})
+});
+
+const editable = computed(() => {
+  return (props.status?.status === 'inactive');
+});
 
 function add_method(event) {
   const method_name = event.target.value;
@@ -91,8 +99,23 @@ function send_changes(index, param) {
   emit('update_method', index, param.name, param.value);
 }
 
+watch(() => props.active_item, (active_item) => {
+
+  if (!props.collapsed && active_item !== null) {
+    const method = props.methods[active_item];
+    if ((method?.Source?.rack_id == null || method?.Source?.well_number == null)) {
+      active_well_field.value = 'Source';
+    }
+    else if ((method?.Target?.rack_id == null || method?.Target?.well_number == null)) {
+      active_well_field.value = 'Target';
+    }
+    else {
+      active_well_field.value = null;
+    }
+  }
+})
+
 watch(() => props.collapsed, (collapsed: boolean) => {
-  console.log({collapsed, props});
   if (collapsed) {
     source_well.value = null; // can be undefined
     target_well.value = null; // can be undefined
@@ -103,8 +126,8 @@ watch(() => props.collapsed, (collapsed: boolean) => {
     if (props.active_item != null) {
       const method_index = props.active_item;
       const method = props.methods[method_index];
-      source_well.value = method['Source']; // can be undefined
-      target_well.value = method['Target']; // can be undefined
+      source_well.value = method['Source'] ?? null; // can be undefined
+      target_well.value = method['Target'] ?? null; // can be undefined
     }
   }
 })
@@ -125,7 +148,7 @@ watch(() => props.collapsed, (collapsed: boolean) => {
       <div class="accordion-collapse collapse" :class="{ show: index === active_item }">
         <div class="accordion-body p-2 border bg-light">
           <table class="table m-0 table-borderless" v-if="index === active_item">
-            <fieldset :disabled="status.status != 'pending'">
+            <fieldset :disabled="!editable">
               <tr v-for="param of parameters[index]" @click="activateSelector(param)">
                 <td :class="{'selector-active': active_well_field === param.name}">
                   <div class="form-check">
@@ -157,7 +180,7 @@ watch(() => props.collapsed, (collapsed: boolean) => {
         </div>
       </div>
     </div>
-    <select v-if="status?.status === 'pending'" class="form-select form-select-sm text-primary outline-primary"
+    <select v-if="editable" class="form-select form-select-sm text-primary outline-primary"
       @change="add_method" value="null">
       <option class="disabled" disabled selected value="null">+ Add method</option>
       <option v-for="(mdef, mname) of method_defs" :value="mname">{{ mdef.display_name }}</option>

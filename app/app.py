@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect
 from gui_api import gui_blueprint
 from lh_api import lh_blueprint
 from nice_api import nice_blueprint
@@ -24,6 +24,10 @@ socketio.init_app(app)
 #@app.route('/')
 #def root():
 #    return render_template('index.html')
+
+@app.route('/')
+def root():
+    return redirect('/static/dist/index.html')
 
 @app.route('/test_emit/')
 def test_emit():
