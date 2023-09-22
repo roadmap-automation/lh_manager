@@ -20,7 +20,7 @@ racks={'Solvent': {'columns': 3, 'rows': 1, 'max_volume': 700.0, 'style': 'grid'
 
 # Mapping from zones to racks. For convenience in following functions (does not have to be 1:1 mapping)
 zone2rack = {Zone.SOLVENT: 'Solvent',
-             Zone.SAMPLE: 'Sample',
+             Zone.SAMPLE: 'Samples',
              Zone.STOCK: 'Stock',
              Zone.MIX: 'Mix',
              Zone.INJECT: 'Inject'}

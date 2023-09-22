@@ -42,21 +42,51 @@ class Composition:
         return cls([Solvent(name, fraction) for name, fraction in zip(solvent_names, solvent_fractions)],
                    [Solute(name, conc) for name, conc in zip(solute_names, solute_concentrations)])
 
+    def get_solvent_names(self) -> Tuple[list[str]]:
+        """Returns list of solvent names"""
+
+        return [solvent.name for solvent in self.solvents]
+
+    def get_solute_names(self) -> Tuple[list[str]]:
+        """Returns list of solute names"""
+
+        return [solute.name for solute in self.solutes]
+
     def get_solvent_fractions(self) -> Tuple[list[str], list[float]]:
         """Returns lists of solvent names and volume fractions"""
 
-        names = [solvent.name for solvent in self.solvents]
         fractions = [solvent.fraction for solvent in self.solvents]
 
-        return names, fractions
+        return self.get_solvent_names(), fractions
 
     def get_solute_concentrations(self) -> Tuple[list[str], list[float]]:
         """Returns lists of solute names and concentrations"""
 
-        names = [solute.name for solute in self.solutes]
         concentrations = [solute.concentration for solute in self.solutes]
 
-        return names, concentrations
+        return self.get_solute_names(), concentrations
+
+    def has_component(self, name: str) -> float | None:
+        """Checks if component exists and if so returns the concentration (for solutes) or 
+            volume fraction (for solvents)
+
+        Args:
+            name (str): name of component to check against solvent and solute name lists
+
+        Returns:
+            float | None: volume fraction (solvents) or amount (solute) if present; otherwise None
+        """
+
+        solvent_names, solvent_fractions = self.get_solvent_fractions()
+
+        if name in solvent_names:
+            return solvent_fractions[solvent_names.index(name)]
+        
+        solute_names, solute_concentrations = self.get_solute_concentrations()
+
+        if name in solute_names:
+            return solute_concentrations[solute_names.index(name)]
+        
 
 def combine_components(components1: list[str], concs1: list[float], volume1: float, components2: list[str], concs2: list[float], volume2: float) -> Tuple[list[str], list[float], float]:
     """Utility function for combining two sets of components
@@ -155,13 +185,23 @@ d2o = Solvent('D2O', 1.0)
 kcl0 = Solute('KCl', 0.1)
 kcl1 = Solute('KCl', 1.0)
 h2o = Solvent('H2O', 1.0)
+peptide = Solute('peptide', 1e-3)
 
 dbuffer = Composition([d2o], [kcl0])
 hbuffer = Composition([h2o], [kcl1])
+water = Composition([h2o], [])
+dwater = Composition([d2o], [])
+peptide_solution = Composition([h2o], [peptide])
+dpeptide_solution = Composition([d2o], [peptide])
 empty = Composition([], [])
 
-example_wells = [Well('Stock', 1, dbuffer, 8.0),
+example_wells = [Well('Stock', 1, dwater, 2.0),
+                 Well('Stock', 3, dwater, 8.0),
                  Well('Stock', 2, hbuffer, 8.0),
-                 Well('Mix', 1, empty, 0.0)]
+                 Well('Mix', 1, empty, 0.0),
+                 Well('Solvent', 1, water, 200),
+                 Well('Samples', 1, peptide_solution, 2),
+                 Well('Samples', 2, dpeptide_solution, 2),
+                 Well('Solvent', 2, dbuffer, 200)]
 
 
