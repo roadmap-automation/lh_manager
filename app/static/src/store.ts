@@ -62,7 +62,7 @@ export interface MethodList {
     status: StatusType,
 }
 
-type StageName = 'prep' | 'inject';
+export type StageName = 'prep' | 'inject';
 
 export interface Sample {
   id: string,
@@ -92,11 +92,26 @@ type Events = {
 
 export const emitter = mitt<Events>();
 
-export async function update_sample(sample_obj: object): Promise<object> {
+export async function update_sample(sample_obj: Sample): Promise<object> {
   const update_result = await fetch("/GUI/UpdateSample", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sample_obj)
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject'] ): Promise<object> {
+  const { name, id, NICE_uuid, NICE_slotID } = sample_obj;
+  const uuid = NICE_uuid ?? null;
+  const slotID = NICE_slotID ?? null; // don't send undefined.
+  const data = { name, id, uuid, slotID, stage };
+  console.log({data});
+  const update_result = await fetch("/NICE/RunSamplewithUUID/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
   });
   const response_body = await update_result.json();
   return response_body;
