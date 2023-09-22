@@ -7,7 +7,7 @@ from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_lis
 
 def validate_format(data: dict) -> bool:
     """Checks format of data input"""
-
+    print('data in: ', list(data.keys()))
     return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
 
 class LHSimpleQueue(Queue):
@@ -27,7 +27,7 @@ class LHSimpleQueue(Queue):
 
         while not self.empty():
             data = self.get()
-            sample = samples.getSamplebyName(data['name'])
+            sample_index, sample = samples.getSampleById(data['id'])
             
             # should only ever be one stage
             for stage in data['stage']:
@@ -46,7 +46,7 @@ class LHSimpleQueue(Queue):
             # get sample name
             # NOTE: checks for inactivity, etc. are done when the sample is enqueued.
             # If anything has changed in the meantime, it will not be captured here
-            sample = samples.getSamplebyName(data['name'])
+            sample_index, sample = samples.getSampleById(data['id'])
 
             # Note: by construction of the queue there should only ever be one item in stage
             for stage in data['stage']:
@@ -72,5 +72,6 @@ LHqueue = LHSimpleQueue()
 
 # TODO: remove for production (though having a dummy method first 
 # might be useful before pushing "auto run" on Trilution)
-LHqueue.put_safe({'name': example_sample_list[0].name, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
+example_sample = example_sample_list[0]
+LHqueue.put_safe({'name': example_sample.name, 'id': example_sample.id, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
 LHqueue.run_next()

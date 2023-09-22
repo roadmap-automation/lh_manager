@@ -12,8 +12,13 @@ from . import nice_blueprint
 def _run_sample(data) -> Response:
     """ Generic function for processing a run request"""
 
+    if 'id' in data:
+        sample_index, sample = samples.getSampleById(data['id'])
+    else:
+        sample = samples.getSamplebyName(data['name'])
+        data['id'] = sample.id
+
     # check that sample name exists
-    sample = samples.getSamplebyName(data['name'])
     if sample is not None:
         # check that requested stages are inactive
         for stage in data['stage']:
