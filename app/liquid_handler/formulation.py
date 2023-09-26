@@ -7,7 +7,7 @@ from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, combine_components, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, InjectWithRinse
+from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, InjectWithRinse, BaseMethod
 
 @dataclass
 class Formulation(MethodList):
@@ -28,9 +28,14 @@ class Formulation(MethodList):
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition
                 is achieved. Defaults to True."""
-    methods_map: dict[str, MethodsType] = field(default_factory=lambda: {'transfer': TransferWithRinse,
-                                                                         'mix': MixWithRinse,
-                                                                         'inject': InjectWithRinse})
+    methods_map: dict[str, BaseMethod] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        super().__post_init__()
+    
+        self.methods_map: dict[str, BaseMethod] = {'transfer': TransferWithRinse,
+                                             'mix': MixWithRinse,
+                                             'inject': InjectWithRinse}
 
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
@@ -105,9 +110,13 @@ class Formulation(MethodList):
         volumes, wells, success = self.formulate(layout)
 
         if success:
+            # sort by volume (largest first)
+            sorted_volumes = sorted(volumes)[::-1]
+            sort_index = [volumes.index(sv) for sv in sorted_volumes]
+            sorted_wells = [wells[si] for si in sort_index]
 
             # Add a transfer method
-            for volume, well in zip(volumes, wells):
+            for volume, well in zip(sorted_volumes, sorted_wells):
                 methods.append(
                     self.methods_map['transfer'](
                         Source=WellLocation(well.rack_id, well.well_number),
@@ -262,5 +271,13 @@ if __name__ == '__main__':
 
     #target_composition = Composition([Solvent('H2O', 0.5), Solvent('D2O', 0.5)], [Solute('KCl', 0.2)])
     target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
+    target_well, _ = layout.get_well_and_rack('Mix', 1)
+
+    f = Formulation(target_composition=target_composition,
+                    target_volume=7.0,
+                    target_well=WellLocation(target_well.rack_id, target_well.well_number))
+    
+    print(f.formulate(layout))
+    print(f.get_methods(layout))
 
     #print(formulate(target_composition, 4, layout, include_zones))
