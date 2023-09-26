@@ -4,7 +4,7 @@ def trigger_layout_update(f):
     """Decorator that announces that layout has changed"""
     def wrap(*args, **kwargs):
         ret_val = f(*args, **kwargs)
-        socketio.emit('update_layout', {'msg': 'update_layout'})
+        socketio.emit('update_layout', {'msg': 'update_layout'}, include_self=True)
         return ret_val
     wrap.__name__ = f.__name__
     return wrap
@@ -13,7 +13,7 @@ def trigger_samples_update(f):
     """Decorator that announces that samples has changed"""
     def wrap(*args, **kwargs):
         ret_val = f(*args, **kwargs)
-        socketio.emit('update_samples', {'msg': 'update_samples'})
+        socketio.emit('update_samples', {'msg': 'update_samples'}, include_self=True)
         return ret_val
     wrap.__name__ = f.__name__
     return wrap
@@ -22,7 +22,7 @@ def trigger_sample_status_update(f):
     """Decorator that announces that samples has changed"""
     def wrap(*args, **kwargs):
         ret_val = f(*args, **kwargs)
-        socketio.emit('update_sample_status', {'msg': 'update_sample_status'})
+        socketio.emit('update_sample_status', {'msg': 'update_sample_status'}, include_self=True)
         return ret_val
     wrap.__name__ = f.__name__
     return wrap
@@ -36,5 +36,5 @@ def samples_update_received():
     print('received samples update')
 
 @socketio.on('sample_status_update_received')
-def samples_update_received():
+def sample_status_update_received():
     print('received sample status update')
