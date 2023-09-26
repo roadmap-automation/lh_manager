@@ -1,5 +1,6 @@
 """Liquid handler state initialization"""
 from .samplelist import SampleContainer, example_sample_list
+from . import formulation
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 
