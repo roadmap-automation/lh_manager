@@ -5,7 +5,7 @@ from scipy.optimize import nnls
 from dataclasses import field
 from pydantic.dataclasses import dataclass
 
-from .bedlayout import Solute, Solvent, Composition, combine_components, LHBedLayout, Well, WellLocation
+from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, InjectWithRinse, BaseMethod
 
@@ -22,16 +22,14 @@ class Formulation(MethodList):
     target_composition: Composition | None = None
     target_volume: float = 0.0
     target_well: WellLocation = field(default_factory=WellLocation)
-    flow_rate: float = 2.5
     include_zones: List[Zone] = field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
     """include_zones (List[Zone]): list of zones to include for calculating formulations. Defaults to [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]"""
     exact_match: bool = True
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition
                 is achieved. Defaults to True."""
-    default_transfer_method: BaseMethod = TransferWithRinse()
-    default_mix_method: BaseMethod = MixWithRinse()
-    default_inject_method: BaseMethod = InjectWithRinse()
+    transfer_template: BaseMethod = TransferWithRinse()
+    mix_template: BaseMethod = MixWithRinse()
     
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
@@ -113,11 +111,10 @@ class Formulation(MethodList):
 
             # Add transfer methods
             for volume, well in zip(sorted_volumes, sorted_wells):
-                new_transfer = copy(self.default_transfer_method)
+                new_transfer = copy(self.transfer_template)
                 new_transfer.Source = WellLocation(well.rack_id, well.well_number)
                 new_transfer.Target = self.target_well
                 new_transfer.Volume = volume,
-                new_transfer.Flow_Rate = self.flow_rate
                 methods.append(new_transfer)
 
             # Add a mix method. Use 90% of total volume in well, unless mix volume is too small.
@@ -128,10 +125,9 @@ class Formulation(MethodList):
             if mix_volume < min_mix_volume:
                 mix_volume = min_mix_volume
 
-            new_mix = copy(self.default_mix_method)
+            new_mix = copy(self.mix_template)
             new_mix.Target = self.target_well
             new_mix.Volume = mix_volume
-            new_mix.Flow_Rate = self.flow_rate
             methods.append(new_mix)
             
         return methods
@@ -271,7 +267,7 @@ if __name__ == '__main__':
     f = Formulation(target_composition=target_composition,
                     target_volume=7.0,
                     target_well=WellLocation(target_well.rack_id, target_well.well_number),
-                    default_mix_method=mix)
+                    mix_template=mix)
     
     print(f.formulate(layout))
     print(f.get_methods(layout))
