@@ -239,8 +239,8 @@ class StageName(str, Enum):
 
 @dataclass
 class MethodList:
-    """Class representing a list of methods representing one LH job. Allows dividing
-        prep and inject operations for a single sample."""
+    """Class representing a list of methods representing one LH job. Can be nested
+        in a single stage"""
     LH_id: int | None = None
     createdDate: str | None = None
     methods: List[MethodsType] = field(default_factory=list)
@@ -258,13 +258,65 @@ class MethodList:
         self.methods.append(method)
         self.methods_complete.append(False)
 
+    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
+        """Returns list of methods. Passing through bed layout
+            allows subclassing for dynamic method generation.
+
+        Args:
+            layout (LHBedLayout): bed layout
+
+        Returns:
+            List[MethodsType]: list of methods
+        """
+
+        return self.methods
+
+@dataclass
+class Stage(MethodList):
+    """Allows dividing prep and inject operations for a single sample."""
+
+    methods: List[MethodsType | MethodList] = field(default_factory=list)
+
+    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
+        """Generates a flattened list of all methods in the stage
+        
+        Args:
+            layout (LHBedLayout): bed layout
+
+        Returns:
+            List[MethodsType]: flattened list of methods int he stage"""
+
+        flat_methods = []
+        for mentry in self.methods:
+            if hasattr(mentry, 'get_methods'):
+                for m in mentry.get_methods(layout):
+                    flat_methods.append(m)
+            else:
+                flat_methods.append(mentry)
+
+        return flat_methods
+    
+    def validate(self, layout: LHBedLayout) -> bool:
+        """Virtually executes a copy of a layout to check for errors
+
+        Args:
+            layout (LHBedLayout): layout to check
+
+        Returns:
+            bool: whether or not an error has been found
+        """
+
+        for m in self.get_methods(layout):
+            m.execute(layout)
+
+
 @dataclass
 class Sample:
     """Class representing a sample to be created by Gilson LH"""
     id: str
     name: str
     description: str
-    stages: Dict[StageName, MethodList] = field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
+    stages: Dict[StageName, Stage] = field(default_factory=lambda: {StageName.PREP: Stage(), StageName.INJECT: Stage()})
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
     current_contents: str = ''
@@ -325,11 +377,11 @@ class Sample:
             print('Warning: undefined sample status. This should never happen!')
             return None
 
-    def toSampleList(self, stage_name: StageName, entry=False) -> dict:
+    def toSampleList(self, stage_name: StageName, layout: LHBedLayout, entry=False) -> dict:
         """Generates dictionary for LH sample list
         
-            methodlist: MethodList containing methods to be included
-
+            stage_name (StageName): Name of stage containing methods to be included
+            layout (LHBedLayout): Name of bed layout to use for validation
             entry: if a list of sample lists entry, SampleList columns field is null; otherwise,
                     if a full sample list, expose all methods 
 
@@ -340,18 +392,21 @@ class Sample:
         assert stage_name in self.stages, "Must use stage from calling sample!"
 
         stage = self.stages[stage_name]
-        expose_methods = None if entry else [
-            m.render_lh_method(self.name, self.description) for m in stage.methods]
-        return asdict(SampleList(
-            name=self.name,
-            id=f'{stage.LH_id}',
-            createdBy='System',
-            description=self.description,
-            createDate=str(stage.createdDate),
-            startDate=str(stage.createdDate),
-            endDate=str(stage.createdDate),
-            columns=expose_methods
-        ))
+        if stage.validate(layout):
+            expose_methods = None if entry else [
+                m.render_lh_method(self.name, self.description) for m in stage.get_methods()]
+            return asdict(SampleList(
+                name=self.name,
+                id=f'{stage.LH_id}',
+                createdBy='System',
+                description=self.description,
+                createDate=str(stage.createdDate),
+                startDate=str(stage.createdDate),
+                endDate=str(stage.createdDate),
+                columns=expose_methods
+            ))
+
+        return {}
 
 @dataclass
 class SampleContainer:

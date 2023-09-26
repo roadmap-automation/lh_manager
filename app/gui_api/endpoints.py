@@ -21,10 +21,10 @@ def AddSample() -> Response:
 
     # dry run (testing only)
     test_layout = deepcopy(layout)
-    for method in new_sample.stages[StageName.PREP].methods:
+    for method in new_sample.stages[StageName.PREP].get_methods(test_layout):
         method.execute(test_layout)
 
-    return make_response({'new sample': new_sample.toSampleList(StageName.PREP), 'layout': asdict(test_layout)}, 200)
+    return make_response({'new sample': new_sample.toSampleList(StageName.PREP, test_layout), 'layout': asdict(test_layout)}, 200)
 
 @gui_blueprint.route('/GUI/UpdateSample/', methods=['POST'])
 @trigger_samples_update
