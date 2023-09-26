@@ -8,7 +8,7 @@ from pydantic.dataclasses import dataclass
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, \
-            BaseMethod, example_sample_list, StageName, lh_method_fields
+            BaseMethod, example_sample_list, StageName, lh_method_fields, lh_methods
 
 @dataclass
 class Formulation(MethodList):
@@ -267,6 +267,7 @@ example_formulation = Formulation(target_composition=target_composition,
 
 example_sample_list[9].stages[StageName.PREP].addMethod(example_formulation)
 
+lh_methods['Formulation'] = Formulation
 for method in [Formulation]:
     fieldlist = []
     for fi in fields(method):
