@@ -60,7 +60,7 @@ def PutSampleData():
         assert method_name == method.method_name, f'Wrong method name {method_name} in result, expected {method.method_name}, full output {data}'
 
         # mark method complete
-        methodlist.methods_complete[method_number] = True
+        method.complete = True
 
         # Change layout state:
         method.execute(layout)
@@ -71,7 +71,7 @@ def PutSampleData():
             sample.current_contents = new_state
 
         # if all methods complete, change status of sample to completed, flag LH as no longer busy, and run the next queue item
-        if all(methodlist.methods_complete):
+        if all(methodlist.get_method_completion()):
             methodlist.status = SampleStatus.COMPLETED
             LHqueue.busy = False
             LHqueue.run_next()

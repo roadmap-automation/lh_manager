@@ -15,6 +15,7 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 class BaseMethod:
     """Base class for LH methods"""
 
+    complete: bool = False
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
     @dataclass
@@ -244,7 +245,6 @@ class MethodList:
     LH_id: int | None = None
     createdDate: str | None = None
     methods: List[MethodsType] = field(default_factory=list)
-    methods_complete: List[bool] = field(default_factory=list)
     status: SampleStatus = SampleStatus.INACTIVE
 
     def __post_init__(self):
@@ -254,9 +254,17 @@ class MethodList:
                 self.methods[i] = lh_methods[method['method_name']](**method)
 
     def addMethod(self, method: MethodsType) -> None:
-        """Adds new method and flag for completion"""
+        """Adds new method"""
         self.methods.append(method)
-        self.methods_complete.append(False)
+
+    def estimated_time(self) -> float:
+        """Generates estimated time of all methods in list
+
+        Returns:
+            float: total estimated time in default time units
+        """
+
+        return sum(m.estimated_time() for m in self.methods)
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Returns list of methods. Passing through bed layout
@@ -270,10 +278,21 @@ class MethodList:
         """
 
         return self.methods
+    
+    def get_method_completion(self) -> List[bool]:
+        """Returns list of method completion status
+
+        Returns:
+            List[bool]: List of method completion status, one for each method in methods
+        """
+
+        return [m.complete for m in self.methods]
+
 
 @dataclass
 class Stage(MethodList):
-    """Allows dividing prep and inject operations for a single sample."""
+    """Allows dividing prep and inject operations for a single sample. Splitting the methods
+        object into methods and run_methods supports MethodList type methods like"""
 
     methods: List[MethodsType | MethodList] = field(default_factory=list)
 
@@ -295,6 +314,23 @@ class Stage(MethodList):
                 flat_methods.append(mentry)
 
         return flat_methods
+    
+    def get_method_completion(self) -> List[bool]:
+        """Returns list of method completion status
+
+        Returns:
+            List[bool]: List of method completion status, one for each method in methods
+        """
+
+        methods_complete = []
+        for mentry in self.methods:
+            if hasattr(mentry, 'get_method_completion'):
+                # only mark as complete if all methods are complete
+                methods_complete.append(all(mentry.get_method_completion()))
+            else:
+                methods_complete.append(mentry.complete)
+
+        return methods_complete
     
     def validate(self, layout: LHBedLayout) -> bool:
         """Virtually executes a copy of a layout to check for errors
@@ -480,22 +516,24 @@ def moveSample(container1: SampleContainer, container2: SampleContainer, key: st
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
-for i in range(100):
+for i in range(10):
     example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
-    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i)))
-    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i)))
+    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i), complete=False))
+    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i), complete=False))
     example_sample_list.append(example_sample)
 
 # throw some new statuses in the mix:
 example_sample_list[0].stages[StageName.PREP].status = SampleStatus.INACTIVE
-example_sample_list[0].stages[StageName.PREP].methods_complete[0] = False
 example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
-example_sample_list[1].stages[StageName.PREP].methods_complete = [True for m in example_sample_list[1].stages[StageName.PREP].methods_complete]
-example_sample_list[1].stages[StageName.INJECT].methods_complete = [True for m in example_sample_list[1].stages[StageName.INJECT].methods_complete]
+for m in example_sample_list[1].stages[StageName.PREP].methods:
+    m.complete = True
+for m in example_sample_list[1].stages[StageName.INJECT].methods:
+    m.complete = True
 example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.INACTIVE
-example_sample_list[2].stages[StageName.PREP].methods_complete = [True for m in example_sample_list[2].stages[StageName.PREP].methods_complete]
+for m in example_sample_list[2].stages[StageName.PREP].methods:
+    m.complete = True
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)
 #print(methods)

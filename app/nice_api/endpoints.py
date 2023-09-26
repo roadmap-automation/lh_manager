@@ -127,8 +127,9 @@ def DryRunSamplewithUUID() -> Response:
             for stage in data['stage']:
                 methodlist = sample.stages[stage]
                 if methodlist.status in (SampleStatus.PENDING, SampleStatus.INACTIVE):
-                    totaltime += sum(method.estimated_time() if not complete else 0.0
-                        for method, complete in zip(methodlist.methods, methodlist.methods_complete))
+                    # NOTE: Formulation methods will return zero for this, leading to inaccurate estimates
+                    totaltime += sum(method.estimated_time() if not method.complete else 0.0
+                        for method in methodlist.methods)
 
             return make_response({'result': 'success', 'time estimate': totaltime}, 200)
         else:
