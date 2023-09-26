@@ -117,15 +117,16 @@ class WellLocation:
 class Well:
     """Class representing the contents of a single well
     
-        rack: Rack value where well is located
-        well_number: Well number in specified rack
-        volume: total volume in the well in mL. None indicates unoccupied well
-        composition: Composition class representing composition of solution in well"""
+        rack_id (str): String description of rack where well is located
+        well_number (int): Well number in specified rack
+        composition (Composition): composition of solution in well
+        volume (float | None): total volume in the well in mL. None indicates unoccupied well
+        """
 
     rack_id: str
     well_number: int
     composition: Composition
-    volume: float
+    volume: float | None
 
     def mix_with(self, volume: float, composition: Composition) -> None:
         """Update volume and composition from mixing with new solution"""
