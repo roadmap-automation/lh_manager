@@ -7,7 +7,7 @@ from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, InjectWithRinse, BaseMethod
+from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, InjectWithRinse, BaseMethod, example_sample_list, StageName
 
 @dataclass
 class Formulation(MethodList):
@@ -100,7 +100,8 @@ class Formulation(MethodList):
         """Overwrites base class method to dynamically create list of methods
         """
 
-        methods = []
+        self.methods = []
+        self.methods_complete = []
         volumes, wells, success = self.formulate(layout)
 
         if success:
@@ -115,7 +116,7 @@ class Formulation(MethodList):
                 new_transfer.Source = WellLocation(well.rack_id, well.well_number)
                 new_transfer.Target = self.target_well
                 new_transfer.Volume = volume,
-                methods.append(new_transfer)
+                self.addMethod(new_transfer)
 
             # Add a mix method. Use 90% of total volume in well, unless mix volume is too small.
             # Assumes well contains more than min_mix_volume
@@ -128,9 +129,9 @@ class Formulation(MethodList):
             new_mix = copy(self.mix_template)
             new_mix.Target = self.target_well
             new_mix.Volume = mix_volume
-            methods.append(new_mix)
-            
-        return methods
+            self.addMethod(new_mix)
+
+        return self.methods
 
     def make_source_matrix(self, source_names: List[str], wells: List[Well]) -> Tuple[List[list], List[Well]]:
         """Makes matrix of source wells that contain desired components
@@ -252,6 +253,18 @@ class Formulation(MethodList):
                 for w in rack.wells
                 if LayoutWell2ZoneWell(w.rack_id, w.well_number)[0] in self.include_zones]
 
+target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
+
+transfer = TransferWithRinse(Flow_Rate=2.0)
+mix = MixWithRinse(Number_of_Mixes=2)
+
+example_formulation = Formulation(target_composition=target_composition,
+                target_volume=7.0,
+                target_well=WellLocation('Mix', 10),
+                mix_template=mix)
+
+example_sample_list[9].stages[StageName.PREP].addMethod(example_formulation)
+
 if __name__ == '__main__':
 
     from .state import layout
@@ -262,6 +275,7 @@ if __name__ == '__main__':
     target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
     target_well, _ = layout.get_well_and_rack('Mix', 1)
 
+    transfer = TransferWithRinse(Flow_Rate=2.0)
     mix = MixWithRinse(Number_of_Mixes=2)
 
     f = Formulation(target_composition=target_composition,
@@ -271,5 +285,6 @@ if __name__ == '__main__':
     
     print(f.formulate(layout))
     print(f.get_methods(layout))
+
 
     #print(formulate(target_composition, 4, layout, include_zones))
