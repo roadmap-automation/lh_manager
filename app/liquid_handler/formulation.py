@@ -2,12 +2,13 @@ from typing import List, Tuple
 from copy import copy
 import numpy as np
 from scipy.optimize import nnls
-from dataclasses import field
+from dataclasses import field, fields
 from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, InjectWithRinse, BaseMethod, example_sample_list, StageName
+from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, \
+            BaseMethod, example_sample_list, StageName, lh_method_fields
 
 @dataclass
 class Formulation(MethodList):
@@ -19,6 +20,7 @@ class Formulation(MethodList):
     #methods_complete: List[bool] = field(default_factory=list)
     #status: SampleStatus = SampleStatus.INACTIVE
     display_name: str = 'Formulation'
+    method_name: str = 'Formulation'
     target_composition: Composition | None = None
     target_volume: float = 0.0
     target_well: WellLocation = field(default_factory=WellLocation)
@@ -264,6 +266,13 @@ example_formulation = Formulation(target_composition=target_composition,
                 mix_template=mix)
 
 example_sample_list[9].stages[StageName.PREP].addMethod(example_formulation)
+
+for method in [Formulation]:
+    fieldlist = []
+    for fi in fields(method):
+        if (fi.name != 'method_name') & (fi.name != 'display_name'):
+            fieldlist.append(fi.name)
+    lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name, 'schema': method.__pydantic_model__.schema()}
 
 if __name__ == '__main__':
 

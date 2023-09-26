@@ -6,6 +6,7 @@ from flask import make_response, request, Response
 
 from liquid_handler.state import samples, layout
 from liquid_handler.samplelist import Sample, lh_method_fields, StageName
+from liquid_handler import formulation
 from .events import trigger_samples_update
 from . import gui_blueprint
 
