@@ -18,6 +18,7 @@ class Formulation(MethodList):
     #methods: List[MethodsType] = field(default_factory=list)
     #methods_complete: List[bool] = field(default_factory=list)
     #status: SampleStatus = SampleStatus.INACTIVE
+    display_name: str = 'Formulation'
     target_composition: Composition | None = None
     target_volume: float = 0.0
     target_well: WellLocation = field(default_factory=WellLocation)
@@ -28,15 +29,10 @@ class Formulation(MethodList):
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition
                 is achieved. Defaults to True."""
-    methods_map: dict[str, BaseMethod] = field(default_factory=dict)
+    default_transfer_method: BaseMethod = TransferWithRinse()
+    default_mix_method: BaseMethod = MixWithRinse()
+    default_inject_method: BaseMethod = InjectWithRinse()
     
-    def __post_init__(self):
-        super().__post_init__()
-    
-        self.methods_map: dict[str, BaseMethod] = {'transfer': TransferWithRinse,
-                                             'mix': MixWithRinse,
-                                             'inject': InjectWithRinse}
-
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
         """Create a formulation from a target composition with a target volume
@@ -115,16 +111,14 @@ class Formulation(MethodList):
             sort_index = [volumes.index(sv) for sv in sorted_volumes]
             sorted_wells = [wells[si] for si in sort_index]
 
-            # Add a transfer method
+            # Add transfer methods
             for volume, well in zip(sorted_volumes, sorted_wells):
-                methods.append(
-                    self.methods_map['transfer'](
-                        Source=WellLocation(well.rack_id, well.well_number),
-                        Target=self.target_well,
-                        Volume=volume,
-                        Flow_Rate=self.flow_rate
-                    )
-                )
+                new_transfer = copy(self.default_transfer_method)
+                new_transfer.Source = WellLocation(well.rack_id, well.well_number)
+                new_transfer.Target = self.target_well
+                new_transfer.Volume = volume,
+                new_transfer.Flow_Rate = self.flow_rate
+                methods.append(new_transfer)
 
             # Add a mix method. Use 90% of total volume in well, unless mix volume is too small.
             # Assumes well contains more than min_mix_volume
@@ -133,13 +127,12 @@ class Formulation(MethodList):
             mix_volume = 0.9 * total_volume
             if mix_volume < min_mix_volume:
                 mix_volume = min_mix_volume
-            methods.append(
-                self.methods_map['mix'](
-                    Target=self.target_well,
-                    Volume=mix_volume,
-                    Flow_Rate=self.flow_rate
-                )
-                )
+
+            new_mix = copy(self.default_mix_method)
+            new_mix.Target = self.target_well
+            new_mix.Volume = mix_volume
+            new_mix.Flow_Rate = self.flow_rate
+            methods.append(new_mix)
             
         return methods
 
@@ -273,9 +266,12 @@ if __name__ == '__main__':
     target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
     target_well, _ = layout.get_well_and_rack('Mix', 1)
 
+    mix = MixWithRinse(Number_of_Mixes=2)
+
     f = Formulation(target_composition=target_composition,
                     target_volume=7.0,
-                    target_well=WellLocation(target_well.rack_id, target_well.well_number))
+                    target_well=WellLocation(target_well.rack_id, target_well.well_number),
+                    default_mix_method=mix)
     
     print(f.formulate(layout))
     print(f.get_methods(layout))
