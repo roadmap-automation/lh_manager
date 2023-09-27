@@ -1,7 +1,7 @@
 """Class definitions for bed layout, wells, and compositions"""
 from dataclasses import field
 from pydantic.dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 @dataclass
 class Solvent:
@@ -181,6 +181,15 @@ class LHBedLayout:
         rack = self.racks[rack_id]
         well_numbers = [well.well_number for well in rack.wells]
         return rack.wells[well_numbers.index(well_number)], rack
+    
+    def get_all_wells(self) -> List[Well]:
+        """Gets all wells in the layout
+
+        Returns:
+            List[Well]: list of all wells
+        """
+
+        return [w for rack in self.racks.values() for w in rack.wells]
 
 d2o = Solvent('D2O', 1.0)
 kcl0 = Solute('KCl', 0.1)

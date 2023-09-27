@@ -192,24 +192,6 @@ class Formulation(MethodList):
 
         return solvent_names + solute_names, solvent_fractions + solute_concentrations
 
-    def get_all_components(self, wells: List[Well]) -> Tuple[List[str], List[str]]:
-        """Gets lists of all solvents and solutes in the specified wells
-
-        Args:
-            wells (List[Well]): list of wells to inspect
-
-        Returns:
-            Tuple[List[str], List[str]]: lists of solvent and solute names
-        """
-
-        solvents = set()
-        solutes = set()
-        for well in wells:
-            solvents.update(set(well.composition.get_solvent_names()))
-            solutes.update(set(well.composition.get_solute_names()))
-
-        return list(solvents), list(solutes)
-
     def select_wells(self, wells: List[Well], target_names: List[str]) -> Tuple[List[Well], List[str]]:
         """Selects wells based on whether they have the appropriate components
 

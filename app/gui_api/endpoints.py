@@ -3,9 +3,12 @@ import warnings
 from dataclasses import asdict, replace
 from copy import deepcopy
 from flask import make_response, request, Response
+from typing import List, Tuple
 
 from liquid_handler.state import samples, layout
 from liquid_handler.samplelist import Sample, lh_method_fields, StageName
+from liquid_handler.bedlayout import Well
+from liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from liquid_handler import formulation
 from .events import trigger_samples_update
 from . import gui_blueprint
@@ -71,3 +74,34 @@ def GetLayout() -> Response:
 
     return make_response(asdict(layout), 200)
 
+def _get_component_zones(wells: List[Well]) -> Tuple[List[Tuple[str, Zone]], List[Tuple[str, Zone]]]:
+    """Gets lists of all solvents and solutes in the specified wells
+
+    Args:
+        wells (List[Well]): list of wells to inspect
+
+    Returns:
+        Tuple[
+            List[Tuple[str, Zone]]: list of tuples with unique solvent names and zones
+            List[Tuple[str, Zone]]]: list of tuples with unique solute names and zones
+            ]
+    """
+
+    all_solvents = set()
+    all_solutes = set()
+    for well in wells:
+        zone, _ = LayoutWell2ZoneWell(well.rack_id, well.well_number)
+        for solvent in well.composition.solvents:
+            all_solvents.add((solvent.name, zone))
+        for solute in well.composition.solutes:
+            all_solutes.add((solute.name, zone))
+
+    return list(all_solvents), list(all_solutes)
+
+@gui_blueprint.route('/GUI/GetComponents/', methods=['GET'])
+def GetComponents() -> Response:
+    """Gets list of components and what zone they're in"""
+
+    solvents, solutes = _get_component_zones(layout.get_all_wells())
+
+    return make_response({'solvents': solvents, 'solutes': solutes}, 200)
