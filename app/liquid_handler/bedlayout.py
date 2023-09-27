@@ -28,8 +28,10 @@ class Composition:
             solvent_ratios = ':'.join(f'{s.fraction * 100:0.0f}' for s in sorted_solvents)
             solvent_names = ':'.join(s.name for s in sorted_solvents)
             res = solvent_ratios + ' ' + solvent_names
-        else:
+        elif len(self.solvents) == 1:
             res = self.solvents[0].name
+        else:
+            res = ''
 
         for solute in self.solutes:
             res += f' + {solute.concentration:.4g} {solute.units} {solute.name}'
@@ -203,12 +205,16 @@ water = Composition([h2o], [])
 dwater = Composition([d2o], [])
 peptide_solution = Composition([h2o], [peptide])
 dpeptide_solution = Composition([d2o], [peptide])
-empty = Composition([], [])
 
-example_wells = [Well('Stock', 1, dwater, 2.0),
+mix_well = Well('Mix', 2, dbuffer, 4.0)
+mix_well.mix_with(2, hbuffer)
+
+empty = Composition([], [])
+example_wells: List[Well] = [Well('Stock', 1, dwater, 2.0),
                  Well('Stock', 3, dwater, 8.0),
                  Well('Stock', 2, hbuffer, 8.0),
                  Well('Mix', 1, empty, 0.0),
+                 mix_well,
                  Well('Solvent', 1, water, 200),
                  Well('Samples', 1, peptide_solution, 2),
                  Well('Samples', 2, dpeptide_solution, 2),
