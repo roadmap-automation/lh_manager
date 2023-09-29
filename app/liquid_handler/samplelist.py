@@ -203,12 +203,13 @@ class Sleep(BaseMethod):
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
 MethodsType = Union[TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
+EXCLUDE_FIELDS = set(["method_name", "display_name", "complete"])
 lh_methods = {v.method_name: v for v in method_list}
 lh_method_fields = {}
 for method in method_list:
     fieldlist = []
     for fi in fields(method):
-        if (fi.name != 'method_name') & (fi.name != 'display_name'):
+        if not fi.name in EXCLUDE_FIELDS:
             fieldlist.append(fi.name)
     lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name, 'schema': method.__pydantic_model__.schema()}
 
