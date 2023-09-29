@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ROADMAP_liquid_handler"
+dependencies = [
+  "flask",
+  "flask-socketio",
+  "simple-websocket",
+  "pydantic",
+  "numpy",
+  "scipy"
+]
+version = "0.0.1"
+authors = [
+  { name="David Hoogerheide", email="david.hoogerheide@nist.gov" },
+  { name="Brian Maranville", email="brian.maranville@nist.gov" },
+]
+description = """\
+Central server to manage Gilson Liquid Handler automation, 
+running as a NICE device for selecting samples to run,
+and supporting web-based GUI for configuration and operation
+"""
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/hoogerheide/liquid_handler_api"
+"Bug Tracker" = "https://github.com/hoogerheide/liquid_handler_api/issues"
