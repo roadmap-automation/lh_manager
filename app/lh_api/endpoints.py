@@ -54,13 +54,13 @@ def PutSampleData():
         sample, stage_name = samples.getSampleStagebyLH_ID(sample_id)
         assert sample is not None and stage_name is not None, "unknown sample"
         methodlist = sample.stages[stage_name]
-        method = methodlist.methods[method_number]
+        method = methodlist.run_methods[method_number]
 
         # double check that correct method is being referenced
         assert method_name == method.method_name, f'Wrong method name {method_name} in result, expected {method.method_name}, full output {data}'
 
         # mark method complete
-        method.complete = True
+        methodlist.run_methods_complete[method_number] = True
 
         # Change layout state:
         method.execute(layout)

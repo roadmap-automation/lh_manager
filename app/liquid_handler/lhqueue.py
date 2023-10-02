@@ -33,6 +33,8 @@ class LHSimpleQueue(Queue):
             for stage in data['stage']:
                 # reset status of sample stage to INACTIVE
                 sample.stages[stage].status = SampleStatus.INACTIVE
+                sample.stages[stage].createdDate = None
+                sample.stages[stage].LH_id = None
 
     def run_next(self) -> None:
         """Runs next item in queue if queue is not busy and there are items to run.
@@ -73,5 +75,5 @@ LHqueue = LHSimpleQueue()
 # TODO: remove for production (though having a dummy method first 
 # might be useful before pushing "auto run" on Trilution)
 example_sample = example_sample_list[0]
-LHqueue.put_safe({'name': example_sample.name, 'id': example_sample.id, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
+#LHqueue.put_safe({'name': example_sample.name, 'id': example_sample.id, 'uuid': '0', 'slotID': '1', 'stage': ['prep']})
 LHqueue.run_next()

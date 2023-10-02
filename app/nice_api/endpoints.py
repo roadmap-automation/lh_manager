@@ -4,7 +4,7 @@ from flask import make_response, Response, request
 
 from liquid_handler.lhqueue import LHqueue, validate_format
 from liquid_handler.samplelist import SampleStatus
-from liquid_handler.state import samples
+from liquid_handler.state import samples, layout
 from gui_api.events import trigger_sample_status_update
 
 from . import nice_blueprint
@@ -128,8 +128,7 @@ def DryRunSamplewithUUID() -> Response:
                 methodlist = sample.stages[stage]
                 if methodlist.status in (SampleStatus.PENDING, SampleStatus.INACTIVE):
                     # NOTE: Formulation methods will return zero for this, leading to inaccurate estimates
-                    totaltime += sum(method.estimated_time() if not method.complete else 0.0
-                        for method in methodlist.methods)
+                    totaltime = methodlist.estimated_time(layout)
 
             return make_response({'result': 'success', 'time estimate': totaltime}, 200)
         else:

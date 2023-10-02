@@ -1,5 +1,5 @@
-from typing import List, Tuple
-from copy import copy
+from typing import List, Tuple, Literal
+from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
 from dataclasses import field, fields
@@ -7,20 +7,16 @@ from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import MethodList, MethodsType, TransferWithRinse, MixWithRinse, \
-            BaseMethod, example_sample_list, StageName, lh_method_fields, lh_methods
+from .samplelist import MethodContainer, BaseMethod, MethodsType, TransferWithRinse, MixWithRinse, \
+            example_sample_list, StageName, lh_method_fields, lh_methods, SampleStatus
 
 @dataclass
-class Formulation(MethodList):
+class Formulation(MethodContainer):
 
-    # Defined from MethodList
-    #LH_id: int | None = None
-    #createdDate: str | None = None
-    #methods: List[MethodsType] = field(default_factory=list)
-    #methods_complete: List[bool] = field(default_factory=list)
-    #status: SampleStatus = SampleStatus.INACTIVE
-    display_name: str = 'Formulation'
-    method_name: str = 'Formulation'
+    # Defined from BaseMethod
+    # complete: bool
+    method_name: Literal['Formulation'] = 'Formulation'
+    display_name: Literal['Formulation'] = 'Formulation'
     target_composition: Composition | None = None
     target_volume: float = 0.0
     target_well: WellLocation = field(default_factory=WellLocation)
@@ -102,8 +98,7 @@ class Formulation(MethodList):
         """Overwrites base class method to dynamically create list of methods
         """
 
-        self.methods = []
-        self.methods_complete = []
+        methods = []
         volumes, wells, success = self.formulate(layout)
 
         if success:
@@ -117,8 +112,8 @@ class Formulation(MethodList):
                 new_transfer = copy(self.transfer_template)
                 new_transfer.Source = WellLocation(well.rack_id, well.well_number)
                 new_transfer.Target = self.target_well
-                new_transfer.Volume = volume,
-                self.addMethod(new_transfer)
+                new_transfer.Volume = volume
+                methods.append(new_transfer)
 
             # Add a mix method. Use 90% of total volume in well, unless mix volume is too small.
             # Assumes well contains more than min_mix_volume
@@ -131,10 +126,10 @@ class Formulation(MethodList):
             new_mix = copy(self.mix_template)
             new_mix.Target = self.target_well
             new_mix.Volume = mix_volume
-            self.addMethod(new_mix)
+            methods.append(new_mix)
 
-        return self.methods
-
+        return methods
+    
     def make_source_matrix(self, source_names: List[str], wells: List[Well]) -> Tuple[List[list], List[Well]]:
         """Makes matrix of source wells that contain desired components
 
@@ -247,7 +242,7 @@ example_formulation = Formulation(target_composition=target_composition,
                 target_well=WellLocation('Mix', 10),
                 mix_template=mix)
 
-example_sample_list[9].stages[StageName.PREP].addMethod(example_formulation)
+example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
 
 lh_methods['Formulation'] = Formulation
 for method in [Formulation]:
@@ -259,7 +254,7 @@ for method in [Formulation]:
 
 if __name__ == '__main__':
 
-    from .state import layout
+    from .state import layout, samples
 
     include_zones = [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]
 
@@ -271,12 +266,15 @@ if __name__ == '__main__':
     mix = MixWithRinse(Number_of_Mixes=2)
 
     f = Formulation(target_composition=target_composition,
-                    target_volume=7.0,
+                    target_volume=8.0,
                     target_well=WellLocation(target_well.rack_id, target_well.well_number),
                     mix_template=mix)
     
     print(f.formulate(layout))
     print(f.get_methods(layout))
-
+    print(f.execute(deepcopy(layout)))
+    print(f.render_lh_method('test_name', 'test_description', layout))
+    print(samples.getSamplebyName(example_sample_list[9].name).toSampleList('prep', layout, False))
+    #print(samples.getSamplebyName(example_sample_list[9].name).stages['prep'].methods)
 
     #print(formulate(target_composition, 4, layout, include_zones))

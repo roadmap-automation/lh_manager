@@ -15,7 +15,6 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 class BaseMethod:
     """Base class for LH methods"""
 
-    complete: bool = False
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
     @dataclass
@@ -34,10 +33,18 @@ class BaseMethod:
         
         return ''
 
-    def estimated_time(self) -> float:
+    def estimated_time(self, layout: LHBedLayout) -> float:
         """Estimated time for method in default time units"""
         return 0.0
-
+    
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[lh_method]:
+        """Renders the lh_method class to a Gilson LH-compatible format"""
+        
+        return []
+    
 @dataclass
 class InjectMethod(BaseMethod):
     """Special class for methods that change the sample composition"""
@@ -69,11 +76,14 @@ class TransferWithRinse(BaseMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
 
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        return self.lh_method(
+        return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
             METHODNAME=self.method_name,
@@ -83,7 +93,7 @@ class TransferWithRinse(BaseMethod):
             Flow_Rate=f'{self.Flow_Rate}',
             Target_Zone=target_zone,
             Target_Well=target_well
-        )
+        )]
 
     def execute(self, layout: LHBedLayout) -> None:
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
@@ -99,7 +109,7 @@ class TransferWithRinse(BaseMethod):
         # Perform mix. Note that target_well volume is also changed by this operation
         target_well.mix_with(self.Volume, source_well.composition)
 
-    def estimated_time(self) -> float:
+    def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
 
 @dataclass
@@ -120,10 +130,13 @@ class MixWithRinse(BaseMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
-
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+        
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        return self.lh_method(
+        return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
             METHODNAME=self.method_name,
@@ -132,9 +145,9 @@ class MixWithRinse(BaseMethod):
             Number_of_Mixes=f'{self.Number_of_Mixes}',
             Target_Zone=target_zone,
             Target_Well=target_well
-        )
+        )]
 
-    def estimated_time(self) -> float:
+    def estimated_time(self, layout: LHBedLayout) -> float:
         return 2 * self.Number_of_Mixes * self.Volume / self.Flow_Rate
 
 @dataclass
@@ -155,10 +168,13 @@ class InjectWithRinse(InjectMethod):
         Aspirate_Flow_Rate: str
         Flow_Rate: str
 
-    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
-
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+        
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
-        return self.lh_method(
+        return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
             METHODNAME=self.method_name,
@@ -167,14 +183,14 @@ class InjectWithRinse(InjectMethod):
             Volume=f'{self.Volume}',
             Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
             Flow_Rate=f'{self.Flow_Rate}'
-        )
+        )]
 
     def execute(self, layout: LHBedLayout) -> None:
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         source_well.volume -= self.Volume
 
-    def estimated_time(self) -> float:
+    def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
 
 @dataclass
@@ -188,21 +204,60 @@ class Sleep(BaseMethod):
     class lh_method(BaseMethod.lh_method):
         Time: str
 
-    def render_lh_method(self, sample_name: str, sample_description: str) -> BaseMethod.lh_method:
-
-        return self.lh_method(
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+        
+        return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
             METHODNAME=self.method_name,
             Time=f'{self.Time}'
-        )
+        )]
 
-    def estimated_time(self) -> float:
+    def estimated_time(self, layout: LHBedLayout) -> float:
         return float(self.Time)
+
+@dataclass
+class MethodContainer(BaseMethod):
+    """Special method that generates a list of basic methods when rendered"""
+
+    def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:
+        """Generates list of methods. Intended to be superceded for specific applications
+
+        Args:
+            layout (LHBedLayout): layout to use for generating method list
+
+        Returns:
+            List[BaseMethod]: list of base methods
+        """
+
+        return []
+
+    def execute(self, layout: LHBedLayout) -> None:
+        for m in self.get_methods(layout):
+            m.execute(layout)
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return sum(m.estimated_time() for m in self.get_methods(layout))
+    
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+        
+        rendered_methods = []
+        for m in self.get_methods(layout):
+            rendered_methods += m.render_lh_method(sample_name=sample_name,
+                                                   sample_description=sample_description,
+                                                   layout=layout)
+        return rendered_methods
+
 
 # get "methods" specification of fields
 method_list = [TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
-MethodsType = Union[TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep]
+MethodsType = Union[TransferWithRinse, MixWithRinse, InjectWithRinse, Sleep, MethodContainer]
 EXCLUDE_FIELDS = set(["method_name", "display_name", "complete"])
 lh_methods = {v.method_name: v for v in method_list}
 lh_method_fields = {}
@@ -246,6 +301,8 @@ class MethodList:
     LH_id: int | None = None
     createdDate: str | None = None
     methods: List[MethodsType] = field(default_factory=list)
+    run_methods: List[MethodsType] | None = None
+    run_methods_complete: List[bool] | None = None
     status: SampleStatus = SampleStatus.INACTIVE
 
     def __post_init__(self):
@@ -258,27 +315,39 @@ class MethodList:
         """Adds new method"""
         self.methods.append(method)
 
-    def estimated_time(self) -> float:
-        """Generates estimated time of all methods in list
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        """Generates estimated time of all methods in list. If list has been prepared for run,
+            use estimated time only from those methods that have not completed
 
         Returns:
             float: total estimated time in default time units
         """
 
-        return sum(m.estimated_time() for m in self.methods)
+        if self.run_methods is None:
+            return sum(m.estimated_time(layout) for m in self.methods)
+        else:
+            return sum(m.estimated_time(layout) if not complete else 0.0 for m, complete in zip(self.run_methods, self.run_methods_complete))
 
-    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
-        """Returns list of methods. Passing through bed layout
-            allows subclassing for dynamic method generation.
-
-        Args:
-            layout (LHBedLayout): bed layout
-
-        Returns:
-            List[MethodsType]: list of methods
+    def prepare_for_run(self, sample_name: str, sample_description: str, layout: LHBedLayout):
+        """Prepares the method list for running by populating run_methods and run_methods_complete.
+            List can then be used for dry or wet runs
         """
 
-        return self.methods
+        # Generate real-time LH methods based on layout
+        self.run_methods = []
+        for m in self.methods:
+            self.run_methods += m.render_lh_method(sample_name=sample_name,
+                                              sample_description=sample_description,
+                                              layout=layout)
+
+        # Generate one entry for each method.
+        self.run_methods_complete = [False for m in self.run_methods]
+
+    def undo_prepare(self):
+        """Undoes the prepare steps"""
+
+        self.run_methods = None
+        self.run_methods_complete = None
     
     def get_method_completion(self) -> List[bool]:
         """Returns list of method completion status
@@ -287,65 +356,10 @@ class MethodList:
             List[bool]: List of method completion status, one for each method in methods
         """
 
-        return [m.complete for m in self.methods]
-
-
-@dataclass
-class Stage(MethodList):
-    """Allows dividing prep and inject operations for a single sample. Splitting the methods
-        object into methods and run_methods supports MethodList type methods like"""
-
-    methods: List[MethodsType | MethodList] = field(default_factory=list)
-
-    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
-        """Generates a flattened list of all methods in the stage
+        if self.run_methods_complete is not None:
+            return all(self.run_methods_complete)
         
-        Args:
-            layout (LHBedLayout): bed layout
-
-        Returns:
-            List[MethodsType]: flattened list of methods int he stage"""
-
-        flat_methods = []
-        for mentry in self.methods:
-            if hasattr(mentry, 'get_methods'):
-                for m in mentry.get_methods(layout):
-                    flat_methods.append(m)
-            else:
-                flat_methods.append(mentry)
-
-        return flat_methods
-    
-    def get_method_completion(self) -> List[bool]:
-        """Returns list of method completion status
-
-        Returns:
-            List[bool]: List of method completion status, one for each method in methods
-        """
-
-        methods_complete = []
-        for mentry in self.methods:
-            if hasattr(mentry, 'get_method_completion'):
-                # only mark as complete if all methods are complete
-                methods_complete.append(all(mentry.get_method_completion()))
-            else:
-                methods_complete.append(mentry.complete)
-
-        return methods_complete
-    
-    def validate(self, layout: LHBedLayout) -> bool:
-        """Virtually executes a copy of a layout to check for errors
-
-        Args:
-            layout (LHBedLayout): layout to check
-
-        Returns:
-            bool: whether or not an error has been found
-        """
-
-        for m in self.get_methods(layout):
-            m.execute(layout)
-
+        return False
 
 @dataclass
 class Sample:
@@ -353,7 +367,7 @@ class Sample:
     id: str
     name: str
     description: str
-    stages: Dict[StageName, Stage] = field(default_factory=lambda: {StageName.PREP: Stage(), StageName.INJECT: Stage()})
+    stages: Dict[StageName, MethodList] = field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
     current_contents: str = ''
@@ -429,21 +443,22 @@ class Sample:
         assert stage_name in self.stages, "Must use stage from calling sample!"
 
         stage = self.stages[stage_name]
-        if stage.validate(layout):
-            expose_methods = None if entry else [
-                m.render_lh_method(self.name, self.description) for m in stage.get_methods()]
-            return asdict(SampleList(
-                name=self.name,
-                id=f'{stage.LH_id}',
-                createdBy='System',
-                description=self.description,
-                createDate=str(stage.createdDate),
-                startDate=str(stage.createdDate),
-                endDate=str(stage.createdDate),
-                columns=expose_methods
-            ))
+        if entry:
+            expose_methods = None
+        else:
+            stage.prepare_for_run(self.name, self.description, layout)
+            expose_methods = stage.run_methods
 
-        return {}
+        return asdict(SampleList(
+            name=self.name,
+            id=f'{stage.LH_id}',
+            createdBy='System',
+            description=self.description,
+            createDate=str(stage.createdDate),
+            startDate=str(stage.createdDate),
+            endDate=str(stage.createdDate),
+            columns=expose_methods
+        ))
 
 @dataclass
 class SampleContainer:
@@ -519,22 +534,16 @@ example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
 for i in range(10):
     example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
-    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i), complete=False))
-    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i), complete=False))
+    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i)))
+    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i)))
     example_sample_list.append(example_sample)
 
 # throw some new statuses in the mix:
 example_sample_list[0].stages[StageName.PREP].status = SampleStatus.INACTIVE
 example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
-for m in example_sample_list[1].stages[StageName.PREP].methods:
-    m.complete = True
-for m in example_sample_list[1].stages[StageName.INJECT].methods:
-    m.complete = True
 example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.INACTIVE
-for m in example_sample_list[2].stages[StageName.PREP].methods:
-    m.complete = True
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)
 #print(methods)

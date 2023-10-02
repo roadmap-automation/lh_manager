@@ -9,7 +9,6 @@ from liquid_handler.state import samples, layout
 from liquid_handler.samplelist import Sample, lh_method_fields, StageName
 from liquid_handler.bedlayout import Well
 from liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
-from liquid_handler import formulation
 from .events import trigger_samples_update
 from . import gui_blueprint
 
