@@ -4,11 +4,12 @@ import { onMounted } from 'vue';
 import Mixture from './Mixture.vue';
 import BedLayout from './BedLayout.vue';
 import SampleList from './SampleList.vue';
+import { samples, sample_status } from '../store';
 
 const props = defineProps({
   msg: String,
-  samples: Array,
-  sample_status: Object,
+  // samples: Array,
+  // sample_status: Object,
 })
 
 const emit = defineEmits(['remove_sample', 'add_sample']);
@@ -26,22 +27,6 @@ const mixture_parts = [];
 onMounted(() => {
   console.log(props.sample_status);
 });
-
-function clicked(bed, vial) {
-  console.log(bed, vial);
-}
-
-function sample_clicked(id) {
-  active_sample.value = id;
-}
-
-function remove_sample(id) {
-  emit('remove_sample', id);
-}
-
-function add_sample(id) {
-  emit('add_sample');
-}
 
 const mixtureIsOpen = ref(false);
 
@@ -81,35 +66,11 @@ function openMixture() {
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
       role="tabpanel" aria-labelledby="layout-tab">
       <div class="overflow-auto">
-        <div v-if="false" class="card m-3">
-          <div class="card-body">
-            <h5 class="card-title">Samples
-              <button class="btn btn-outline-primary" @click="add_sample">Add</button>
-            </h5>
-          </div>
-          <!-- <ol class="list-group list-group-flush list-group-numbered overflow-auto"> -->
-          <transition-group class="list-group list-group-flush list-group-numbered overflow-auto" name="list" tag="ol">
-            <li class="list-group-item d-flex justify-content-between list-group-item-action list-complete-item"
-              :class="{ active: sample.id === active_sample }" v-for="sample of samples" :key="sample.id"
-              @click="sample_clicked(sample.id)">
-              <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
-              <span class="align-middle px-2"> {{ sample.description }}</span>
-              <button type="button" class="btn-close btn-sm align-middle edit" aria-label="Edit"
-                @click="remove_sample(sample.id)"></button>
-              <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
-                @click="remove_sample(sample.id)"></button>
-            </li>
-          </transition-group>
-          <!-- <button class="btn btn-outline-primary" @click="add_sample">Add</button> -->
-          <!-- </ol> -->
-        </div>
         <div class="card m-3">
           <div class="card-body">
-            <h5 class="card-title">Samples
-              <button class="btn btn-outline-primary btn-sm float-end" @click="add_sample">Add</button>
-            </h5>
+            <h5 class="card-title">Samples</h5>
           </div>
-          <SampleList :samples="samples" :sample_status="sample_status"/>
+          <SampleList />
         </div>
       </div>
 

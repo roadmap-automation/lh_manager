@@ -12,7 +12,7 @@ const props = defineProps<{
 const text_size = 30;
 const padding = 6;
 
-const rack = layout.value.racks[props.rack_id] || {};
+const rack = layout.value?.racks[props.rack_id] ?? {rows: 0, columns:0, style: 'grid'};
 
 const row_array = computed(() => Array.from({ length: rack.rows }).map((_, i) => i))
 const col_array = computed(() => Array.from({ length: rack.columns }).map((_, i) => i));
@@ -47,7 +47,7 @@ function x_offset(col: number, row: number, centered: boolean = true) {
   else {
     start = centering_offset;
   }  
-  return padding + (col_width.value * (col + start));
+  return padding + ((col_width.value ?? 0) * (col + start));
 }
 
 function clicked(row: number, col: number) {

@@ -5,7 +5,8 @@ export interface MethodDef {
   display_name: string,
   fields: string[],
   schema: {
-    properties: string[]
+    properties: {[key: string]: object},
+    definitions: {[key: string]: object},
   }
 }
 
@@ -14,50 +15,20 @@ export interface WellLocation {
   well_number: number,
 }
 
-export interface TransferWithRinse {
-  Source: WellLocation,
-  Target: WellLocation,
-  Volume: number, // float = 1.0
-  Flow_Rate: number, // float = 2.5
-  display_name: 'Transfer With Rinse',
-  method_name: 'NCNR_TransferWithRinse',
+export type MethodType = {
+  display_name: string,
+  method_name: string,
+  Source?: WellLocation,
+  Target?: WellLocation,
+  [fieldname: string]: string | number | WellLocation | null | undefined,
 }
-
-export interface MixWithRinse {
-  //"""Inject with rinse"""
-  Target: WellLocation,
-  Volume: number, // = 1.0
-  Flow_Rate: number, // float = 2.5
-  Number_of_Mixes: number, // int = 3
-  display_name: 'Mix With Rinse',
-  method_name: 'NCNR_MixWithRinse',
-}
-
-export interface InjectWithRinse {
-  //"""Inject with rinse"""
-  Source: WellLocation, // defined in InjectMethod
-  Volume: number, // float = 1.0
-  Aspirate_Flow_Rate: number, // float = 2.5
-  Flow_Rate: number, // float = 2.5
-  display_name: 'Inject With Rinse',
-  method_name: 'NCNR_InjectWithRinse',
-}
-
-export interface Sleep{
-  //"""Sleep"""
-  Time: number, // float = 1.0
-  display_name: 'Sleep',
-  method_name: 'NCNR_Sleep',
-}
-
-type MethodsType = TransferWithRinse | MixWithRinse | InjectWithRinse | Sleep;
 
 // Class representing a list of methods representing one LH job. Allows dividing
 // prep and inject operations for a single sample.
 export interface MethodList {
     LH_id: number | null,
     createdDate: string | null,
-    methods: MethodsType[],
+    methods: MethodType[],
     methods_complete: boolean[], 
     status: StatusType,
 }
@@ -81,9 +52,27 @@ export interface SampleStatus {
   methods_complete?: boolean[]
 }
 
+export interface SampleStatusMap {
+  [sample_id: string]: {
+    status: StatusType,
+    stages: {
+      [stage_name in StageName]: SampleStatus
+    }
+  }
+}
+
+type Component = [name: string, zone: string];
+
+interface SourceComponents {
+  solutes: Component[],
+  solvents: Component[]
+}
+
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered'}} }>();
-export const samples = ref<object[]>([]);
+export const samples = ref<Sample[]>([]);
+export const sample_status = ref<SampleStatusMap>({});
+export const source_components = ref<SourceComponents>();
 
 type Events = {
   well_picked: WellLocation
@@ -92,7 +81,7 @@ type Events = {
 
 export const emitter = mitt<Events>();
 
-export async function update_sample(sample_obj: Sample): Promise<object> {
+export async function update_sample(sample_obj: Partial<Sample>): Promise<object> {
   const update_result = await fetch("/GUI/UpdateSample", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
@@ -115,6 +104,51 @@ export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep
   });
   const response_body = await update_result.json();
   return response_body;
+}
+
+
+export async function refreshLayout() {
+  const new_layout = await (await fetch("/GUI/GetLayout")).json();
+  console.log({new_layout});
+  layout.value = new_layout;
+}
+
+export async function refreshSamples() {
+  const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json() as { samples: { samples: Sample[] }};
+  samples.value = new_samples_in;
+  console.log({new_samples_in});
+  // filter samples to extract only what the GUI will edit:
+  // const new_samples = new_samples_in.map((s) => {
+  //   const { description, stages: unfiltered_stages, name, id } = s;
+  //   const stages = Object.fromEntries(Object.entries(unfiltered_stages).map(([stage, { methods }]) => [stage, { methods }]));
+  //   return { description, name, id, stages };
+  // });
+  // samples.value = new_samples;
+}
+
+export async function refreshSampleStatus() {
+  const new_sample_status = await (await fetch('/GUI/GetSampleStatus/')).json();
+  sample_status.value = new_sample_status;
+  console.log({new_sample_status});
+}
+
+export async function refreshMethodDefs() {
+  const { methods } = await (await fetch("/GUI/GetAllMethods/")).json() as {methods: Record<string, MethodDef>};
+  method_defs.value = methods;
+  console.log({methods});
+}
+
+export function remove_sample(id) {
+  const idx_to_remove = samples.value.findIndex((s) => s.id == id);
+  if (idx_to_remove != null) {
+    samples.value.splice(idx_to_remove, 1);
+  }
+}
+
+export async function refreshComponents() {
+  const new_source_components = await (await fetch("/GUI/GetComponents/")).json();
+  source_components.value = new_source_components;
+  console.log({new_source_components});
 }
 
 export const source_well = ref<WellLocation | null>(null);

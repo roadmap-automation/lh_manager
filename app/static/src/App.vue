@@ -4,14 +4,12 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
-import { method_defs, layout, samples, SampleStatus } from './store';
+import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshLayout, refreshComponents } from './store';
 import type { MethodDef } from './store';
 
 const connected = ref(false);
-const sample_status = ref({});
 
 const socket = io('', {
-  // this is mostly here to test what happens on server fail:
 });
 
 socket.on('connect', () => {
@@ -21,6 +19,7 @@ socket.on('connect', () => {
   refreshSamples();
   refreshSampleStatus();
   refreshMethodDefs();
+  refreshComponents();
 });
 
 socket.on('disconnect', (payload) => {
@@ -33,51 +32,15 @@ socket.on('update_samples', () => {
   refreshSamples();
 })
 
+socket.on('update_sample_status', () => {
+  // go fetch from the endpoint...
+  refreshSampleStatus();
+})
+
 socket.on('update_layout', () => {
   refreshLayout();
 })
 
-async function refreshLayout() {
-  const new_layout = await (await fetch("/GUI/GetLayout")).json();
-  console.log({new_layout});
-  layout.value = new_layout;
-}
-
-async function refreshSamples() {
-  const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json();
-  // filter samples to extract only what the GUI will edit:
-  const new_samples = new_samples_in.map((s) => {
-    const { description, stages: unfiltered_stages, name, id } = s;
-    const stages = Object.fromEntries(Object.entries(unfiltered_stages).map(([stage, { methods }]) => [stage, { methods }]));
-    return { description, name, id, stages };
-  });
-  samples.value = new_samples;
-}
-
-async function refreshSampleStatus() {
-  const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json();
-  const new_sample_status = Object.fromEntries(new_samples_in.map((s) => {
-    const { stages: unfiltered_stages, id } = s;
-    const stages = Object.fromEntries(Object.entries(unfiltered_stages).map(([stage, { methods_complete, status }]) => [stage, { methods_complete, status }]));
-
-    return [id, stages];
-  }));
-  sample_status.value = new_sample_status;
-  console.log(new_sample_status, new_samples_in);
-}
-
-async function refreshMethodDefs() {
-  const { methods } = await (await fetch("/GUI/GetAllMethods/")).json() as {methods: Record<string, MethodDef>};
-  method_defs.value = methods;
-  console.log({methods});
-}
-
-function remove_sample(id) {
-  const idx_to_remove = samples.value.findIndex((s) => s.id == id);
-  if (idx_to_remove != null) {
-    samples.value.splice(idx_to_remove, 1);
-  }
-}
 
 </script>
 
@@ -92,7 +55,7 @@ function remove_sample(id) {
         </div>
       </div>
     </nav>
-    <LiquidHandler :samples="samples" :sample_status="sample_status" @remove_sample="remove_sample" />
+    <LiquidHandler />
   </div>
 </template>
 
