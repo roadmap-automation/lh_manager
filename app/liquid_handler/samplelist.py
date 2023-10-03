@@ -1,6 +1,7 @@
 from dataclasses import InitVar, asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
+from uuid import uuid4
 from typing import Dict, List, Literal, Optional, Union, Tuple
 from .bedlayout import Well, LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
@@ -364,13 +365,18 @@ class MethodList:
 @dataclass
 class Sample:
     """Class representing a sample to be created by Gilson LH"""
-    id: str
     name: str
     description: str
+    id: str | None = None
     stages: Dict[StageName, MethodList] = field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
     current_contents: str = ''
+
+    def __post_init__(self) -> None:
+
+        if self.id is None:
+            self.id = str(uuid4())
 
     def get_LH_ids(self) -> list[int | None]:
 
@@ -533,7 +539,7 @@ Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
 for i in range(10):
-    example_sample = Sample(id=str(i), name=f'testsample{i}', description='test sample description')
+    example_sample = Sample(name=f'testsample{i}', description='test sample description')
     example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i)))
     example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i)))
     example_sample_list.append(example_sample)
