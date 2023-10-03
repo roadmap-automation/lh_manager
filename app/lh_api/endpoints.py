@@ -1,6 +1,5 @@
 """Gilson Trilution LH 4.0 Endpoints"""
 from flask import make_response, Response, request
-from copy import deepcopy
 
 from liquid_handler.state import samples, layout
 from liquid_handler.lhqueue import LHqueue
@@ -11,16 +10,14 @@ from . import lh_blueprint
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:
-    test_layout = deepcopy(layout)
-    sample_list = [sample.toSampleList(stage_name, test_layout, entry=True) for sample in samples.samples for stage_name in sample.stages if sample.stages[stage_name].status==SampleStatus.ACTIVE]
+    sample_list = [sample.toSampleList(stage_name, layout, entry=True) for sample in samples.samples for stage_name in sample.stages if sample.stages[stage_name].status==SampleStatus.ACTIVE]
 
     return make_response({'sampleLists': sample_list}, 200)
 
 @lh_blueprint.route('/LH/GetSampleList/<sample_list_id>', methods=['GET'])
 def GetSampleList(sample_list_id) -> Response:
-    test_layout = deepcopy(layout)
     sample, stage_name = samples.getSampleStagebyLH_ID(int(sample_list_id))
-    sampleList = sample.toSampleList(stage_name, test_layout) if sample is not None and stage_name is not None else []
+    sampleList = sample.toSampleList(stage_name, layout) if sample is not None and stage_name is not None else []
 
     return make_response({'sampleList': sampleList}, 200)
 
