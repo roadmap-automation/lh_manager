@@ -61,6 +61,23 @@ def GetSamples() -> Response:
 
     return make_response({'samples': asdict(samples)}, 200)
 
+@gui_blueprint.route('/GUI/GetSampleStatus/', methods=['GET'])
+def GetSamplesStatus() -> Response:
+    """Gets sample list statuses"""
+
+    status_dict = {}
+    for sample in samples.samples:
+        status = {"status": sample.get_status()}
+        stages = {}
+        for stage_name, stage in sample.stages.items():
+            stage_status = {"status": stage.status}
+            stage_status["methods_complete"] = stage.get_method_completion()
+            stages[stage_name] = stage_status
+        status["stages"] = stages
+        status_dict[sample.id] = status
+
+    return make_response(status_dict, 200)
+
 @gui_blueprint.route('/GUI/GetAllMethods/', methods=['GET'])
 def GetAllMethodSchema() -> Response:
     """Gets method fields and pydantic schema of all methods"""
