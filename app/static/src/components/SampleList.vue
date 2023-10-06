@@ -1,25 +1,20 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
-import { Modal } from 'bootstrap';
+import Modal from 'bootstrap/js/src/modal';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
 // import { socket_emit } from '../store.ts';
-import { update_sample, run_sample, active_item, active_stage, active_method } from '../store';
-import type { SampleStatus, StatusType, Sample, StageName } from '../store';
-
-const props = defineProps<{
-  samples: Sample[],
-  sample_status: {[sample_id: string]: {[stage_name in StageName]: SampleStatus}},
-}>();
+import { samples, sample_status, update_sample, run_sample, active_item, active_stage, active_method } from '../store';
+import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
 
 const emit = defineEmits(['update_sample']);
 
 const editing_item = ref(null);
-const modal_node = ref(null);
-const modal = ref(null);
-const name_input = ref(null);
+const modal_node = ref<HTMLElement>();
+const modal = ref<Modal>();
+const name_input = ref<HTMLInputElement>();
 const modal_title = ref("Edit Sample Name and Description")
-const sample_to_edit = ref({ name: '', description: '', id: '' });
+const sample_to_edit = ref<Partial<Sample>>({ name: '', description: '', id: '' });
 
 function toggleItem(index) {
   active_item.value = (index === active_item.value) ? null : index;
@@ -28,6 +23,8 @@ function toggleItem(index) {
 }
 
 function add_sample() {
+  // when "update_sample" is called with a new id, 
+  // it creates a new sample on the server
   const id = uuidv4();
   const name = "";
   const description = "";
@@ -37,7 +34,7 @@ function add_sample() {
 }
 
 async function edit_sample_name(index) {
-  const s = props.samples[index];
+  const s = samples[index];
   const { id, name, description } = s;
   modal_title.value = "Edit Sample Name and Description";
   sample_to_edit.value = { id, name, description };
@@ -109,40 +106,10 @@ function set_active_method(stage_name, method_index) {
 
 onMounted(() => {
   modal.value = new Modal(modal_node.value);
-  modal_node.value.addEventListener('shown.bs.modal', function () {
+  modal_node.value?.addEventListener('shown.bs.modal', function () {
     name_input.value?.focus();
   })
 });
-
-function get_sample_status(sample_id: string): StatusType {
-  const status = props.sample_status[sample_id];
-  const stage_status = Object.values(status).map((stage) => stage?.status);
-  if (stage_status.every(s => s === 'inactive')) {
-    return 'inactive';
-  }
-  else if (stage_status.some((s) => s === 'active')) {
-    return 'active';
-  }
-  else if (stage_status.some((s) => s === 'pending')) {
-    return 'pending';
-  }
-  else if (stage_status.every((s) => s === 'completed')) {
-    return 'completed';
-  }
-  else if (stage_status.some((s) => s === 'completed') && stage_status.some((s) => s === 'inactive')) {
-    return 'partially complete';
-  }
-  else {
-    console.warn(`unexpected status: ${JSON.stringify(status)}`);
-    return null;
-  }
-}
-
-const status_by_id = computed(() => {
-  return Object.fromEntries(props.samples.map((s) => {
-    return [s.id, get_sample_status(s.id)];
-  }));
-})
 
 const status_class_map: {[status in StatusType]: string} = {
   'inactive': '',
@@ -160,14 +127,14 @@ const status_class_map: {[status in StatusType]: string} = {
     <div class="accordion-item" v-for="(sample, sindex) of samples" :key="sample.id">
       <div class="accordion-header">
         <button class="accordion-button p-1"
-          :class="{ collapsed: sindex !== active_item, [status_class_map[status_by_id[sample.id]]]: true }" type="button"
+          :class="{ collapsed: sindex !== active_item, [status_class_map[sample_status[sample.id]?.status ?? 'inactive']]: true }" type="button"
           @click="toggleItem(sindex)" :aria-expanded="sindex === active_item">
           <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
           <span class="align-middle px-2"> {{ sample.description }}</span>
           <button type="button" class="btn-close btn-sm align-middle edit" aria-label="Edit Name or Description"
             @click.stop="edit_sample_name(sindex)"></button>
             <button 
-              v-if="status_by_id[sample.id] === 'inactive'"
+              v-if="(sample_status[sample.id]?.status ?? 'inactive') === 'inactive'"
               type="button"
               class="btn-close btn-sm align-middle start"
               aria-label="Run stage"
@@ -180,14 +147,17 @@ const status_class_map: {[status in StatusType]: string} = {
           <div v-for="(stage, stage_name) of sample.stages">
             <h6 :class="status_class_map[sample_status?.[sample.id]?.[stage_name]?.status ?? 'inactive']">{{ stage_name }}:
               <button 
-                v-if="sample_status?.[sample.id]?.[stage_name]?.status === 'inactive'"
+                v-if="sample_status?.[sample.id]?.stages?.[stage_name]?.status === 'inactive'"
                 type="button"
                 class="btn-close btn-sm align-middle start"
                 aria-label="Run stage"
                 @click.stop="run_stage(sample, [stage_name])">
               </button>
             </h6>
-            <MethodList :methods="stage.methods" :status="sample_status?.[sample.id]?.prep" :collapsed="!(sindex === active_item && stage_name == active_stage)"
+            <MethodList 
+              :methods="stage.methods"
+              :status="sample_status?.[sample.id]?.stages?.[stage_name]"
+              :collapsed="!(sindex === active_item && stage_name == active_stage)"
               :active_item="(stage_name === active_stage) ? active_method : null"
               @add_method="(m) => add_method(m, sample, stage_name)"
               @set_location="(i, n, l) => set_location(i, n, l, sample, stage_name)"

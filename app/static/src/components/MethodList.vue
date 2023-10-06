@@ -1,18 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { method_defs, source_well, target_well, layout, emitter } from '../store';
-import type { SampleStatus, WellLocation } from '../store';
-
-type Method = {
-  display_name: string,
-  method_name: string,
-  Source?: WellLocation,
-  Target?: WellLocation,
-  [fieldname: string]: string | number | WellLocation | null | undefined,
-}
+import { method_defs, source_components, source_well, target_well, layout, emitter } from '../store';
+import type { SampleStatus, WellLocation, MethodType } from '../store';
 
 const props = defineProps<{
-  methods: Method[],
+  methods: MethodType[],
+  components: any,
   status: SampleStatus,
   collapsed: boolean,
   active_item: number | null
@@ -25,7 +18,7 @@ function toggleItem(index) {
   emit('set_active', index);
 }
 
-function method_string(method: Method) {
+function method_string(method: MethodType) {
   const param_strings = get_parameters(method)
     .map(({name, value}) => {
       if (value &&  typeof(value) === 'object') {
@@ -34,23 +27,23 @@ function method_string(method: Method) {
       return `${name}=${value}`
     });
 
-  const output = `${method.display_name}: ${param_strings.join(',')}`;
+  const output = `${param_strings.join(', ')}`;
   return output;
 }
 
-function get_parameters(method: Method) {
+function get_parameters(method: MethodType) {
   const { method_name } = method;
   const method_def = method_defs.value[method_name];
   if (method_def == null) {
     return [];
   }
-  const { fields, schema: { properties } } = method_def;
+  const { fields, schema } = method_def;
   const params = fields.map((field_name) => {
-    const p = properties[field_name];
-    const type = ('$ref' in p) ? p['$ref'] : p.type;
+    const properties = schema.properties[field_name];
+    const type = ('$ref' in properties) ? properties['$ref'] : properties.type;
     const value = clone(method[field_name]);
     const original_value = clone(method[field_name]);
-    return {name: field_name, value, original_value, type };
+    return {name: field_name, value, original_value, type, schema, properties };
   });
   return params
 }
@@ -62,6 +55,17 @@ function clone(obj) {
 const parameters = computed(() => {
   return props.methods.map(get_parameters);
 });
+
+function filter_components(index, component_key: 'solutes' | 'solvents') {
+  const components = source_components.value?.[component_key] ?? [];
+  const include_zones_param = parameters.value[index].find((p) => p.name === 'include_zones');
+  const include_zones = include_zones_param?.value ?? null;
+  const filtered_components = (include_zones === null) ? [...components] : components.filter((c) => (include_zones.includes(c[1])));
+  const unique_components = new Set(filtered_components.map((c) => c[0]));
+  // console.log(source_components.value, component_key);
+  // console.log({components, filtered_components, include_zones, unique_components});
+  return [...unique_components];
+}
 
 const editable = computed(() => {
   return (props.status?.status === 'inactive');
@@ -97,6 +101,30 @@ function activateSelector({name, type}) {
 function send_changes(index, param) {
   console.log('send changes', param.name, param.value);
   emit('update_method', index, param.name, param.value);
+}
+
+
+function add_component(index, param, component_type: 'solvents' | 'solutes') {
+  if (param.value == null) {
+    param.value = {
+      solutes: [],
+      solvents: []
+    }
+  }
+  const first_available = filter_components(index, component_type)[0];
+  console.log(index, component_type, first_available);
+  if (first_available !== undefined) {
+    const new_component: {name: string, fraction?: number, concentration?: number} = {name: first_available};
+    if (component_type === 'solvents') {
+      new_component.fraction = 0;
+    }
+    else {
+      new_component.concentration = 0;
+    }
+    console.log({param});
+    param.value[component_type].push(new_component);
+    send_changes(index, param);
+  }
 }
 
 watch(() => props.active_item, (active_item) => {
@@ -140,9 +168,10 @@ watch(() => props.collapsed, (collapsed: boolean) => {
       <h2 class="accordion-header">
         <button class="accordion-button p-1" :class="{ collapsed: index !== active_item }" type="button"
           @click="toggleItem(index)" :aria-expanded="index === active_item">
-          <span class="align-middle px-2" :class="{ 'text-danger': status?.methods_complete?.[index] }"> {{
-              method_string(method)
-          }}</span>
+          <span class="d-inline align-middle text-light bg-dark" > {{ method.display_name }}:</span>
+          <span class="d-inline align-middle px-2 method-string" :class="{ 'text-danger': status?.methods_complete?.[index] }">
+            {{ method_string(method) }}
+          </span>
         </button>
       </h2>
       <div class="accordion-collapse collapse" :class="{ show: index === active_item }">
@@ -164,6 +193,11 @@ watch(() => props.collapsed, (collapsed: boolean) => {
                     @keydown.enter="send_changes(index, param)"
                     @blur="send_changes(index, param)" />
                 </td>
+                <td v-if="param.type === 'boolean'">
+                  <input type="checkbox"
+                    v-model="param.value" :name="`param_${param.name}`"
+                    @change="send_changes(index, param)" />
+                </td>
                 <td v-if="param.type === '#/definitions/WellLocation'">
                   <select v-if="layout != null && param.value && 'rack_id' in param.value" v-model="param.value.rack_id" @change="send_changes(index, param)">
                     <option :value="null" disabled></option>
@@ -173,6 +207,51 @@ watch(() => props.collapsed, (collapsed: boolean) => {
                     :name="`param_${param.name}_well`" 
                     @keydown.enter="send_changes(index, param)"
                     @blur="send_changes(index, param)" />
+                </td>
+                <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/definitions/Zone'">
+                  <select v-model="param.value" multiple @change="send_changes(index, param)">
+                    <option v-for="zone in param.schema.definitions?.Zone?.enum" :value="zone">{{ zone }}</option>
+                  </select>
+                </td>
+                <td v-if="param.type === '#/definitions/Composition'">
+                  <div>
+                    <div>Solutes: 
+                      <button class="btn btn-sm btn-outline-primary" @click="add_component(index, param, 'solutes')">add</button>
+                    </div>
+                    <div class="ps-3" v-for="(solute, sindex) of (param?.value?.solutes ?? [])">
+                      <select v-model="solute.name" @change="send_changes(index, param)">
+                        <option v-for="source_solute of filter_components(index, 'solutes')" :value="source_solute">{{ source_solute }}</option>
+                      </select>
+                      <label>concentration ({{ solute.units }}):
+                        <input 
+                          class="number px-1 py-0"  
+                          v-model="solute.concentration"
+                          @keydown.enter="send_changes(index, param)"
+                          @blur="send_changes(index, param)" />
+                      </label>
+                      <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
+                         @click="param.value.solutes.splice(sindex, 1); send_changes(index, param)"></button>
+                    </div>
+                  </div>
+                  <div>
+                    <div>Solvents: 
+                      <button class="btn btn-sm btn-outline-primary" @click="add_component(index, param, 'solvents')">add</button>
+                    </div>
+                    <div class="ps-3" v-for="(solvent, sindex) of (param?.value?.solvents ?? [])">
+                      <select v-model="solvent.name">
+                        <option v-for="source_solvent of filter_components(index, 'solvents')" :value="source_solvent">{{ source_solvent }}</option>
+                      </select>
+                      <label>fraction:
+                        <input 
+                          class="number px-1 py-0"  
+                          v-model="solvent.fraction"
+                          @keydown.enter="send_changes(index, param)"
+                          @blur="send_changes(index, param)" />
+                      </label>
+                      <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
+                         @click="param.value.solvents.splice(sindex, 1); send_changes(index, param)"></button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </fieldset>
@@ -208,5 +287,8 @@ input.number {
 
 input.dirty {
   color: red;
+}
+span.method-string {
+  max-width: 800px;
 }
 </style>
