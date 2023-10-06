@@ -63,6 +63,7 @@ def UpdateDryRunQueue() -> Response:
     data = request.get_json(force=True)
     assert isinstance(data, dict)
     samples.dryrun_queue = DryRunQueue(**data)
+    samples.validate_queue(samples.dryrun_queue)
 
     return make_response({'dry run queue updated': None}, 200)
 

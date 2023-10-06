@@ -1,9 +1,10 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from dataclasses import field
 from pydantic.dataclasses import dataclass
 from .samplelist import Sample, StageName, SampleStatus
 from .bedlayout import LHBedLayout
-from .dryrun import DryRunQueue, DryRunError
+from .dryrun import DryRunQueue
+from .items import Item, MethodError
 
 @dataclass
 class SampleContainer:
@@ -66,7 +67,7 @@ class SampleContainer:
 
         return max([lh_id if lh_id is not None else -1 for lh_id in lh_ids])
     
-    def dryrun(self, layout: LHBedLayout) -> List[DryRunError]:
+    def dryrun(self, layout: LHBedLayout) -> List[Tuple[Item, List[MethodError]]]:
         """Executes dry run of everything in the queue by copying the layout and
             executing all methods in the queue
 
@@ -74,15 +75,16 @@ class SampleContainer:
             layout (LHBedLayout): bed layout on which to dry run
 
         Returns:
-            List[DryRunError]: list of errors
+            List[Tuple[Item, List[MethodError]]]: list of item / error list keys
         """
-        errors: List[DryRunError] = []
+        errors: List[Tuple[Item, List[MethodError]]] = []
         self.validate_queue(self.dryrun_queue)
         for item in self.dryrun_queue.stages:
             _, sample = self.getSampleById(item.id)
-            sample.stages[item.stage].execute(layout)
+            new_errors = sample.stages[item.stage].execute(layout)
+            if not all (v is None for v in new_errors):
+                errors.append((item, new_errors))
 
-        # TODO: figure out how to catch errors
         return errors
     
     def validate_queue(self, q: DryRunQueue) -> None:

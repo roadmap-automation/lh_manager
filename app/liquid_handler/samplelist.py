@@ -5,6 +5,7 @@ from uuid import uuid4
 from typing import Dict, List, Literal, Optional, Union, Tuple
 from .bedlayout import Well, LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
+from .items import LHError, Item, StageName, MethodError
 from datetime import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -25,10 +26,10 @@ class BaseMethod:
         SAMPLEDESCRIPTION: str
         METHODNAME: str
 
-    def execute(self, layout: LHBedLayout) -> None:
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""
-        pass
-
+        return None
+    
     def new_sample_composition(self, layout: LHBedLayout) -> str:
         """Returns new sample composition if applicable"""
         
@@ -96,16 +97,23 @@ class TransferWithRinse(BaseMethod):
             Target_Well=target_well
         )]
 
-    def execute(self, layout: LHBedLayout) -> None:
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         target_well, target_rack = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
-        
-        # TODO: real error reporting
-        assert source_well.volume > self.Volume, f"{source_well.well_number} in {source_well.rack_id} rack contains {source_well.volume} but needs {self.Volume}"
+
+        if self.Volume > source_well.volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Well {source_well.well_number} in {source_well.rack_id} \
+                                      rack contains {source_well.volume} but needs {self.Volume}")
+
         source_well.volume -= self.Volume
 
-        assert (target_well.volume + self.Volume) < target_rack.max_volume, f"{source_well.well_number} in {source_well.rack_id} rack contains {source_well.volume} but needs {self.Volume}"
+        if (target_well.volume + self.Volume) > target_rack.max_volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Total volume {target_well.volume + self.Volume} from existing volume {target_well.volume} and transfer volume {self.Volume} exceeds rack maximum volume {target_rack.max_volume}"
+                                      )
 
         # Perform mix. Note that target_well volume is also changed by this operation
         target_well.mix_with(self.Volume, source_well.composition)
@@ -147,6 +155,15 @@ class MixWithRinse(BaseMethod):
             Target_Zone=target_zone,
             Target_Well=target_well
         )]
+    
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+
+        target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
+
+        if self.Volume > target_well.volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Mix with volume {self.Volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
+                                      )
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return 2 * self.Number_of_Mixes * self.Volume / self.Flow_Rate
@@ -186,9 +203,16 @@ class InjectWithRinse(InjectMethod):
             Flow_Rate=f'{self.Flow_Rate}'
         )]
 
-    def execute(self, layout: LHBedLayout) -> None:
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+        
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+
+        if self.Volume > source_well.volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Injection of volume {self.Volume} requested but well {source_well.well_number} in {source_well.rack_id} rack contains only {source_well.volume}"
+                                      )
+            
         source_well.volume -= self.Volume
 
     def estimated_time(self, layout: LHBedLayout) -> float:
@@ -224,6 +248,8 @@ class Sleep(BaseMethod):
 class MethodContainer(BaseMethod):
     """Special method that generates a list of basic methods when rendered"""
 
+    display_name: str = 'MethodContainer'
+
     def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:
         """Generates list of methods. Intended to be superceded for specific applications
 
@@ -236,9 +262,12 @@ class MethodContainer(BaseMethod):
 
         return []
 
-    def execute(self, layout: LHBedLayout) -> None:
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+        """Returns the error if any of the submethods give errors"""
         for m in self.get_methods(layout):
-            m.execute(layout)
+            error = m.execute(layout)
+            if error is not None:
+                return MethodError(f'{self.display_name}.{error.name}', error.error)
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return sum(m.estimated_time() for m in self.get_methods(layout))
@@ -291,10 +320,6 @@ class SampleList:
     endDate: str
     columns: list[BaseMethod.lh_method] | None
 
-class StageName(str, Enum):
-    PREP = 'prep'
-    INJECT = 'inject'
-
 @dataclass
 class MethodList:
     """Class representing a list of methods representing one LH job. Can be nested
@@ -344,11 +369,16 @@ class MethodList:
         # Generate one entry for each method.
         self.run_methods_complete = [False for _ in self.run_methods]
 
-    def execute(self, layout: LHBedLayout):
-        """Executes all methods. Used for dry running"""
+    def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
+        """Executes all methods. Used for dry running. Returns list of
+            errors, one for each method, or None if no error"""
 
+        errors = []
         for m in self.methods:
-            m.execute(layout)
+            print(f'Executing {m}')
+            errors += [m.execute(layout)]
+
+        return errors
 
     def undo_prepare(self):
         """Undoes the prepare steps"""
