@@ -2,10 +2,12 @@
 import json
 import os
 from dataclasses import asdict
-from .samplelist import SampleContainer, example_sample_list
+from .samplecontainer import SampleContainer
+from .samplelist import example_sample_list, StageName
 from . import formulation
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
+from .dryrun import DryRunItem
 from app_config import parser
 
 LOG_PATH = 'persistent_state'
@@ -62,3 +64,5 @@ if layout is None:
     # TODO: remove for production
     for well in example_wells:
         layout.add_well_to_rack(well.rack_id, well)
+
+samples.dryrun_queue.add_item(DryRunItem(example_sample_list[9].id, StageName.PREP))

@@ -9,6 +9,7 @@ from liquid_handler.state import samples, layout
 from liquid_handler.samplelist import Sample, lh_method_fields, StageName
 from liquid_handler.bedlayout import Well
 from liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
+from liquid_handler.dryrun import DryRunQueue
 from .events import trigger_samples_update
 from . import gui_blueprint
 
@@ -53,7 +54,26 @@ def UpdateSample() -> Response:
         samples.samples[sample_index] = new_sample
         return make_response({'sample updated': id}, 200)
 
-    
+@gui_blueprint.route('/GUI/UpdateDryRunQueue/', methods=['POST'])
+@trigger_samples_update
+def UpdateDryRunQueue() -> Response:
+    """Updates the dry run queue
+    """
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    samples.dryrun_queue = DryRunQueue(**data)
+
+    return make_response({'dry run queue updated': None}, 200)
+
+@gui_blueprint.route('/GUI/DryRun/', methods=['POST'])
+def DryRun() -> Response:
+    """Performs dry run and returns list of errors
+    """
+    test_layout = deepcopy(layout)
+    errors = samples.dryrun(test_layout)
+
+    return make_response({'dry run errors': errors}, 200)
 
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:

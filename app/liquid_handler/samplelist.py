@@ -342,7 +342,13 @@ class MethodList:
                                               layout=layout)
 
         # Generate one entry for each method.
-        self.run_methods_complete = [False for m in self.run_methods]
+        self.run_methods_complete = [False for _ in self.run_methods]
+
+    def execute(self, layout: LHBedLayout):
+        """Executes all methods. Used for dry running"""
+
+        for m in self.methods:
+            m.execute(layout)
 
     def undo_prepare(self):
         """Undoes the prepare steps"""
@@ -465,74 +471,6 @@ class Sample:
             endDate=str(stage.createdDate),
             columns=expose_methods
         ))
-
-@dataclass
-class SampleContainer:
-    """Specialized sample dictionary allowing convenient referencing by sample ID or sample name"""
-
-    samples: list[Sample] = field(default_factory=list)
-
-    def _getIDs(self) -> list[str]:
-
-        return [s.id for s in self.samples]
-
-    def _getNames(self) -> list[str]:
-
-        return [s.name for s in self.samples]
-
-    def getSampleStagebyLH_ID(self, id: int) -> Tuple[Sample | None, StageName | None]:
-        """Return sample with specific id"""
-
-        for sample in self.samples:
-            if id in sample.get_LH_ids():
-                return sample, sample.getStageByID(id)
-
-        return None, None
-        #raise ValueError(f"Sample ID {id} not found!")
-
-    def getSampleById(self, id: str) -> Tuple[int, Sample] | Tuple[None, None]:
-        return next(((i,s) for i,s in enumerate(self.samples) if s.id == id), (None, None))
-
-    def getSamplebyName(self, name: str, status: SampleStatus | None = None) -> Sample | None:
-        """Return sample with specific name"""
-        names = self._getNames()
-        if name in names:
-            sample = self.samples[names.index(name)]
-            return sample if (sample.get_status() == status) | (status is None) else None
-        else:
-            return None
-            #raise ValueError(f"Sample name {name} not found!")
-
-    def addSample(self, sample: Sample) -> None:
-        """Sample appender that checks for proper ID value"""
-        if sample.id in self._getIDs():
-            print(f'Warning: id {sample.id} already taken. Sample not added.')
-        else:
-            self.samples.append(sample)
-        
-    def deleteSample(self, sample: Sample) -> None:
-        """Special remover that also updates index object"""
-        
-        self.samples.pop(self.samples.index(sample))
-
-    def getMaxLH_id(self) -> int:
-        """ Returns maximum index value for Sample.MethodList.LH_id. If no LH_ids are defined,
-            returns -1."""
-        
-        lh_ids = []
-        for sample in self.samples:
-            for lh_id in sample.get_LH_ids():
-                lh_ids.append(lh_id)
-
-        return max([lh_id if lh_id is not None else -1 for lh_id in lh_ids])
-
-def moveSample(container1: SampleContainer, container2: SampleContainer, key: str, value) -> None:
-    """Utility for moving a sample from one SampleContainer to another
-        Deprecated in favor of Sample.status enum"""
-
-    sample = container1.getSample(key, value)
-    container2.addSample(sample)
-    container1.deleteSample(sample)
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
