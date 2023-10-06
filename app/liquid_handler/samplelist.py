@@ -38,6 +38,9 @@ class BaseMethod:
     def estimated_time(self, layout: LHBedLayout) -> float:
         """Estimated time for method in default time units"""
         return 0.0
+
+    def get_methods(self):
+        return [self]
     
     def render_lh_method(self,
                          sample_name: str,
@@ -354,7 +357,7 @@ class MethodList:
         else:
             return sum(m.estimated_time(layout) if not complete else 0.0 for m, complete in zip(self.run_methods, self.run_methods_complete))
 
-    def prepare_for_run(self, sample_name: str, sample_description: str, layout: LHBedLayout):
+    def prepare_run_methods(self):
         """Prepares the method list for running by populating run_methods and run_methods_complete.
             List can then be used for dry or wet runs
         """
@@ -362,9 +365,7 @@ class MethodList:
         # Generate real-time LH methods based on layout
         self.run_methods = []
         for m in self.methods:
-            self.run_methods += m.render_lh_method(sample_name=sample_name,
-                                              sample_description=sample_description,
-                                              layout=layout)
+            self.run_methods += m.get_methods()
 
         # Generate one entry for each method.
         self.run_methods_complete = [False for _ in self.run_methods]
@@ -387,7 +388,8 @@ class MethodList:
         self.run_methods_complete = None
     
     def get_method_completion(self) -> List[bool]:
-        """Returns list of method completion status
+        """Returns list of method completion status. If prepare_run_methods has not been
+            run (i.e. run_methods is None), returns False
 
         Returns:
             List[bool]: List of method completion status, one for each method in methods
@@ -488,8 +490,10 @@ class Sample:
         if entry:
             expose_methods = None
         else:
-            stage.prepare_for_run(self.name, self.description, layout)
-            expose_methods = stage.run_methods
+            stage.prepare_run_methods()
+            expose_methods = [m.render_lh_method(sample_name=self.name,
+                                              sample_description=self.description,
+                                              layout=layout) for m in stage.run_methods]
 
         return asdict(SampleList(
             name=self.name,
