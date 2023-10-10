@@ -5,7 +5,8 @@ from flask import make_response, Response, request
 from liquid_handler.lhqueue import LHqueue, validate_format
 from liquid_handler.samplelist import SampleStatus
 from liquid_handler.state import samples, layout
-from gui_api.events import trigger_sample_status_update
+from liquid_handler.items import Item
+from gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
 from . import nice_blueprint
 
@@ -13,10 +14,9 @@ def _run_sample(data) -> Response:
     """ Generic function for processing a run request"""
 
     if 'id' in data:
-        sample_index, sample = samples.getSampleById(data['id'])
+        _, sample = samples.getSampleById(data['id'])
     else:
         sample = samples.getSamplebyName(data['name'])
-        data['id'] = sample.id
 
     # check that sample name exists
     if sample is not None:
@@ -26,9 +26,8 @@ def _run_sample(data) -> Response:
                 return make_response({'result': 'error', 'message': f'stage {stage} of sample {data["name"]} is not inactive'}, 400)
             
             # create new run command specific to stage and add to queue
-            sample.stages[stage].status = SampleStatus.PENDING
-            stagedata = {**data, 'stage': [stage]}
-            LHqueue.put_safe(stagedata)
+            #stagedata = {**data, 'stage': [stage]}
+            LHqueue.put_safe(Item(sample.id, stage, data))
             LHqueue.run_next()
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
@@ -36,6 +35,7 @@ def _run_sample(data) -> Response:
     return make_response({'result': 'error', 'message': 'sample not found'}, 400)
 
 @nice_blueprint.route('/NICE/RunSample/<sample_name>/<uuid>/<slotID>/<stage>/', methods=['GET'])
+@trigger_run_queue_update
 @trigger_sample_status_update
 def RunSample(sample_name, uuid, slotID, stage) -> Response:
     """Runs a sample by name and stage. For testing only"""
@@ -50,6 +50,7 @@ def RunSample(sample_name, uuid, slotID, stage) -> Response:
     return _run_sample(data)
 
 @nice_blueprint.route('/NICE/RunSamplewithUUID/', methods=['POST'])
+@trigger_run_queue_update
 @trigger_sample_status_update
 def RunSamplewithUUID() -> Response:
     """Runs a sample by name, giving it a UUID. Returns error if sample not found or sample is already active or completed."""
@@ -69,18 +70,12 @@ def RunSamplewithUUID() -> Response:
 def _getActiveSample() -> str:
     """Gets the currently active sample with the earliest createdDate."""
 
-    # find active samples
-    active_sample_names = [sample.name for sample in samples.samples if sample.get_status() == SampleStatus.ACTIVE]
-    active_name = ''
+    active_sample = LHqueue.active_sample
 
-    if len(active_sample_names):
-        # regenerate datetime objects from date strings
-        active_sample_dates = [sample.get_earliest_date() for sample in samples.samples if sample.get_status() == SampleStatus.ACTIVE]
+    if active_sample is not None:
+        return samples.getSampleById(active_sample.id)[1].name
 
-        # select name of sample with earliest createdDate
-        active_name = active_sample_names[active_sample_dates.index(min(active_sample_dates))]
-    
-    return active_name
+    return ''
 
 @nice_blueprint.route('/NICE/GetActiveSample/', methods=['GET'])
 def GetActiveSample() -> Response:
@@ -154,6 +149,8 @@ def GetLHQueue() -> Response:
     return make_response({'LHQueue': LHqueue.repr_queue()}, 200)
 
 @nice_blueprint.route('/NICE/Stop/', methods=['GET', 'POST'])
+@trigger_run_queue_update
+@trigger_sample_status_update
 def Stop() -> Response:
     """Stops operation by emptying liquid handler queue.
     
@@ -161,8 +158,36 @@ def Stop() -> Response:
         
         TODO: Remove GET for production"""
 
-    init_size = LHqueue.qsize()
+    with LHqueue.lock:
+        init_size = len(LHqueue.stages)
 
     LHqueue.stop()
 
     return make_response({'result': 'success', 'number_operations_canceled': init_size, 'message': f'{init_size} pending LH operations canceled'}, 200)
+
+@nice_blueprint.route('/NICE/Pause/', methods=['GET', 'POST'])
+def Pause() -> Response:
+    """Pauses liquid handler queue.
+    
+        Ignores request data.
+        
+        TODO: Remove GET for production"""
+
+    LHqueue.pause()
+
+    return make_response({'result': 'success'}, 200)
+
+@nice_blueprint.route('/NICE/Resume/', methods=['GET', 'POST'])
+@trigger_run_queue_update
+@trigger_sample_status_update
+def Resume() -> Response:
+    """Pauses liquid handler queue.
+    
+        Ignores request data.
+        
+        TODO: Remove GET for production"""
+
+    LHqueue.resume()
+    LHqueue.run_next()
+
+    return make_response({'result': 'success'}, 200)

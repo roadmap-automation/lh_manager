@@ -1,11 +1,11 @@
-from dataclasses import InitVar, asdict, fields, field
+from dataclasses import asdict, fields, field
 from pydantic.dataclasses import dataclass
 from enum import Enum
 from uuid import uuid4
-from typing import Dict, List, Literal, Optional, Union, Tuple
-from .bedlayout import Well, LHBedLayout, WellLocation
+from typing import Dict, List, Literal, Union
+from .bedlayout import LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .items import LHError, Item, StageName, MethodError
+from .items import StageName, MethodError
 from datetime import datetime
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -527,10 +527,12 @@ class Sample:
         if entry:
             expose_methods = None
         else:
-            stage.prepare_run_methods()
-            expose_methods = [m.render_lh_method(sample_name=self.name,
+            stage.prepare_run_methods(layout)
+            expose_methods = []
+            for m in stage.run_methods:
+                expose_methods += m.render_lh_method(sample_name=self.name,
                                               sample_description=self.description,
-                                              layout=layout) for m in stage.run_methods]
+                                              layout=layout)
 
         return asdict(SampleList(
             name=self.name,

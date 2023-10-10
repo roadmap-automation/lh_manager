@@ -10,6 +10,7 @@ from liquid_handler.samplelist import Sample, lh_method_fields, StageName
 from liquid_handler.bedlayout import Well
 from liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from liquid_handler.dryrun import DryRunQueue
+from liquid_handler.lhqueue import LHqueue, RunQueue
 from .events import trigger_samples_update
 from . import gui_blueprint
 
@@ -75,6 +76,25 @@ def DryRun() -> Response:
     errors = samples.dryrun(test_layout)
 
     return make_response({'dry run errors': errors}, 200)
+
+@gui_blueprint.route('/GUI/UpdateRunQueue/', methods=['POST'])
+def UpdateRunQueue() -> Response:
+    """Updates the dry run queue
+    """
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    new_queue = RunQueue(**data)
+    with LHqueue.lock:
+        LHqueue.stages = new_queue.stages
+
+    return make_response({'run queue updated': None}, 200)
+
+@gui_blueprint.route('/GUI/GetRunQueue/', methods=['GET'])
+def GetRunQueue() -> Response:
+    """Gets run queue as dict"""
+
+    return make_response({'run_queue': asdict(LHqueue)}, 200)
 
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:
