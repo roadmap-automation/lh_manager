@@ -39,7 +39,7 @@ class BaseMethod:
         """Estimated time for method in default time units"""
         return 0.0
 
-    def get_methods(self):
+    def get_methods(self, layout: LHBedLayout):
         return [self]
     
     def render_lh_method(self,
@@ -357,7 +357,7 @@ class MethodList:
         else:
             return sum(m.estimated_time(layout) if not complete else 0.0 for m, complete in zip(self.run_methods, self.run_methods_complete))
 
-    def prepare_run_methods(self):
+    def prepare_run_methods(self, layout: LHBedLayout):
         """Prepares the method list for running by populating run_methods and run_methods_complete.
             List can then be used for dry or wet runs
         """
@@ -365,10 +365,21 @@ class MethodList:
         # Generate real-time LH methods based on layout
         self.run_methods = []
         for m in self.methods:
-            self.run_methods += m.get_methods()
+            self.run_methods += m.get_methods(layout)
 
         # Generate one entry for each method.
         self.run_methods_complete = [False for _ in self.run_methods]
+
+    def explode(self, layout: LHBedLayout):
+        """Permanently replaces the original methods with "exploded" methods, i.e. rendered methods
+            based on the provided layout. Cannot be undone.
+
+        Args:
+            layout (LHBedLayout): layout to use to generate exploded methods
+        """
+
+        self.prepare_run_methods(layout)
+        self.methods = self.run_methods
 
     def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
         """Executes all methods. Used for dry running. Returns list of
