@@ -1,8 +1,8 @@
 from flask import Flask, render_template, redirect
-from gui_api import gui_blueprint
-from lh_api import lh_blueprint
-from nice_api import nice_blueprint
-from sio import socketio
+from .gui_api import gui_blueprint
+from .lh_api import lh_blueprint
+from .nice_api import nice_blueprint
+from .sio import socketio
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")

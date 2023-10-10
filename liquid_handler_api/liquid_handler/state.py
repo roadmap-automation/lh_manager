@@ -8,7 +8,7 @@ from . import formulation
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item
-from app_config import parser
+from ..app_config import parser
 
 LOG_PATH = 'persistent_state'
 LAYOUT_LOG = os.path.join(LOG_PATH, 'layout.json')

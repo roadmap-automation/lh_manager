@@ -6,7 +6,6 @@ from datetime import datetime
 from .state import samples
 from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
 from .dryrun import DryRunQueue
-from gui_api.events import trigger_run_queue_update, trigger_sample_status_update
 from .items import Item
 
 def validate_format(data: dict) -> bool:

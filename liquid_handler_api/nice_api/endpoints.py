@@ -2,11 +2,11 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from liquid_handler.lhqueue import LHqueue, validate_format
-from liquid_handler.samplelist import SampleStatus
-from liquid_handler.state import samples, layout
-from liquid_handler.items import Item
-from gui_api.events import trigger_sample_status_update, trigger_run_queue_update
+from ..liquid_handler.lhqueue import LHqueue, validate_format
+from ..liquid_handler.samplelist import SampleStatus
+from ..liquid_handler.state import samples, layout
+from ..liquid_handler.items import Item
+from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
 from . import nice_blueprint
 

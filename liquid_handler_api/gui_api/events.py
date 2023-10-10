@@ -1,5 +1,5 @@
-from sio import socketio
-from liquid_handler.state import save_layout, save_samples
+from ..sio import socketio
+from ..liquid_handler.state import save_layout, save_samples
 
 def trigger_layout_update(f):
     """Decorator that announces that layout has changed"""
