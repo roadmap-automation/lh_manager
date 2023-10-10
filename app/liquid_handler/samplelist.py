@@ -42,6 +42,9 @@ class BaseMethod:
     def get_methods(self, layout: LHBedLayout):
         return [self]
     
+    def explode(self, layout: LHBedLayout) -> None:
+        pass
+    
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
