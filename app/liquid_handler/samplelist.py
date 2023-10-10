@@ -58,6 +58,7 @@ class InjectMethod(BaseMethod):
     """Special class for methods that change the sample composition"""
 
     Source: WellLocation = field(default_factory=WellLocation)
+    Volume: float = 1.0
 
     def new_sample_composition(self, layout: LHBedLayout) -> str:
         """Returns string representation of source well composition"""
@@ -65,12 +66,35 @@ class InjectMethod(BaseMethod):
         return repr(source_well.composition)
 
 @dataclass
-class TransferWithRinse(BaseMethod):
-    """Transfer with rinse"""
+class MixMethod(BaseMethod):
+    """Special class for methods that change the sample composition"""
+
+    Target: WellLocation = field(default_factory=WellLocation)
+    Volume: float = 1.0
+
+    def new_sample_composition(self, layout: LHBedLayout) -> str:
+        """Returns string representation of source well composition"""
+        target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
+        return repr(target_well.composition)
+
+@dataclass
+class TransferMethod(BaseMethod):
+    """Special class for methods that change the sample composition"""
 
     Source: WellLocation = field(default_factory=WellLocation)
     Target: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
+
+    def new_sample_composition(self, layout: LHBedLayout) -> str:
+        """Returns string representation of source well composition"""
+        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        return repr(source_well.composition)
+
+@dataclass
+class TransferWithRinse(TransferMethod):
+    """Transfer with rinse"""
+
+    # Source, Target, and Volume defined in MixMethod
     Flow_Rate: float = 2.5
     display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
     method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
@@ -128,10 +152,9 @@ class TransferWithRinse(BaseMethod):
         return self.Volume / self.Flow_Rate
 
 @dataclass
-class MixWithRinse(BaseMethod):
+class MixWithRinse(MixMethod):
     """Inject with rinse"""
-    Target: WellLocation = field(default_factory=WellLocation)
-    Volume: float = 1.0
+    # Target and Volume defined in MixMethod
     Flow_Rate: float = 2.5
     Number_of_Mixes: int = 3
     display_name: Literal['Mix With Rinse'] = 'Mix With Rinse'
@@ -178,7 +201,7 @@ class MixWithRinse(BaseMethod):
 class InjectWithRinse(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
-    Volume: float = 1.0
+    #Volume: float defined in InjectMethod
     Aspirate_Flow_Rate: float = 2.5
     Flow_Rate: float = 2.5
     display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'

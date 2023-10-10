@@ -7,8 +7,8 @@ from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import MethodContainer, BaseMethod, MethodsType, TransferWithRinse, MixWithRinse, \
-            example_sample_list, StageName, lh_method_fields, lh_methods, SampleStatus
+from .samplelist import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
+            example_sample_list, StageName, lh_method_fields, lh_methods, TransferMethod, MixMethod
 
 @dataclass
 class Formulation(MethodContainer):
@@ -26,8 +26,8 @@ class Formulation(MethodContainer):
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition
                 is achieved. Defaults to True."""
-    transfer_template: BaseMethod = TransferWithRinse()
-    mix_template: BaseMethod = MixWithRinse()
+    transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
+    mix_template: MixMethod = field(default_factory=MixWithRinse)
     
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
