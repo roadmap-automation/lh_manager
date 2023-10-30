@@ -4,7 +4,7 @@ import Modal from 'bootstrap/js/src/modal';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
 // import { socket_emit } from '../store.ts';
-import { samples, sample_status, update_sample, run_sample, active_item, active_stage, active_method } from '../store';
+import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index } from '../store';
 import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
 
 const emit = defineEmits(['update_sample']);
@@ -17,8 +17,8 @@ const modal_title = ref("Edit Sample Name and Description")
 const sample_to_edit = ref<Partial<Sample>>({ name: '', description: '', id: '' });
 
 function toggleItem(index) {
-  active_item.value = (index === active_item.value) ? null : index;
-  active_method.value = null;
+  active_sample_index.value = (index === active_sample_index.value) ? null : index;
+  active_method_index.value = null;
   active_stage.value = null;
 }
 
@@ -55,19 +55,6 @@ function close_modal() {
   modal.value?.hide();
 }
 
-function add_method(method, sample, stage_name) {
-  const { id, stages } = sample;
-  // work with a copy
-  const stage = { ...stages[stage_name] };
-  const new_methods = [...stage.methods, method];
-  stage.methods = new_methods;
-  const method_index = new_methods.length - 1;
-  const new_sample = { ...sample };
-  sample.stages[stage_name] = stage;
-  update_sample(new_sample);
-  set_active_method(stage_name, method_index);
-}
-
 function update_method(sample, stage_name, index, field_name, field_value) {
   const { id, stages } = sample;
   // work with a copy
@@ -80,28 +67,6 @@ function update_method(sample, stage_name, index, field_name, field_value) {
   sample.stages[stage_name] = stage;
   console.log('updating method', method, sample, stage, new_sample);
   update_sample(new_sample);
-}
-
-function set_location(index, name, {rack_id, well_number}, sample, stage_name) {
-  const { id, stages } = sample;
-  // work with a copy
-  const stage = { ...stages[stage_name] };
-  const method = stage.methods[index];
-  method[name] = {rack_id, well_number};
-  const new_sample = { ...sample };
-  sample.stages[stage_name] = stage;
-  update_sample(new_sample);
-}
-
-function set_active_method(stage_name, method_index) {
-  if (active_stage.value === stage_name && active_method.value === method_index) {
-    active_method.value = null;
-    active_stage.value = null;
-  }
-  else {
-    active_stage.value = stage_name;
-    active_method.value = method_index;
-  }
 }
 
 onMounted(() => {
@@ -127,8 +92,8 @@ const status_class_map: {[status in StatusType]: string} = {
     <div class="accordion-item" v-for="(sample, sindex) of samples" :key="sample.id">
       <div class="accordion-header">
         <button class="accordion-button p-1"
-          :class="{ collapsed: sindex !== active_item, [status_class_map[sample_status[sample.id]?.status ?? 'inactive']]: true }" type="button"
-          @click="toggleItem(sindex)" :aria-expanded="sindex === active_item">
+          :class="{ collapsed: sindex !== active_sample_index, [status_class_map[sample_status[sample.id]?.status ?? 'inactive']]: true }" type="button"
+          @click="toggleItem(sindex)" :aria-expanded="sindex === active_sample_index">
           <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
           <span class="align-middle px-2"> {{ sample.description }}</span>
           <button type="button" class="btn-close btn-sm align-middle edit" aria-label="Edit Name or Description"
@@ -142,8 +107,8 @@ const status_class_map: {[status in StatusType]: string} = {
             </button>
         </button>
       </div>
-      <div class="accordion-collapse collapse" :class="{ show: sindex === active_item }">
-        <div class="accordion-body py-0">
+      <div class="accordion-collapse collapse" :class="{ show: sindex === active_sample_index }">
+        <div v-if="sindex === active_sample_index" class="accordion-body py-0">
           <div v-for="(stage, stage_name) of sample.stages">
             <h6 :class="status_class_map[sample_status?.[sample.id]?.[stage_name]?.status ?? 'inactive']">{{ stage_name }}:
               <button 
@@ -154,14 +119,13 @@ const status_class_map: {[status in StatusType]: string} = {
                 @click.stop="run_stage(sample, [stage_name])">
               </button>
             </h6>
-            <MethodList 
+            <MethodList
+              :sample_id="sample.id"
+              :stage_name="stage_name"
               :methods="stage.methods"
-              :status="sample_status?.[sample.id]?.stages?.[stage_name]"
-              :collapsed="!(sindex === active_item && stage_name == active_stage)"
-              :active_item="(stage_name === active_stage) ? active_method : null"
               @add_method="(m) => add_method(m, sample, stage_name)"
               @set_location="(i, n, l) => set_location(i, n, l, sample, stage_name)"
-              @set_active="(index) => set_active_method(stage_name, index)"
+              @set_active="(index) => toggle_active_method(stage_name, index)"
               @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />
           </div>
         </div>
