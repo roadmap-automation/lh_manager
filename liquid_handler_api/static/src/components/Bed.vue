@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { emitter, layout, samples, active_item, active_stage, active_method } from '../store';
+import { layout, pick_handler, source_well, target_well } from '../store';
 
 const props = defineProps<{
   height: number,
@@ -53,28 +53,19 @@ function x_offset(col: number, row: number, centered: boolean = true) {
 function clicked(row: number, col: number) {
   const well_number = row * rack.columns + col + 1;
   const rack_id = props.rack_id;
-  emitter.emit('well_picked', { rack_id, well_number });
+  pick_handler({ rack_id, well_number });
 }
-
-const active_wells = computed(() => {
-  if (active_item.value == null || active_stage.value == null || active_method.value == null) {
-    return {target: null, source: null};
-  }
-  const sample = samples.value[active_item.value];
-  const stage = sample?.stages?.[active_stage.value];
-  const method = stage?.methods?.[active_method.value];
-  return {target: method?.['Target'], source: method?.['Source']};
-})
 
 function highlight_class(col, row) {
   const well_number = row * rack.columns + col + 1;
   const classList: string[] = [];
-  const {target, source} = active_wells.value;
+  const target = target_well.value;
+  const source = source_well.value;
   if (props.rack_id === target?.rack_id && well_number === target?.well_number) {
-    classList.push("target");
+    classList.push("Target");
   }
   if (props.rack_id === source?.rack_id && well_number === source?.well_number) {
-    classList.push("source");
+    classList.push("Source");
   }
   return classList.join(" ")
 }
@@ -128,11 +119,10 @@ rect {
   fill: darkgreen;
 }
 
-.source {
-  fill: lightgreen;
+.Source {
+  fill: url(#source);
 }
-
-.target {
-  fill: pink;
+.Target {
+  fill: url(#target);
 }
 </style>
