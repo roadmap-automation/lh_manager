@@ -1,4 +1,4 @@
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, toRaw } from 'vue';
 import mitt from 'mitt';
 
 export interface MethodDef {
@@ -34,6 +34,7 @@ export interface MethodList {
 }
 
 export type StageName = 'prep' | 'inject';
+export type WellFieldName = 'Source' | 'Target';
 
 export interface Sample {
   id: string,
@@ -89,6 +90,84 @@ export async function update_sample(sample_obj: Partial<Sample>): Promise<object
   });
   const response_body = await update_result.json();
   return response_body;
+}
+
+function get_sample_by_id(sample_id: string) {
+  return samples.value.find((s) => (s.id === sample_id));
+}
+
+export function add_method(sample_id: string, stage_name: StageName, method_name: string) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    const { stages } = s;
+    const stage = stages[stage_name];
+    const num_methods = stage.methods.push({method_name});
+    update_sample(s);
+    active_stage.value = stage_name;
+    active_method_index.value = num_methods - 1;
+  }
+}
+
+export function update_method(sample_id: string, stage_name: StageName, method_index: number, field_name: string, field_value) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    const { stages } = s;
+    const stage = stages[stage_name];
+    const method = stage.methods[method_index];
+    method[field_name] = field_value;
+    update_sample(s);
+  }
+}
+
+export function remove_method(sample_id: string, stage_name: StageName, method_index: number) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    const { stages } = s;
+    const stage = stages[stage_name];
+    stage.methods.splice(method_index, 1);
+    const num_methods = stage.methods.length;
+    update_sample(s);
+    active_stage.value = stage_name;
+    active_method_index.value = num_methods - 1;
+  }
+}
+
+export function set_location(method_index: number, name: WellFieldName, rack_id: string, well_number: number, sample_id: string, stage_name: StageName) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    const { stages } = s;
+    const stage = stages[stage_name];
+    const method = stage.methods[method_index];
+    method[name] = { rack_id, well_number };
+    update_sample(s);
+  }
+}
+
+export function pick_handler(well_location: WellLocation) {
+  if (active_sample_index.value !== null && active_stage.value !== null && active_sample_index.value !== null) {
+    const sample = samples.value[active_sample_index.value];
+    const s: Sample = structuredClone(toRaw(sample));
+    const stage = s?.stages?.[active_stage.value];
+    const method = stage?.methods?.[active_method_index.value] ?? {};
+    const well_field = active_well_field.value;
+    console.log({sample, stage, method, well_field});
+    if (well_field != null && well_field in method) {
+      method[well_field] = well_location;
+      if (well_field === 'Source') {
+        source_well.value = well_location;
+      }
+      else if (well_field === 'Target') {
+        target_well.value = well_location;
+      }
+      update_sample(s);
+      return
+    }
+  }
+  console.warn("no active well field to set");
 }
 
 export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject'] ): Promise<object> {
@@ -154,6 +233,7 @@ export async function refreshComponents() {
 export const source_well = ref<WellLocation | null>(null);
 export const target_well = ref<WellLocation | null>(null);
 
-export const active_item = ref<number | null>(null);
-export const active_method = ref<number | null>(null);
-export const active_stage = ref<'prep' | 'inject' | null>(null);
+export const active_sample_index = ref<number | null>(null);
+export const active_method_index = ref<number | null>(null);
+export const active_stage = ref<StageName | null>(null);
+export const active_well_field = ref<WellFieldName | null>(null);
