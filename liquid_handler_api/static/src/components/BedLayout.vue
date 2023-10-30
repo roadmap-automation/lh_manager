@@ -7,6 +7,30 @@ import { layout, emitter } from '../store';
 
 <template>
   <svg class="wrapper" v-if="layout !== undefined" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id="pattern"
+              width="8" height="10"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45 50 50)">
+        <line stroke="#a6a6a6" stroke-width="7px" y2="10"/>
+      </pattern>
+      <pattern id="source"
+              width="12" height="12"
+              viewBox="0,0,6,6"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(-45 0 0)">
+        <line stroke="#E1FAE1" stroke-width="6px" x1="6" x2="6" y1="0" y2="12" />
+        <line stroke="lightgreen" stroke-width="6px" x1="0" x2="0" y1="0" y2="10"/>
+      </pattern>
+      <pattern id="target"
+              width="12" height="12"
+              viewBox="0,0,6,6"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45 0 0)">
+        <line stroke="white" stroke-width="6px" x1="6" x2="6" y1="0" y2="12" />
+        <line stroke="pink" stroke-width="6px" x1="0" x2="0" y1="0" y2="10"/>
+      </pattern>
+    </defs>
     <svg class="inner" viewBox="0 0 900 1000" x="0" y="0" preserveAspectRatio="xMinYMin meet">
       <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
       <g transform="translate(0,0)">
