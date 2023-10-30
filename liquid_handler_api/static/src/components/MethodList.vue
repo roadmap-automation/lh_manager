@@ -1,21 +1,42 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { method_defs, source_components, source_well, target_well, layout, emitter } from '../store';
-import type { SampleStatus, WellLocation, MethodType } from '../store';
+import { ref, computed, defineProps } from 'vue';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, method_defs, source_components, source_well, target_well, layout, sample_status, update_method } from '../store';
+import type { MethodType, StageName } from '../store';
+import MethodFields from './MethodFields.vue';
 
 const props = defineProps<{
+  sample_id: string,
+  stage_name: StageName,
   methods: MethodType[],
-  components: any,
-  status: SampleStatus,
-  collapsed: boolean,
-  active_item: number | null
 }>();
 
-const emit = defineEmits(['add_method', 'set_location', 'set_active', 'update_method']);
-const active_well_field = ref<string | null>(null);
+// const active_well_field = ref<string | null>(null);
 
-function toggleItem(index) {
-  emit('set_active', index);
+function toggleItem(method_index) {
+  if (active_stage.value === props.stage_name && active_method_index.value === method_index) {
+    active_method_index.value = null;
+    active_stage.value = null;
+    source_well.value = null; // can be undefined
+    target_well.value = null; // can be undefined
+  }
+  else {
+    active_stage.value = props.stage_name;
+    active_method_index.value = method_index;
+    const method = props.methods[method_index];
+    source_well.value = method['Source'] ?? null; // can be undefined
+    target_well.value = method['Target'] ?? null; // can be undefined
+    console.log(source_well.value, target_well.value);
+
+    if ((method?.Source?.rack_id == null || method?.Source?.well_number == null)) {
+      active_well_field.value = 'Source';
+    }
+    else if ((method?.Target?.rack_id == null || method?.Target?.well_number == null)) {
+      active_well_field.value = 'Target';
+    }
+    else {
+      active_well_field.value = null;
+    }
+  }
 }
 
 function method_string(method: MethodType) {
@@ -56,6 +77,10 @@ const parameters = computed(() => {
   return props.methods.map(get_parameters);
 });
 
+const status = computed(() => {
+  return sample_status.value[props.sample_id]?.stages?.[props.stage_name];
+})
+
 function filter_components(index, component_key: 'solutes' | 'solvents') {
   const components = source_components.value?.[component_key] ?? [];
   const include_zones_param = parameters.value[index].find((p) => p.name === 'include_zones');
@@ -68,28 +93,8 @@ function filter_components(index, component_key: 'solutes' | 'solvents') {
 }
 
 const editable = computed(() => {
-  return (props.status?.status === 'inactive');
+  return (status.value?.status === 'inactive');
 });
-
-function add_method(event) {
-  const method_name = event.target.value;
-  const method_def = method_defs.value[method_name];
-  emit('add_method', {method_name})
-  event.target.value = "null";
-
-}
-
-function pick_handler({rack_id, well_number}) {
-  const method_index = props.active_item;
-  if (method_index == null) {
-    console.warn(`tried to handle pick on collapsed? ${method_index}, ${JSON.stringify(props)}`);
-    return
-  }
-  const name = active_well_field.value;
-  if (name != null) {
-    emit('set_location', method_index, name, {rack_id, well_number});
-  }
-}
 
 
 function activateSelector({name, type}) {
@@ -99,8 +104,7 @@ function activateSelector({name, type}) {
 }
 
 function send_changes(index, param) {
-  console.log('send changes', param.name, param.value);
-  emit('update_method', index, param.name, param.value);
+  update_method(props.sample_id, props.stage_name, index, param.name, param.value);
 }
 
 
@@ -127,38 +131,6 @@ function add_component(index, param, component_type: 'solvents' | 'solutes') {
   }
 }
 
-watch(() => props.active_item, (active_item) => {
-
-  if (!props.collapsed && active_item !== null) {
-    const method = props.methods[active_item];
-    if ((method?.Source?.rack_id == null || method?.Source?.well_number == null)) {
-      active_well_field.value = 'Source';
-    }
-    else if ((method?.Target?.rack_id == null || method?.Target?.well_number == null)) {
-      active_well_field.value = 'Target';
-    }
-    else {
-      active_well_field.value = null;
-    }
-  }
-})
-
-watch(() => props.collapsed, (collapsed: boolean) => {
-  if (collapsed) {
-    source_well.value = null; // can be undefined
-    target_well.value = null; // can be undefined
-    emitter.off('well_picked', pick_handler);
-  }
-  else {
-    emitter.on('well_picked', pick_handler);
-    if (props.active_item != null) {
-      const method_index = props.active_item;
-      const method = props.methods[method_index];
-      source_well.value = method['Source'] ?? null; // can be undefined
-      target_well.value = method['Target'] ?? null; // can be undefined
-    }
-  }
-})
 
 </script>
 
@@ -166,101 +138,34 @@ watch(() => props.collapsed, (collapsed: boolean) => {
   <div class="accordion accordion-flush">
     <div class="accordion-item" v-for="(method, index) of methods" :key="index">
       <h2 class="accordion-header">
-        <button class="accordion-button p-1" :class="{ collapsed: index !== active_item }" type="button"
-          @click="toggleItem(index)" :aria-expanded="index === active_item">
+        <button class="accordion-button p-1" :class="{ collapsed: stage_name === active_stage && index !== active_method_index }" type="button"
+          @click="toggleItem(index)" :aria-expanded="index === active_method_index">
           <span class="d-inline align-middle text-light bg-dark" > {{ method.display_name }}:</span>
           <span class="d-inline align-middle px-2 method-string" :class="{ 'text-danger': status?.methods_complete?.[index] }">
             {{ method_string(method) }}
           </span>
         </button>
       </h2>
-      <div class="accordion-collapse collapse" :class="{ show: index === active_item }">
+      <div class="accordion-collapse collapse" :class="{ show: stage_name === active_stage && index === active_method_index }">
         <div class="accordion-body p-2 border bg-light">
-          <table class="table m-0 table-borderless" v-if="index === active_item">
-            <fieldset :disabled="!editable">
-              <tr v-for="param of parameters[index]" @click="activateSelector(param)">
-                <td :class="{'selector-active': active_well_field === param.name}">
-                  <div class="form-check">
-                  <label>
-                    <!-- <input class="form-check-input" v-if="ptype === '#/definitions/Well'" type="radio" :name="`param_${name}`" /> -->
-                    {{ param.name }}:
-                  </label>
-                  </div>
-                </td>
-                <td v-if="param.type === 'number' || param.type === 'integer'">
-                  <input class="number px-1 py-0"
-                    v-model.number="param.value" :name="`param_${param.name}`"
-                    @keydown.enter="send_changes(index, param)"
-                    @blur="send_changes(index, param)" />
-                </td>
-                <td v-if="param.type === 'boolean'">
-                  <input type="checkbox"
-                    v-model="param.value" :name="`param_${param.name}`"
-                    @change="send_changes(index, param)" />
-                </td>
-                <td v-if="param.type === '#/definitions/WellLocation'">
-                  <select v-if="layout != null && param.value && 'rack_id' in param.value" v-model="param.value.rack_id" @change="send_changes(index, param)">
-                    <option :value="null" disabled></option>
-                    <option v-for="(rack_def, rack_name) of layout.racks">{{rack_name}}</option>
-                  </select>
-                  <input v-if="param.value && 'well_number' in param.value" class="number px-1 py-0" v-model="param.value.well_number"
-                    :name="`param_${param.name}_well`" 
-                    @keydown.enter="send_changes(index, param)"
-                    @blur="send_changes(index, param)" />
-                </td>
-                <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/definitions/Zone'">
-                  <select v-model="param.value" multiple @change="send_changes(index, param)">
-                    <option v-for="zone in param.schema.definitions?.Zone?.enum" :value="zone">{{ zone }}</option>
-                  </select>
-                </td>
-                <td v-if="param.type === '#/definitions/Composition'">
-                  <div>
-                    <div>Solutes: 
-                      <button class="btn btn-sm btn-outline-primary" @click="add_component(index, param, 'solutes')">add</button>
-                    </div>
-                    <div class="ps-3" v-for="(solute, sindex) of (param?.value?.solutes ?? [])">
-                      <select v-model="solute.name" @change="send_changes(index, param)">
-                        <option v-for="source_solute of filter_components(index, 'solutes')" :value="source_solute">{{ source_solute }}</option>
-                      </select>
-                      <label>concentration ({{ solute.units }}):
-                        <input 
-                          class="number px-1 py-0"  
-                          v-model="solute.concentration"
-                          @keydown.enter="send_changes(index, param)"
-                          @blur="send_changes(index, param)" />
-                      </label>
-                      <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
-                         @click="param.value.solutes.splice(sindex, 1); send_changes(index, param)"></button>
-                    </div>
-                  </div>
-                  <div>
-                    <div>Solvents: 
-                      <button class="btn btn-sm btn-outline-primary" @click="add_component(index, param, 'solvents')">add</button>
-                    </div>
-                    <div class="ps-3" v-for="(solvent, sindex) of (param?.value?.solvents ?? [])">
-                      <select v-model="solvent.name">
-                        <option v-for="source_solvent of filter_components(index, 'solvents')" :value="source_solvent">{{ source_solvent }}</option>
-                      </select>
-                      <label>fraction:
-                        <input 
-                          class="number px-1 py-0"  
-                          v-model="solvent.fraction"
-                          @keydown.enter="send_changes(index, param)"
-                          @blur="send_changes(index, param)" />
-                      </label>
-                      <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
-                         @click="param.value.solvents.splice(sindex, 1); send_changes(index, param)"></button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </fieldset>
+          <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
+            <MethodFields
+              :sample_id="sample_id"
+              :stage_name="stage_name"
+              :editable="editable"
+              :method_index="index"
+              :method="method"
+            />
+
           </table>
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-sm btn-danger" @click="remove_method(sample_id, stage_name, index)">remove</button>
+          </div>
         </div>
       </div>
     </div>
     <select v-if="editable" class="form-select form-select-sm text-primary outline-primary"
-      @change="add_method" value="null">
+      @change="add_method(sample_id, stage_name, $event.target?.value)" value="null">
       <option class="disabled" disabled selected value="null">+ Add method</option>
       <option v-for="(mdef, mname) of method_defs" :value="mname">{{ mdef.display_name }}</option>
     </select>
