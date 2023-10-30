@@ -19,7 +19,7 @@ class Formulation(MethodContainer):
     display_name: Literal['Formulation'] = 'Formulation'
     target_composition: Composition | None = None
     target_volume: float = 0.0
-    target_well: WellLocation = field(default_factory=WellLocation)
+    Target: WellLocation = field(default_factory=WellLocation)
     include_zones: List[Zone] = field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
     """include_zones (List[Zone]): list of zones to include for calculating formulations. Defaults to [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]"""
     exact_match: bool = True
@@ -111,7 +111,7 @@ class Formulation(MethodContainer):
             for volume, well in zip(sorted_volumes, sorted_wells):
                 new_transfer = copy(self.transfer_template)
                 new_transfer.Source = WellLocation(well.rack_id, well.well_number)
-                new_transfer.Target = self.target_well
+                new_transfer.Target = self.Target
                 new_transfer.Volume = volume
                 methods.append(new_transfer)
 
@@ -124,7 +124,7 @@ class Formulation(MethodContainer):
                 mix_volume = min_mix_volume
 
             new_mix = copy(self.mix_template)
-            new_mix.Target = self.target_well
+            new_mix.Target = self.Target
             new_mix.Volume = mix_volume
             methods.append(new_mix)
 
@@ -239,7 +239,7 @@ mix = MixWithRinse(Number_of_Mixes=2)
 
 example_formulation = Formulation(target_composition=target_composition,
                 target_volume=7.0,
-                target_well=WellLocation('Mix', 10),
+                Target=WellLocation('Mix', 10),
                 mix_template=mix)
 
 example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
@@ -267,7 +267,7 @@ if __name__ == '__main__':
 
     f = Formulation(target_composition=target_composition,
                     target_volume=8.0,
-                    target_well=WellLocation(target_well.rack_id, target_well.well_number),
+                    Target=WellLocation(target_well.rack_id, target_well.well_number),
                     mix_template=mix)
     
     print(f.formulate(layout))
