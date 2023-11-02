@@ -262,7 +262,6 @@ class InjectWithRinse(InjectMethod):
 class Sleep(BaseMethod):
     """Sleep"""
 
-    method_type: Literal[MethodType.NONE] = MethodType.NONE
     Time: float = 1.0
     display_name: Literal['Sleep'] = 'Sleep'
     method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
