@@ -1,6 +1,7 @@
 """Liquid handler state initialization"""
 import json
 import os
+from pathlib import Path
 from dataclasses import asdict
 from .samplecontainer import SampleContainer
 from .samplelist import example_sample_list, StageName
@@ -10,9 +11,9 @@ from .bedlayout import LHBedLayout, example_wells
 from .items import Item
 from ..app_config import parser
 
-LOG_PATH = '../persistent_state'
-LAYOUT_LOG = os.path.join(LOG_PATH, 'layout.json')
-SAMPLES_LOG = os.path.join(LOG_PATH, 'samples.json')
+LOG_PATH = Path(__file__).parent / 'persistent_state'
+LAYOUT_LOG = LOG_PATH / 'layout.json'
+SAMPLES_LOG = LOG_PATH / 'samples.json'
 
 def load_state():
 
