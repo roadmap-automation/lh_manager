@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
 import { active_well_field, method_defs, source_components, source_well, target_well, layout, update_at_pointer } from '../store';
+import json_pointer from 'json-pointer';
 import type { MethodType, StageName } from '../store';
 
 const props = defineProps<{
@@ -8,6 +9,7 @@ const props = defineProps<{
   pointer: string,
   method: MethodType,
   editable: boolean,
+  hide_fields: string[],
 }>();
 
 function send_changes(param) {
@@ -37,9 +39,19 @@ const parameters = computed(() => {
   return get_parameters(props.method);
 });
 
-const transfer_methods = computed(() => {
-  return Object.entries(method_defs.value).filter(([mname, mdef]) => mdef.method_type == 'Transfer');
-});
+function get_template_names(field_type: string, schema: any) {
+  const schema_def = json_pointer.get(schema, field_type.replace(/^#/, ''));
+  const method_type = schema_def?.properties?.method_type?.default;
+  const template_names = Object.entries(method_defs.value).filter(([mname, mdef]) => (
+    mdef.schema.properties?.method_type?.default === method_type
+  )).map(([mname, mdef]) => mname);
+  return template_names;
+}
+
+function get_fields_to_hide(field_type: string, schema: any) {
+  const schema_def = json_pointer.get(schema, field_type.replace(/^#/, ''));
+  return Object.keys(schema_def?.properties ?? {});
+}
 
 function clone(obj) {
   return (obj === undefined) ? undefined : JSON.parse(JSON.stringify(obj));
@@ -88,7 +100,7 @@ function activateSelector({name, type}) {
 
 <template>
   <fieldset :disabled="!editable">
-    <tr v-for="param of parameters" @click="activateSelector(param)">
+    <tr v-for="param of parameters.filter((p) => (!hide_fields.includes(p.name)))" @click="activateSelector(param)">
       <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: param.type === '#/definitions/WellLocation' }">
         <div class="form-check">
           <label>
@@ -154,11 +166,18 @@ function activateSelector({name, type}) {
           </div>
         </div>
       </td>
-      <td v-if="param.type === '#/definitions/MixMethod'">
+      <td v-if="param.type === '#/definitions/TransferMethod' || param.type === '#/definitions/MixMethod'">
         <select v-model="param.value.method_name">
-            <option v-for="transfer_template of ['transfer', 'transfer_and_mix']" >
-              {{ transfer_template }}</option>
+            <option v-for="mname of get_template_names(param.type, param.schema)" >
+              {{ mname }}</option>
         </select>
+        <MethodFields
+          :sample_id="sample_id"
+          :pointer="`${pointer}/${param.name}`"
+          :editable="editable"
+          :method="param.value"
+          :hide_fields="get_fields_to_hide(param.type, param.schema)"
+        />
       </td>
     </tr>
   </fieldset>

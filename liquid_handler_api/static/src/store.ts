@@ -97,8 +97,11 @@ function get_sample_by_id(sample_id: string) {
   return samples.value.find((s) => (s.id === sample_id));
 }
 
-export function add_method(sample_id: string, stage_name: StageName, method_name: string) {
+export function add_method(sample_id: string, stage_name: StageName, event: Event) {
   const sample = get_sample_by_id(sample_id);
+  // event comes from a select element:
+  const event_target = event.target as HTMLOptionElement;
+  const method_name = event_target.value;
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
     const { stages } = s;
@@ -108,13 +111,16 @@ export function add_method(sample_id: string, stage_name: StageName, method_name
     active_stage.value = stage_name;
     active_method_index.value = num_methods - 1;
   }
+  event_target.value = "";
 }
 
 export async function update_at_pointer(sample_id: string, pointer: string | string[], value: any) {
   const sample = get_sample_by_id(sample_id);
+  // console.log({pointer});
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
-    json_pointer.set(s, pointer, value)
+    const g = json_pointer.get(s, pointer);
+    json_pointer.set(s, pointer, value);
     return await update_sample(s);
   }
 }
@@ -164,7 +170,7 @@ export function pick_handler(well_location: WellLocation) {
     const stage = s?.stages?.[active_stage.value];
     const method = stage?.methods?.[active_method_index.value] ?? {};
     const well_field = active_well_field.value;
-    console.log({sample, stage, method, well_field});
+    // console.log({sample, stage, method, well_field});
     if (well_field != null && well_field in method) {
       method[well_field] = well_location;
       if (well_field === 'Source') {

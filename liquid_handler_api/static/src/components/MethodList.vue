@@ -27,7 +27,6 @@ function toggleItem(method_index) {
     const method = props.methods[method_index];
     source_well.value = method['Source'] ?? null; // can be undefined
     target_well.value = method['Target'] ?? null; // can be undefined
-    console.log(source_well.value, target_well.value);
 
     if ((method?.Source?.rack_id == null || method?.Source?.well_number == null)) {
       active_well_field.value = 'Source';
@@ -75,64 +74,13 @@ function clone(obj) {
   return (obj === undefined) ? undefined : JSON.parse(JSON.stringify(obj));
 }
 
-const parameters = computed(() => {
-  return props.methods.map(get_parameters);
-});
-
 const status = computed(() => {
   return sample_status.value[props.sample_id]?.stages?.[props.stage_name];
 })
 
-function filter_components(index, component_key: 'solutes' | 'solvents') {
-  const components = source_components.value?.[component_key] ?? [];
-  const include_zones_param = parameters.value[index].find((p) => p.name === 'include_zones');
-  const include_zones = include_zones_param?.value ?? null;
-  const filtered_components = (include_zones === null) ? [...components] : components.filter((c) => (include_zones.includes(c[1])));
-  const unique_components = new Set(filtered_components.map((c) => c[0]));
-  // console.log(source_components.value, component_key);
-  // console.log({components, filtered_components, include_zones, unique_components});
-  return [...unique_components];
-}
-
 const editable = computed(() => {
   return (status.value?.status === 'inactive');
 });
-
-
-function activateSelector({name, type}) {
-  if (type === '#/definitions/WellLocation') {
-    active_well_field.value = name;
-  }
-}
-
-function send_changes(index, param) {
-  update_method(props.sample_id, props.stage_name, index, param.name, param.value);
-}
-
-
-function add_component(index, param, component_type: 'solvents' | 'solutes') {
-  if (param.value == null) {
-    param.value = {
-      solutes: [],
-      solvents: []
-    }
-  }
-  const first_available = filter_components(index, component_type)[0];
-  console.log(index, component_type, first_available);
-  if (first_available !== undefined) {
-    const new_component: {name: string, fraction?: number, concentration?: number} = {name: first_available};
-    if (component_type === 'solvents') {
-      new_component.fraction = 0;
-    }
-    else {
-      new_component.concentration = 0;
-    }
-    console.log({param});
-    param.value[component_type].push(new_component);
-    send_changes(index, param);
-  }
-}
-
 
 </script>
 
@@ -156,6 +104,7 @@ function add_component(index, param, component_type: 'solvents' | 'solutes') {
               :pointer="`/stages/${stage_name}/methods/${index}`"
               :editable="editable"
               :method="method"
+              :hide_fields="[]"
             />
 
           </table>
@@ -166,8 +115,8 @@ function add_component(index, param, component_type: 'solvents' | 'solutes') {
       </div>
     </div>
     <select v-if="editable" class="form-select form-select-sm text-primary outline-primary"
-      @change="add_method(sample_id, stage_name, $event.target?.value)" value="null">
-      <option class="disabled" disabled selected value="null">+ Add method</option>
+      @change="add_method(sample_id, stage_name, $event)" value="">
+      <option class="disabled" disabled selected value="">+ Add method</option>
       <option v-for="(mdef, mname) of method_defs" :value="mname">{{ mdef.display_name }}</option>
     </select>
   </div>
