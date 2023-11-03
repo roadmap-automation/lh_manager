@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, source_components, source_well, target_well, layout, update_method } from '../store';
+import { active_well_field, method_defs, source_components, source_well, target_well, layout, update_at_pointer } from '../store';
 import type { MethodType, StageName } from '../store';
 
 const props = defineProps<{
   sample_id: string,
-  stage_name: StageName,
-  method_index: number,
+  pointer: string,
   method: MethodType,
   editable: boolean,
 }>();
 
 function send_changes(param) {
-  update_method(props.sample_id, props.stage_name, props.method_index, param.name, param.value);
+  const method_pointer = `${props.pointer}/${param.name}`;
+  update_at_pointer(props.sample_id, method_pointer, param.value);
 }
 
 
@@ -35,6 +35,10 @@ function get_parameters(method: MethodType) {
 
 const parameters = computed(() => {
   return get_parameters(props.method);
+});
+
+const transfer_methods = computed(() => {
+  return Object.entries(method_defs.value).filter(([mname, mdef]) => mdef.method_type == 'Transfer');
 });
 
 function clone(obj) {
@@ -149,6 +153,12 @@ function activateSelector({name, type}) {
               @click="param.value.solvents.splice(sindex, 1); send_changes(param)"></button>
           </div>
         </div>
+      </td>
+      <td v-if="param.type === '#/definitions/MixMethod'">
+        <select v-model="param.value.method_name">
+            <option v-for="transfer_template of ['transfer', 'transfer_and_mix']" >
+              {{ transfer_template }}</option>
+        </select>
       </td>
     </tr>
   </fieldset>
