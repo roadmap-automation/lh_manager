@@ -13,10 +13,18 @@ DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 ## ========== Methods specification =============
 # methods must also be added to lh_methods list to be used
 
+class MethodType(str, Enum):
+    NONE = 'none'
+    CONTAINER = 'container'
+    TRANSFER = 'transfer'
+    MIX = 'mix'
+    INJECT = 'inject'
+
 @dataclass
 class BaseMethod:
     """Base class for LH methods"""
 
+    method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
     @dataclass
@@ -57,6 +65,7 @@ class BaseMethod:
 class InjectMethod(BaseMethod):
     """Special class for methods that change the sample composition"""
 
+    method_type: Literal[MethodType.INJECT] = MethodType.INJECT
     Source: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
 
@@ -69,6 +78,7 @@ class InjectMethod(BaseMethod):
 class MixMethod(BaseMethod):
     """Special class for methods that change the sample composition"""
 
+    method_type: Literal[MethodType.MIX] = MethodType.MIX
     Target: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
 
@@ -81,6 +91,7 @@ class MixMethod(BaseMethod):
 class TransferMethod(BaseMethod):
     """Special class for methods that change the sample composition"""
 
+    method_type: Literal[MethodType.TRANSFER] = MethodType.TRANSFER
     Source: WellLocation = field(default_factory=WellLocation)
     Target: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
@@ -250,6 +261,7 @@ class InjectWithRinse(InjectMethod):
 @dataclass
 class Sleep(BaseMethod):
     """Sleep"""
+
     Time: float = 1.0
     display_name: Literal['Sleep'] = 'Sleep'
     method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
@@ -277,6 +289,7 @@ class Sleep(BaseMethod):
 class MethodContainer(BaseMethod):
     """Special method that generates a list of basic methods when rendered"""
 
+    method_type: Literal[MethodType.CONTAINER] = MethodType.CONTAINER
     display_name: str = 'MethodContainer'
 
     def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:

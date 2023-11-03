@@ -10,7 +10,7 @@ from .bedlayout import LHBedLayout, example_wells
 from .items import Item
 from ..app_config import parser
 
-LOG_PATH = 'persistent_state'
+LOG_PATH = '../persistent_state'
 LAYOUT_LOG = os.path.join(LOG_PATH, 'layout.json')
 SAMPLES_LOG = os.path.join(LOG_PATH, 'samples.json')
 
