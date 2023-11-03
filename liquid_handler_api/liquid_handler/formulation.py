@@ -28,7 +28,13 @@ class Formulation(MethodContainer):
                 is achieved. Defaults to True."""
     transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
     mix_template: MixMethod = field(default_factory=MixWithRinse)
-    
+
+    def __post_init__(self):
+        for attr_name in ('mix_template', 'transfer_template'):
+            attr = getattr(self, attr_name)
+            if isinstance(attr, dict):
+                setattr(self, attr_name, lh_methods[attr['method_name']](**attr))
+
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
         """Create a formulation from a target composition with a target volume
