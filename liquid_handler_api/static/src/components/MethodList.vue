@@ -11,8 +11,10 @@ const props = defineProps<{
 }>();
 
 // const active_well_field = ref<string | null>(null);
+const pointer_base = `/${props.stage_name}/methods`;
 
 function toggleItem(method_index) {
+  const pointer = `${pointer_base}/${method_index}`;
   if (active_stage.value === props.stage_name && active_method_index.value === method_index) {
     active_method_index.value = null;
     active_stage.value = null;
@@ -151,9 +153,8 @@ function add_component(index, param, component_type: 'solvents' | 'solutes') {
           <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
             <MethodFields
               :sample_id="sample_id"
-              :stage_name="stage_name"
+              :pointer="`/stages/${stage_name}/methods/${index}`"
               :editable="editable"
-              :method_index="index"
               :method="method"
             />
 

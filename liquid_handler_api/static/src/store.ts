@@ -1,4 +1,5 @@
 import { ref, shallowRef, toRaw } from 'vue';
+import json_pointer from 'json-pointer';
 import mitt from 'mitt';
 
 export interface MethodDef {
@@ -106,6 +107,15 @@ export function add_method(sample_id: string, stage_name: StageName, method_name
     update_sample(s);
     active_stage.value = stage_name;
     active_method_index.value = num_methods - 1;
+  }
+}
+
+export async function update_at_pointer(sample_id: string, pointer: string | string[], value: any) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    json_pointer.set(s, pointer, value)
+    return await update_sample(s);
   }
 }
 
