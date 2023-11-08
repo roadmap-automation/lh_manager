@@ -4,7 +4,7 @@ import { onMounted } from 'vue';
 import Mixture from './Mixture.vue';
 import BedLayout from './BedLayout.vue';
 import SampleList from './SampleList.vue';
-import { samples, sample_status } from '../store';
+import { samples, sample_status, wells } from '../store';
 
 const props = defineProps({
   msg: String,
@@ -75,7 +75,7 @@ function openMixture() {
       </div>
 
       <div class="flex-grow-1">
-        <BedLayout />
+        <BedLayout :wells="wells" />
       </div>
     </div>
 

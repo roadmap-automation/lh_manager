@@ -195,14 +195,15 @@ input.number {
   border-color: #0d6efd;
 }
 .selector-active {
-  border-color: #0d6efd;
+  /* border-color: #0d6efd;
   border-style: solid;
   border-width: 3px;
-  border-radius: 10;
+  border-radius: 10; */
+  background-color: yellow;
 
 }
 
-td.Source {
+td.Source-old {
   background: repeating-linear-gradient(
     45deg,
     lightgreen 0px,
@@ -212,7 +213,14 @@ td.Source {
   );
 }
 
-td.Target {
+td.Source .form-check {
+  border-color: magenta;
+  border-style: solid;
+  border-width: 8px;
+  border-radius: 10;
+}
+
+td.Target-old {
   background: repeating-linear-gradient(
     -45deg,
     pink 0px,
@@ -221,6 +229,14 @@ td.Target {
     white 10px
   );
 }
+
+td.Target .form-check {
+  border-color: darkorange;
+  border-style: solid;
+  border-width: 8px;
+  border-radius: 10;
+}
+
 input.dirty {
   color: red;
 }

@@ -1,4 +1,4 @@
-import { ref, shallowRef, toRaw } from 'vue';
+import { computed, ref, shallowRef, toRaw } from 'vue';
 import json_pointer from 'json-pointer';
 import mitt from 'mitt';
 
@@ -64,6 +64,19 @@ export interface SampleStatusMap {
 }
 
 type Component = [name: string, zone: string];
+type Solvent = {name: string, concentration: number, units: string};
+type Solute = {name: string, fraction: number};
+
+export interface Well {
+  composition: {solvents: Solvent[], solutes: Solute[]},
+  rack_id: string,
+  volume: number,
+  well_number: number,
+}
+
+interface WellWithZone extends Well {
+  zone: string,
+}
 
 interface SourceComponents {
   solutes: Component[],
@@ -71,10 +84,18 @@ interface SourceComponents {
 }
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
-export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered'}} }>();
+export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
 export const source_components = ref<SourceComponents>();
+export const wells = ref<Well[]>([]);
+
+// export const layout_with_contents = computed(() => {
+//   const layout_copy = structuredClone(toRaw(layout.value));
+//   wells.value.forEach((w) => {
+//     layout_copy[w.rack_id] = 
+//   })
+// });
 
 type Events = {
   well_picked: WellLocation
@@ -206,6 +227,24 @@ export async function refreshLayout() {
   const new_layout = await (await fetch("/GUI/GetLayout")).json();
   console.log({new_layout});
   layout.value = new_layout;
+}
+
+function dedupe<T>(arr: T[]): T[] {
+  const strings = arr.map((el) => JSON.stringify(el));
+  const set = new Set(strings);
+  const vals = Array.from(set).map((s) => JSON.parse(s));
+  return vals;
+}
+
+export async function refreshWells() {
+  const new_wells = await (await fetch("/GUI/GetWells")).json() as WellWithZone[];
+  const solvent_zones: Component[] = new_wells.map((well) => (well.composition.solvents.map((s) => ([s.name, well.zone] as Component)))).flat();
+  const solute_zones: Component[] = new_wells.map((well) => (well.composition.solutes.map((s) => ([s.name, well.zone] as Component)))).flat();
+  const dedup_solvent_zones = dedupe(solvent_zones);
+  const dedup_solute_zones = dedupe(solute_zones);
+  source_components.value = {solvents: dedup_solvent_zones, solutes: dedup_solute_zones};
+  wells.value = new_wells;
+  console.log({new_wells});
 }
 
 export async function refreshSamples() {

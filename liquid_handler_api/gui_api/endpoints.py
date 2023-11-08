@@ -3,11 +3,11 @@ import warnings
 from dataclasses import asdict, replace
 from copy import deepcopy
 from flask import make_response, request, Response
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.samplelist import Sample, lh_method_fields, StageName
-from ..liquid_handler.bedlayout import Well
+from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
 from ..liquid_handler.lhqueue import LHqueue, RunQueue
@@ -162,3 +162,21 @@ def GetComponents() -> Response:
     solvents, solutes = _get_component_zones(layout.get_all_wells())
 
     return make_response({'solvents': solvents, 'solutes': solutes}, 200)
+
+@gui_blueprint.route('/GUI/GetWells', methods=['GET'])
+def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
+    """ Gets a list of all filled wells """
+    wells: List[Well]
+    if well_locations is None:
+        wells = layout.get_all_wells()
+    else:
+        wells = []
+        for loc in well_locations:
+            well, rack = layout.get_well_and_rack(loc.rack_id, loc.well_number)
+            wells.append(well)
+    wells_dict = [asdict(well) for well in wells]
+    for wd in wells_dict:
+        zone, _ = LayoutWell2ZoneWell(wd['rack_id'], wd['well_number'])
+        wd['zone'] = zone
+    return make_response(wells_dict, 200)
+
