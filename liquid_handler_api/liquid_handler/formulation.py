@@ -2,7 +2,7 @@ from typing import List, Tuple, Literal
 from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
-from dataclasses import field, fields
+from dataclasses import field
 from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
@@ -237,7 +237,7 @@ class Formulation(MethodContainer):
 target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
 
 transfer = TransferWithRinse(Flow_Rate=2.0)
-mix = MixWithRinse(Number_of_Mixes=2)
+mix = MixWithRinse(Repeats=2)
 
 example_formulation = Formulation(target_composition=target_composition,
                 target_volume=7.0,
@@ -257,7 +257,7 @@ if __name__ == '__main__':
     target_well, _ = layout.get_well_and_rack('Mix', 1)
 
     transfer = TransferWithRinse(Flow_Rate=2.0)
-    mix = MixWithRinse(Number_of_Mixes=2)
+    mix = MixWithRinse(Repeats=2)
 
     f = Formulation(target_composition=target_composition,
                     target_volume=8.0,
