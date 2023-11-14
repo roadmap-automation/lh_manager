@@ -363,8 +363,12 @@ class InjectWithRinse(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
     #Volume: float defined in InjectMethod
-    Aspirate_Flow_Rate: float = 2.5
+    Aspirate_Flow_Rate: float = 2.0
     Flow_Rate: float = 2.5
+    Extra_Volume: float = 0.1
+    Outside_Rinse_Volume: float = 0.5
+    Air_Gap: float = 0.1
+    Use_Liquid_Level_Detection: bool = True
     display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'
     method_name: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
@@ -375,6 +379,10 @@ class InjectWithRinse(InjectMethod):
         Volume: str
         Aspirate_Flow_Rate: str
         Flow_Rate: str
+        Extra_Volume: str
+        Outside_Rinse_Volume: str
+        Air_Gap: str
+        Use_Liquid_Level_Detection: str
 
     def render_lh_method(self,
                          sample_name: str,
@@ -390,7 +398,11 @@ class InjectWithRinse(InjectMethod):
             Source_Well=source_well,
             Volume=f'{self.Volume}',
             Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
-            Flow_Rate=f'{self.Flow_Rate}'
+            Flow_Rate=f'{self.Flow_Rate}',
+            Extra_Volume=f'{self.Extra_Volume}',
+            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
+            Air_Gap=f'{self.Air_Gap}',
+            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}'
         )]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
