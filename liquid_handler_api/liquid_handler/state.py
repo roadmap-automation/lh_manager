@@ -11,7 +11,7 @@ from .bedlayout import LHBedLayout, example_wells
 from .items import Item
 from ..app_config import parser
 
-LOG_PATH = Path(__file__).parent / 'persistent_state'
+LOG_PATH = Path(__file__).parent.parent / 'persistent_state'
 LAYOUT_LOG = LOG_PATH / 'layout.json'
 SAMPLES_LOG = LOG_PATH / 'samples.json'
 
