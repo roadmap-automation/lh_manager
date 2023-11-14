@@ -9,7 +9,7 @@ from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLoca
 from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import example_sample_list, StageName
 from .methods import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
-            TransferMethod, MixMethod, register
+            TransferMethod, MixMethod, register, method_manager
 
 @register
 @dataclass
@@ -35,7 +35,7 @@ class Formulation(MethodContainer):
         for attr_name in ('mix_template', 'transfer_template'):
             attr = getattr(self, attr_name)
             if isinstance(attr, dict):
-                setattr(self, attr_name, lh_methods[attr['method_name']](**attr))
+                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
 
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
