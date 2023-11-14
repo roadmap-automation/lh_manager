@@ -4,7 +4,7 @@ import os
 from dataclasses import asdict
 from .samplecontainer import SampleContainer
 from .samplelist import example_sample_list, StageName
-from . import formulation
+from . import formulation, qcmd
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item
