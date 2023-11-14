@@ -6,6 +6,8 @@ from .bedlayout import LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .items import MethodError
 
+EXCLUDE_FIELDS = set(["method_name", "display_name", "complete", "method_type"])
+
 ## ========== Base Methods specification =============
 
 class MethodType(str, Enum):
@@ -182,8 +184,6 @@ class TransferMethod(BaseMethod):
 ### =========== Methods manager ==============
 
 MethodsType = Union[BaseMethod, InjectMethod, MixMethod, TransferMethod, MethodContainer]
-
-EXCLUDE_FIELDS = set(["method_name", "display_name", "complete"])
 
 class MethodManager:
     """Convenience class for managing methods."""
