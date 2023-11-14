@@ -6,7 +6,8 @@ from flask import make_response, request, Response
 from typing import List, Tuple, Optional
 
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.samplelist import Sample, lh_method_fields, StageName
+from ..liquid_handler.samplelist import Sample, StageName
+from ..liquid_handler.methods import method_manager
 from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
@@ -123,7 +124,7 @@ def GetSamplesStatus() -> Response:
 def GetAllMethodSchema() -> Response:
     """Gets method fields and pydantic schema of all methods"""
 
-    return make_response({'methods': lh_method_fields}, 200)
+    return make_response({'methods': method_manager.get_all_schema()}, 200)
 
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:

@@ -2,14 +2,16 @@ from typing import List, Tuple, Literal
 from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
-from dataclasses import field, fields
+from dataclasses import field
 from pydantic.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
-            example_sample_list, StageName, lh_method_fields, lh_methods, TransferMethod, MixMethod
+from .samplelist import example_sample_list, StageName
+from .methods import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
+            TransferMethod, MixMethod, register
 
+@register
 @dataclass
 class Formulation(MethodContainer):
 
@@ -241,7 +243,7 @@ class Formulation(MethodContainer):
 target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
 
 transfer = TransferWithRinse(Flow_Rate=2.0)
-mix = MixWithRinse(Number_of_Mixes=2)
+mix = MixWithRinse(Repeats=2)
 
 example_formulation = Formulation(target_composition=target_composition,
                 target_volume=7.0,
@@ -249,14 +251,6 @@ example_formulation = Formulation(target_composition=target_composition,
                 mix_template=mix)
 
 example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
-
-lh_methods['Formulation'] = Formulation
-for method in [Formulation]:
-    fieldlist = []
-    for fi in fields(method):
-        if (fi.name != 'method_name') & (fi.name != 'display_name'):
-            fieldlist.append(fi.name)
-    lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name, 'schema': method.__pydantic_model__.schema()}
 
 if __name__ == '__main__':
 
@@ -269,7 +263,7 @@ if __name__ == '__main__':
     target_well, _ = layout.get_well_and_rack('Mix', 1)
 
     transfer = TransferWithRinse(Flow_Rate=2.0)
-    mix = MixWithRinse(Number_of_Mixes=2)
+    mix = MixWithRinse(Repeats=2)
 
     f = Formulation(target_composition=target_composition,
                     target_volume=8.0,
