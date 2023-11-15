@@ -9,11 +9,11 @@ from dataclasses import asdict
 
 from .samplelist import Sample
 
-SAMPLE_HISTORY = Path(__file__).parent.parent / 'persistent_state' / 'completed_samples.sqlite'
+SAMPLE_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'completed_samples.sqlite'
 
 class History:
     table_name = 'completed_samples'
-    table_definition = f'CREATE TABLE {table_name}(uuid TEXT, NICE_uuid TEXT, sample TEXT)'
+    table_definition = f'CREATE TABLE {table_name}(uuid TEXT PRIMARY KEY, NICE_uuid TEXT, sample JSON)'
 
     def __init__(self, database_path: str = SAMPLE_HISTORY) -> None:
         self.db_path = database_path
@@ -37,18 +37,12 @@ class History:
         """
 
         insert_start_time = time.time()
-
-        # check if datastream already exists, using start time as unique identifier
-        res = self.db.execute(f"SELECT rowid FROM {self.table_name} WHERE uuid='{sample.id}'")
-        found_id = res.fetchone()
-
-        # record does not exist
-        if found_id is None:
-            print(f'Inserting new record with id {sample.id} and name {sample.name}')
-            self.db.execute(f"INSERT INTO {self.table_name} VALUES ('{sample.id}', '{sample.NICE_uuid}', '{json.dumps(asdict(sample))}')")
-        else:
-            print(f'Updating record with id {sample.id} and name {sample.name}')
-            self.db.execute(f"UPDATE {self.table_name} SET NICE_uuid = '{sample.NICE_uuid}', sample = '{json.dumps(asdict(sample))}' WHERE rowid = {found_id[0]}")
+        res = self.db.execute(f"""\
+            INSERT INTO {self.table_name}(uuid, NICE_uuid, sample) VALUES (?, ?, ?)
+            ON CONFLICT(uuid) DO UPDATE SET 
+              NICE_uuid=excluded.NICE_uuid,
+              sample=excluded.sample;
+        """, (sample.id, sample.NICE_uuid, json.dumps(asdict(sample))))
         
         self.db.commit()
 
