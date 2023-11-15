@@ -13,7 +13,13 @@ SAMPLE_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'com
 
 class History:
     table_name = 'completed_samples'
-    table_definition = f'CREATE TABLE {table_name}(uuid TEXT PRIMARY KEY, NICE_uuid TEXT, sample JSON)'
+    table_definition = f"""\
+        CREATE TABLE IF NOT EXISTS {table_name}(
+            uuid TEXT PRIMARY KEY,
+            NICE_uuid TEXT,
+            sample JSON,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) WITHOUT ROWID;"""
 
     def __init__(self, database_path: str = SAMPLE_HISTORY) -> None:
         self.db_path = database_path
