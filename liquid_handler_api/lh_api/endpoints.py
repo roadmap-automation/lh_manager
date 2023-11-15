@@ -4,7 +4,7 @@ from flask import make_response, Response, request
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.lhqueue import LHqueue
 from ..liquid_handler.samplelist import SampleStatus
-from ..gui_api.events import trigger_sample_status_update, trigger_layout_update, trigger_run_queue_update
+from ..gui_api.events import trigger_layout_update, trigger_run_queue_update, trigger_samples_update
 
 from . import lh_blueprint
 
@@ -34,7 +34,7 @@ def PutSampleListValidation(sample_list_id):
     return make_response({sample_list_id: validation}, 200)
 
 @lh_blueprint.route('/LH/PutSampleData/', methods=['POST'])
-@trigger_sample_status_update
+@trigger_samples_update
 @trigger_layout_update
 @trigger_run_queue_update
 def PutSampleData():
@@ -68,9 +68,15 @@ def PutSampleData():
         if len(new_state):
             sample.current_contents = new_state
 
-        # if all methods complete, change status of sample to completed, flag LH as no longer busy, and run the next queue item
+        # if all methods complete, change status of method list to completed, flag LH as no longer busy, and run the next queue item
         if all(methodlist.get_method_completion()):
             methodlist.status = SampleStatus.COMPLETED
+
+            # check if the entire sample is completed; if so, archive it
+            if sample.get_status() == SampleStatus.COMPLETED:
+                samples.archiveSample(sample)
+
+            # activate next queue item
             LHqueue.active_sample = None
             LHqueue.run_next()
 
