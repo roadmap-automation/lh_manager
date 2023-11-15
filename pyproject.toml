@@ -33,3 +33,6 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/hoogerheide/liquid_handler_api"
 "Bug Tracker" = "https://github.com/hoogerheide/liquid_handler_api/issues"
+
+[tool.setuptools]
+package-dir = {"liquid_handler_api" = "liquid_handler_api"}
