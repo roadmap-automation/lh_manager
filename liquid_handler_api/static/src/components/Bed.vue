@@ -87,14 +87,16 @@ function fill_path(col, row) {
   if (well_number in filled_cells.value) {
     const well_volume = filled_cells.value[well_number].volume;
     const max_volume = layout.value?.racks[props.rack_id].max_volume ?? well_volume;
-    const fill_fraction = well_volume / max_volume;
+    const epsilon = 1e-8;
+    // keep fill fraction just below one so there's still an arc to draw...
+    const fill_fraction = Math.min(well_volume / max_volume, 1-epsilon);
     const cx = x_offset(col, row);
     const cy = y_offset(row);
     if (props.shape === 'circle') {  
       const rr = r.value;
-      const y = cy + rr * (2 * fill_fraction - 1);
+      const y = cy - rr * (2 * fill_fraction - 1);
       // const sweep_flag = (fill_fraction > 0.5) ? "0" : "1";
-      const large_arc = (fill_fraction > 0.5) ? "0" : "1";
+      const large_arc = (fill_fraction > 0.5) ? "1" : "0";
       const dx = 2 * rr * Math.sqrt(fill_fraction - fill_fraction**2);
       return `M${cx - dx} ${y} A ${rr} ${rr} 0 ${large_arc} 0 ${cx + dx} ${y} Z`;
     }
