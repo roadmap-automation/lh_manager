@@ -1,6 +1,6 @@
 from typing import List
 from dataclasses import field
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from .items import Item
 
 @dataclass

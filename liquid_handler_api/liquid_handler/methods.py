@@ -1,5 +1,5 @@
 from dataclasses import fields, field
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Literal, Union, Set
 from .bedlayout import LHBedLayout, WellLocation

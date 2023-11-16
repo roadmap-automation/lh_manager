@@ -1,4 +1,4 @@
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from typing import List, Literal
 from .methods import BaseMethod, register, InjectMethod
 from .bedlayout import LHBedLayout

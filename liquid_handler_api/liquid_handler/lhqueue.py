@@ -1,6 +1,6 @@
 """Internal queue for feeding LH operations one at a time"""
 from threading import Lock
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from datetime import datetime
 
 from .state import samples

@@ -3,7 +3,7 @@ from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
 from dataclasses import field
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
