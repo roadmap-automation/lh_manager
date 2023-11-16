@@ -12,7 +12,7 @@ from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
 from ..liquid_handler.lhqueue import LHqueue, RunQueue
-from .events import trigger_samples_update
+from .events import trigger_samples_update, trigger_layout_update
 from . import gui_blueprint
 
 @gui_blueprint.route('/webform/AddSample/', methods=['POST'])
@@ -203,3 +203,14 @@ def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
         wd['zone'] = zone
     return make_response(wells_dict, 200)
 
+@gui_blueprint.route('/GUI/UpdateWell', methods=['POST'])
+@trigger_layout_update
+def UpdateWell() -> Response:
+    """ Replaces any existing well definition weith the same rack_id, well_number
+    (or creates a new well definition if none already exists) """
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    well = Well(**data)
+    layout.update_well(well)
+    return make_response(asdict(well), 200)
