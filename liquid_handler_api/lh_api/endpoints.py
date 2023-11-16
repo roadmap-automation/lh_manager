@@ -3,8 +3,9 @@ from flask import make_response, Response, request
 
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.lhqueue import LHqueue
-from ..liquid_handler.samplelist import SampleStatus
-from ..gui_api.events import trigger_sample_status_update, trigger_layout_update, trigger_run_queue_update
+from ..liquid_handler.samplelist import SampleStatus, Sample
+from ..gui_api.events import trigger_layout_update, trigger_run_queue_update, \
+                            trigger_sample_status_update, trigger_samples_update
 
 from . import lh_blueprint
 
@@ -32,6 +33,11 @@ def PutSampleListValidation(sample_list_id):
     assert validation == 'SUCCESS', f'Error in validation. Full message: ' + data['validation']['message']
 
     return make_response({sample_list_id: validation}, 200)
+
+@trigger_samples_update
+def _delete_sample(sample: Sample) -> None:
+    """Deletes sample with decorator that triggers update"""
+    samples.deleteSample(sample)
 
 @lh_blueprint.route('/LH/PutSampleData/', methods=['POST'])
 @trigger_sample_status_update
@@ -68,11 +74,18 @@ def PutSampleData():
         if len(new_state):
             sample.current_contents = new_state
 
-        # if all methods complete, change status of sample to completed, flag LH as no longer busy, and run the next queue item
+        # if all methods complete, change status of method list to completed, flag LH as no longer busy, and run the next queue item
         if all(methodlist.get_method_completion()):
             methodlist.status = SampleStatus.COMPLETED
+
+            # activate next queue item
             LHqueue.active_sample = None
             LHqueue.run_next()
+
+        # archive the sample and remove it from active samples if all stages are complete
+        samples.archiveSample(sample)
+        if sample.get_status() == SampleStatus.COMPLETED:
+            _delete_sample(sample)
 
     # TODO: ELSE: Throw error
 
