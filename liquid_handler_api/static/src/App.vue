@@ -39,6 +39,7 @@ socket.on('update_sample_status', () => {
 
 socket.on('update_layout', () => {
   refreshLayout();
+  refreshWells();
 })
 
 
