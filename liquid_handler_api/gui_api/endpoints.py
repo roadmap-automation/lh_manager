@@ -12,7 +12,7 @@ from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
 from ..liquid_handler.lhqueue import LHqueue, RunQueue
-from .events import trigger_samples_update, trigger_layout_update
+from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update
 from . import gui_blueprint
 
 @gui_blueprint.route('/webform/AddSample/', methods=['POST'])
@@ -34,6 +34,7 @@ def AddSample() -> Response:
 
 @gui_blueprint.route('/GUI/UpdateSample/', methods=['POST'])
 @trigger_samples_update
+@trigger_sample_status_update
 def UpdateSample() -> Response:
     """Modifies an existing sample"""
     data = request.get_json(force=True)
