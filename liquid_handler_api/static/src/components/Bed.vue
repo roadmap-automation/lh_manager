@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { layout, pick_handler, source_well, target_well } from '../store';
+import { layout, pick_handler, source_well, target_well, well_editor_active, well_to_edit } from '../store';
 import type { Well } from '../store';
 
 const props = defineProps<{
@@ -58,6 +58,13 @@ function clicked(row: number, col: number) {
   pick_handler({ rack_id, well_number });
 }
 
+function edit_well(row: number, col: number) {
+  const well_number = row * rack.columns + col + 1;
+  const rack_id = props.rack_id;
+  well_to_edit.value = {well_number, rack_id};
+  well_editor_active.value = true;
+}
+
 function highlight_class(col, row) {
   const well_number = row * rack.columns + col + 1;
   const classList: string[] = [];
@@ -78,7 +85,6 @@ function highlight_class(col, row) {
 const filled_cells = computed(() => {
   const local_wells = props.wells.filter((w) => (w.rack_id === props.rack_id));
   const local_wells_lookup = Object.fromEntries(local_wells.map((w) => [w.well_number, w]));
-  console.log(props.rack_id, local_wells_lookup);
   return local_wells_lookup;
 });
 
@@ -124,11 +130,12 @@ onMounted(() => {
     <g v-for="col of col_array" :index="col" :class="highlight_class(col, row)" :n="row * rack.columns + col">
       <title>{{ row * rack.columns + col + 1 }}</title>
       <circle v-if="props.shape === 'circle'" class="vial-button" :cx="x_offset(col, row)" :cy="y_offset(row)" :r="r"
-        @click="clicked(row, col)">
+        @click="clicked(row, col)"
+        @contextmenu.prevent="edit_well(row, col)">
         <title>{{ filled_cells[row*rack.columns + col + 1] }}</title>
       </circle>
       <rect :class="highlight_class(col, row)" v-if="props.shape === 'rect'" class="vial-button" :width="col_width - 2*padding" :height="row_height - 2*padding"
-        :x="x_offset(col, row, false)" :y="y_offset(row, false)" @click="clicked(row, col)">
+        :x="x_offset(col, row, false)" :y="y_offset(row, false)" @click="clicked(row, col)" @contextmenu.prevent="edit_well(row, col)">
         <title>{{ filled_cells[row*rack.columns + col + 1] }}</title>
       </rect>
       <path class="fill-fraction" :d="fill_path(col, row)"></path>
