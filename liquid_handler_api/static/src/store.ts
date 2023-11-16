@@ -64,8 +64,8 @@ export interface SampleStatusMap {
 }
 
 type Component = [name: string, zone: string];
-type Solvent = {name: string, concentration: number, units: string};
-type Solute = {name: string, fraction: number};
+export type Solute = {name: string, concentration: number, units: string};
+export type Solvent = {name: string, fraction: number};
 
 export interface Well {
   composition: {solvents: Solvent[], solutes: Solute[]},
@@ -89,6 +89,8 @@ export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
 export const source_components = ref<SourceComponents>();
 export const wells = ref<Well[]>([]);
+export const well_editor_active = ref(false);
+export const well_to_edit = ref<WellLocation>();
 
 // export const layout_with_contents = computed(() => {
 //   const layout_copy = structuredClone(toRaw(layout.value));
@@ -205,6 +207,17 @@ export function pick_handler(well_location: WellLocation) {
     }
   }
   console.warn("no active well field to set");
+}
+
+export async function update_well_contents(well: Well) {
+  console.log("updating well: ", well, JSON.stringify(well));
+  const update_result = await fetch("/GUI/UpdateWell", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(well)
+  });
+  const response_body = await update_result.json();
+  return response_body;
 }
 
 export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject'] ): Promise<object> {
