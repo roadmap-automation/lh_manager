@@ -102,13 +102,16 @@ const status_class_map: {[status in StatusType]: string} = {
           @click="toggleItem(sindex)" :aria-expanded="sindex === active_sample_index">
           <span class="fw-bold align-middle px-2"> {{ sample.name }} </span>
           <span class="align-middle px-2"> {{ sample.description }}</span>
-          <button type="button" class="btn-close btn-sm align-middle edit" aria-label="Edit Name or Description"
+          <button type="button" class="btn-close btn-sm align-middle edit"
+            aria-label="Edit Name or Description"
+            title="Edit Name or Description"
             @click.stop="edit_sample_name(sindex)"></button>
             <button 
               v-if="(sample_status?.[sample.id]?.status ?? 'inactive') === 'inactive'"
               type="button"
               class="btn-close btn-sm align-middle start"
-              aria-label="Run stages"
+              aria-label="Run all stages"
+              title="Run all stages"
               @click.stop="run_stage(sample, ['prep', 'inject'])">
             </button>
             <button
@@ -116,6 +119,7 @@ const status_class_map: {[status in StatusType]: string} = {
               type="button"
               class="btn-close btn-sm align-middle archive"
               aria-label="Archive sample"
+              title="Archive sample"
               @click.stop="archive_and_remove_sample(sample.id)">
             </button>
         </button>
