@@ -105,7 +105,8 @@ function fill_path(col, row) {
       const dy = 0.5 * (row_height.value ?? 0) - padding;
       const x = cx - padding;
       const y = cy - padding;
-      return `M${x - dx} ${y - dy} L ${x + dx} ${y - dy} L ${x + dx} ${y + dy} L ${x - dx} ${y + dy} Z`;
+      const y_top = y - dy * (2 * fill_fraction - 1);
+      return `M${x - dx} ${y_top} L ${x + dx} ${y_top} L ${x + dx} ${y + dy} L ${x - dx} ${y + dy} Z`;
     }
   }
   else {
