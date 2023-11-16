@@ -5,6 +5,7 @@ import Mixture from './Mixture.vue';
 import BedLayout from './BedLayout.vue';
 import SampleList from './SampleList.vue';
 import { samples, sample_status, wells } from '../store';
+import EditWellContents from './EditWellContents.vue';
 
 const props = defineProps({
   msg: String,
@@ -80,9 +81,7 @@ function openMixture() {
     </div>
 
   </div>
-
-
-
+  <EditWellContents :wells="wells" />
 
 </template>
 
