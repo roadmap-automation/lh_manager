@@ -92,7 +92,8 @@ class RunQueue(DryRunQueue):
                     # only if an injection operation, set sample NICE_uuid and NICE_slotID
                     if item.stage == StageName.INJECT:
                         sample.NICE_uuid = item.data.get('uuid', None)
-                        sample.NICE_slotID = int(item.data.get('slotID', 0))
+                        slot_id = item.data.get('slotID', 0)
+                        sample.NICE_slotID = int(slot_id) if slot_id is not None else None
 
                     self.active_sample = item
 

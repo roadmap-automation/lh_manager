@@ -107,12 +107,12 @@ class MethodList:
         self.run_methods = None
         self.run_methods_complete = None
     
-    def get_method_completion(self) -> List[bool]:
+    def get_method_completion(self) -> bool:
         """Returns list of method completion status. If prepare_run_methods has not been
             run (i.e. run_methods is None), returns False
 
         Returns:
-            List[bool]: List of method completion status, one for each method in methods
+            bool: Method completion status, one for each method in methods
         """
 
         if self.run_methods_complete is not None:

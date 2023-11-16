@@ -75,7 +75,7 @@ def PutSampleData():
             sample.current_contents = new_state
 
         # if all methods complete, change status of method list to completed, flag LH as no longer busy, and run the next queue item
-        if all(methodlist.get_method_completion()):
+        if methodlist.get_method_completion():
             methodlist.status = SampleStatus.COMPLETED
 
             # activate next queue item
