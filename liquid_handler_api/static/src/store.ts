@@ -187,7 +187,7 @@ export function set_location(method_index: number, name: WellFieldName, rack_id:
 }
 
 export function pick_handler(well_location: WellLocation) {
-  if (active_sample_index.value !== null && active_stage.value !== null && active_sample_index.value !== null) {
+  if (active_sample_index.value !== null && active_stage.value !== null && active_sample_index.value !== null && active_method_index.value !== null) {
     const sample = samples.value[active_sample_index.value];
     const s: Sample = structuredClone(toRaw(sample));
     const stage = s?.stages?.[active_stage.value];
