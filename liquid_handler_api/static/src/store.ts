@@ -107,7 +107,7 @@ type Events = {
 export const emitter = mitt<Events>();
 
 export async function update_sample(sample_obj: Partial<Sample>): Promise<object> {
-  const update_result = await fetch("/GUI/UpdateSample", {
+  const update_result = await fetch("/GUI/UpdateSample/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(sample_obj)
@@ -118,6 +118,16 @@ export async function update_sample(sample_obj: Partial<Sample>): Promise<object
 
 function get_sample_by_id(sample_id: string) {
   return samples.value.find((s) => (s.id === sample_id));
+}
+
+export async function archive_and_remove_sample(sample_id: string) {
+  const update_result = await fetch("/GUI/ArchiveandRemoveSample/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({id: sample_id})
+  });
+  const response_body = await update_result.json();
+  return response_body;
 }
 
 export function add_method(sample_id: string, stage_name: StageName, event: Event) {
@@ -211,7 +221,7 @@ export function pick_handler(well_location: WellLocation) {
 
 export async function update_well_contents(well: Well) {
   console.log("updating well: ", well, JSON.stringify(well));
-  const update_result = await fetch("/GUI/UpdateWell", {
+  const update_result = await fetch("/GUI/UpdateWell/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -237,7 +247,7 @@ export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep
 
 
 export async function refreshLayout() {
-  const new_layout = await (await fetch("/GUI/GetLayout")).json();
+  const new_layout = await (await fetch("/GUI/GetLayout/")).json();
   console.log({new_layout});
   layout.value = new_layout;
 }
@@ -250,7 +260,7 @@ function dedupe<T>(arr: T[]): T[] {
 }
 
 export async function refreshWells() {
-  const new_wells = await (await fetch("/GUI/GetWells")).json() as WellWithZone[];
+  const new_wells = await (await fetch("/GUI/GetWells/")).json() as WellWithZone[];
   const solvent_zones: Component[] = new_wells.map((well) => (well.composition.solvents.map((s) => ([s.name, well.zone] as Component)))).flat();
   const solute_zones: Component[] = new_wells.map((well) => (well.composition.solutes.map((s) => ([s.name, well.zone] as Component)))).flat();
   const dedup_solvent_zones = dedupe(solvent_zones);
