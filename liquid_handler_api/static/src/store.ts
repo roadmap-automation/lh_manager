@@ -230,6 +230,16 @@ export async function update_well_contents(well: Well) {
   return response_body;
 }
 
+export async function remove_well_definition(well: Well) {
+  const update_result = await fetch("/GUI/RemoveWellDefinition/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(well)
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
 export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject'] ): Promise<object> {
   const { name, id, NICE_uuid, NICE_slotID } = sample_obj;
   const uuid = NICE_uuid ?? null;

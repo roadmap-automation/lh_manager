@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, defineProps, onMounted, watch, toRaw } from 'vue'
 import { Modal } from 'bootstrap/dist/js/bootstrap.esm';
-import { well_editor_active, well_to_edit, layout, update_well_contents } from '../store';
+import { well_editor_active, well_to_edit, layout, update_well_contents, remove_well_definition } from '../store';
 import type { Well, Solute, Solvent } from '../store';
 
 const props = defineProps<{
@@ -57,6 +57,13 @@ function send_changes() {
   well_editor_active.value = false;
 };
 
+function remove_definition() {
+  if (current_well.value) {
+    remove_well_definition(current_well.value);
+  }
+  well_editor_active.value = false;
+}
+
 </script>
 
 <template>
@@ -106,9 +113,12 @@ function send_changes() {
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="well_editor_active=false">Close</button>
-          <button type="button" class="btn btn-primary" @click="send_changes">Save changes</button>
+        <div class="modal-footer justify-content-between">
+          <button type="button" class="btn btn-danger" @click="remove_definition">Remove Definition</button>
+          <div class="d-inline-flex">
+            <button type="button" class="btn btn-secondary me-2" @click="well_editor_active=false">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="send_changes">Save changes</button>
+          </div>
         </div>
       </div>
     </div>

@@ -215,3 +215,14 @@ def UpdateWell() -> Response:
     well = Well(**data)
     layout.update_well(well)
     return make_response(asdict(well), 200)
+
+@gui_blueprint.route('/GUI/RemoveWellDefinition/', methods=['POST'])
+@trigger_layout_update
+def RemoveWellDefinition() -> Response:
+    """ Replaces any existing well definition weith the same rack_id, well_number
+    (or creates a new well definition if none already exists) """
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    layout.remove_well_definition(data["rack_id"], data["well_number"])
+    return make_response({"well definition removed": data}, 200)
