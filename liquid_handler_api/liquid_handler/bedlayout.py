@@ -193,6 +193,17 @@ class LHBedLayout:
 
         return [w for rack in self.racks.values() for w in rack.wells]
 
+    def update_well(self, well: Well):
+        """Removes existing wells with the same rack_id, well_number
+        Then appends the well to the end of that rack.wells """
+
+        rack = self.racks[well.rack_id]
+        # removes all existing wells with same well_number (go backwards to pop off the end):
+        for i, existing_well in reversed(list(enumerate(rack.wells))):
+            if existing_well.well_number == well.well_number:
+                rack.wells.pop(i)
+        rack.wells.append(well)
+
 d2o = Solvent('D2O', 1.0)
 kcl0 = Solute('KCl', 0.1)
 kcl1 = Solute('KCl', 1.0)
