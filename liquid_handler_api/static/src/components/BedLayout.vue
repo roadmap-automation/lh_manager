@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, defineProps } from 'vue'
 import Bed from './Bed.vue';
-import { layout, wells } from '../store';
+import { layout } from '../store';
 import type { Well } from '../store';
 
 const props = defineProps<{
