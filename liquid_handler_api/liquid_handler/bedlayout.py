@@ -1,6 +1,6 @@
 """Class definitions for bed layout, wells, and compositions"""
 from dataclasses import field
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from typing import Optional, Tuple, List
 
 @dataclass

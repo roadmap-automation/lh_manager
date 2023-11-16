@@ -1,6 +1,6 @@
 from typing import List, Tuple, Dict
 from dataclasses import field
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 from .history import History
 from .samplelist import Sample, StageName, SampleStatus
 from .bedlayout import LHBedLayout

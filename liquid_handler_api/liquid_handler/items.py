@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import field
-from pydantic.dataclasses import dataclass
+from pydantic.v1.dataclasses import dataclass
 
 class StageName(str, Enum):
     PREP = 'prep'

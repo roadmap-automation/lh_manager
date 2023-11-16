@@ -2,3 +2,6 @@ flask
 flask-socketio
 simple-websocket
 pydantic
+numpy
+scipy
+nodejs
