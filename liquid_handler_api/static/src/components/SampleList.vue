@@ -112,7 +112,7 @@ const status_class_map: {[status in StatusType]: string} = {
               @click.stop="run_stage(sample, ['prep', 'inject'])">
             </button>
             <button
-              v-if="(sample_status[sample.id]?.status ?? 'inactive') === 'inactive'"
+              v-if="['active', 'completed', 'partially_completed'].includes(sample_status[sample.id]?.status)"
               type="button"
               class="btn-close btn-sm align-middle archive"
               aria-label="Archive sample"
