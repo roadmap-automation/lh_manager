@@ -51,14 +51,14 @@ class SampleContainer:
             print(f'Warning: id {sample.id} already taken. Sample not added.')
         else:
             self.samples.append(sample)
-        
+    
     def deleteSample(self, sample: Sample) -> None:
         """Special remover that also updates index object"""
         
         self.samples.pop(self.samples.index(sample))
 
     def archiveSample(self, sample: Sample) -> None:
-        """Moves sample to history archive and removes it from the active sample list
+        """Moves sample to history archive
 
         Args:
             sample (Sample): sample to archive
@@ -67,8 +67,6 @@ class SampleContainer:
         history = History()
         history.smart_insert(sample)
         history.close()
-
-        self.deleteSample(sample)
 
     def getMaxLH_id(self) -> int:
         """ Returns maximum index value for Sample.MethodList.LH_id. If no LH_ids are defined,
