@@ -56,6 +56,28 @@ def UpdateSample() -> Response:
         samples.samples[sample_index] = new_sample
         return make_response({'sample updated': id}, 200)
 
+@gui_blueprint.route('/GUI/ArchiveandRemoveSample/', methods=['POST'])
+@trigger_samples_update
+def ArchiveandRemoveSample() -> Response:
+    """Archives an existing sample and deletes"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't archive")
+        return make_response({'error': "no id in sample, can't archive"}, 200)
+
+    sample_index, sample = samples.getSampleById(id)
+    print(data, sample)
+    if sample is None or sample_index is None:
+        """ sample not found """
+        return make_response({'error': "sample not found, can't archive"}, 200)
+    else:
+        """ archive sample """
+        samples.archiveSample(sample)
+        samples.deleteSample(sample)
+        return make_response({'sample archived and removed': id}, 200)
+
 @gui_blueprint.route('/GUI/UpdateDryRunQueue/', methods=['POST'])
 @trigger_samples_update
 def UpdateDryRunQueue() -> Response:

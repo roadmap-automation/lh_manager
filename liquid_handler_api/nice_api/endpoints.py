@@ -6,6 +6,7 @@ from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
+from ..liquid_handler.history import History
 from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
 from . import nice_blueprint
@@ -101,7 +102,23 @@ def GetMetaData(uuid) -> Response:
         Responses are sorted by createdDate"""
 
     if uuid != chr(0):
+        # Get samples from history
+        # NOTE: it may not be necessary to re-initialize historical data into Sample objects but
+        # it makes the code cleaner.
+        history = History()
+        samples_history = history.get_samples_by_NICE_uuid(uuid)
+        history.close()
+
+        # get currently active samples
         samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
+
+        # remove duplicates from history (if active in memory, should use that one). This should
+        # never happen
+        sample_ids = [s.id for s in samples_uuid]
+        samples_history = [s for s in samples_history if s.id not in sample_ids]
+
+        # concatenate the historical and current lists
+        samples_uuid += samples_history
         
         if len(samples_uuid):
             samples_uuid.sort(key=lambda sample: sample.get_earliest_date())

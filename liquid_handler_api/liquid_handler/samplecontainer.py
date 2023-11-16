@@ -1,6 +1,7 @@
 from typing import List, Tuple, Dict
 from dataclasses import field
 from pydantic.dataclasses import dataclass
+from .history import History
 from .samplelist import Sample, StageName, SampleStatus
 from .bedlayout import LHBedLayout
 from .dryrun import DryRunQueue
@@ -50,11 +51,22 @@ class SampleContainer:
             print(f'Warning: id {sample.id} already taken. Sample not added.')
         else:
             self.samples.append(sample)
-        
+    
     def deleteSample(self, sample: Sample) -> None:
         """Special remover that also updates index object"""
         
         self.samples.pop(self.samples.index(sample))
+
+    def archiveSample(self, sample: Sample) -> None:
+        """Moves sample to history archive
+
+        Args:
+            sample (Sample): sample to archive
+        """
+
+        history = History()
+        history.smart_insert(sample)
+        history.close()
 
     def getMaxLH_id(self) -> int:
         """ Returns maximum index value for Sample.MethodList.LH_id. If no LH_ids are defined,
