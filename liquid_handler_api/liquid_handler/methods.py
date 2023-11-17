@@ -353,7 +353,18 @@ class MixWithRinse(MixMethod):
             Target_Zone=target_zone,
             Target_Well=target_well
         )]
-    
+
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+
+        target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
+
+        if self.Volume > target_well.volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Mix with volume {self.Volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
+                                      )
+
+        target_well.volume -= self.Extra_Volume
+
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate)
 
@@ -435,6 +446,34 @@ class Sleep(BaseMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return float(self.Time)
+    
+@register
+@dataclass
+class Sleep2(BaseMethod):
+    """Sleep"""
+
+    Time2: float = 1.0
+    display_name: Literal['Sleep2'] = 'Sleep2'
+    method_name: Literal['NCNR_Sleep2'] = 'NCNR_Sleep2'
+
+    @dataclass
+    class lh_method(BaseMethod.lh_method):
+        Time2: str
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+        
+        return [self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Time2=f'{self.Time2}'
+        )]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return float(self.Time2)
 
 @register
 @dataclass
