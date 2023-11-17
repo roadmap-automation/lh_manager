@@ -13,6 +13,7 @@ class SampleContainer:
 
     samples: list[Sample] = field(default_factory=list)
     dryrun_queue: DryRunQueue = field(default_factory=DryRunQueue)
+    max_LH_id: int = 1
 
     def _getIDs(self) -> list[str]:
 
@@ -68,17 +69,6 @@ class SampleContainer:
         history.smart_insert(sample)
         history.close()
 
-    def getMaxLH_id(self) -> int:
-        """ Returns maximum index value for Sample.MethodList.LH_id. If no LH_ids are defined,
-            returns -1."""
-        
-        lh_ids = []
-        for sample in self.samples:
-            for lh_id in sample.get_LH_ids():
-                lh_ids.append(lh_id)
-
-        return max([lh_id if lh_id is not None else -1 for lh_id in lh_ids])
-    
     def dryrun(self, layout: LHBedLayout) -> List[Tuple[Item, List[MethodError]]]:
         """Executes dry run of everything in the queue by copying the layout and
             executing all methods in the queue

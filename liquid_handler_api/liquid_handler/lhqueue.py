@@ -87,7 +87,10 @@ class RunQueue(DryRunQueue):
                     methodlist = sample.stages[item.stage]
                     methodlist.status = SampleStatus.ACTIVE
                     methodlist.createdDate = datetime.now().strftime(DATE_FORMAT)
-                    methodlist.LH_id = samples.getMaxLH_id() + 1
+
+                    # set ID equal to max id and increment by 1
+                    methodlist.LH_id = samples.max_LH_id + 1
+                    samples.max_LH_id += 1
 
                     # only if an injection operation, set sample NICE_uuid and NICE_slotID
                     if item.stage == StageName.INJECT:
