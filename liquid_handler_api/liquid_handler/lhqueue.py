@@ -60,7 +60,7 @@ class RunQueue(DryRunQueue):
         """Empties queue and resets status of incomplete methods to INACTIVE"""
 
         with self.lock:
-            while not len(self.stages):
+            while len(self.stages):
                 data = self.stages.pop(0)
                 _, sample = samples.getSampleById(data.id)
                 
