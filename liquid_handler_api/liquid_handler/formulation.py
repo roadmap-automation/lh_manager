@@ -11,6 +11,8 @@ from .samplelist import example_sample_list, StageName
 from .methods import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
             TransferMethod, MixMethod, register, method_manager
 
+ZERO_VOLUME_TOLERANCE = 1e-8
+
 @register
 @dataclass
 class Formulation(MethodContainer):
@@ -80,7 +82,7 @@ class Formulation(MethodContainer):
             sol, res = nnls(source_matrix, target_vector)
 
             if np.isclose(res, 0.0, atol=1e-9):
-                print(f'Good residual {res:0.0e}')
+                print(f'Good residual {res:0.0e}, solution {sol}')
                 success = True
             else:
                 print(f'Bad residual {res:0.0e}, quitting formulation')
@@ -98,9 +100,9 @@ class Formulation(MethodContainer):
                     success = False
 
         # 4. Find all unique solutions an use a priority to find the best one (fewest operations, least time, etc.)
-        source_wells = [well for well, vol in zip(source_wells, sol) if vol > 0]
+        source_wells = [well for well, vol in zip(source_wells, sol) if vol > ZERO_VOLUME_TOLERANCE]
 
-        return (sol[sol>0] * self.target_volume).tolist(), source_wells, success
+        return (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
     
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
