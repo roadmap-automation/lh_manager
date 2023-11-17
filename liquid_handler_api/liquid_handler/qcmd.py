@@ -107,7 +107,7 @@ class InjectWithRinseSync(InjectMethod):
     Tag_Name: str = ''
     Record_Time: float = 1.5
     Equilibration_Time: float = 2.5
-    display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'
+    display_name: Literal['Inject With Synchronization'] = 'Inject With Synchronization'
     method_name: Literal['NCNR_InjectWithRinse_Sync'] = 'NCNR_InjectWithRinse_Sync'
 
     @dataclass
