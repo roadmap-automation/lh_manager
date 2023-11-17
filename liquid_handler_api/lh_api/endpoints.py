@@ -28,11 +28,16 @@ def PutSampleListValidation(sample_list_id):
 
     # check validation (SUCCESS or ERROR)
     validation = data['validation']['validationType']
+    error = None
     
-    # TODO: Actual error handling flow
-    assert validation == 'SUCCESS', f'Error in validation. Full message: ' + data['validation']['message']
+    # TODO: Actual error handling flow, sample activation/inactivation methods
+    if not validation == 'SUCCESS':
+        error = f'Error in validation. Full message: ' + data['validation']['message']
+        sample, stage_name = samples.getSampleStagebyLH_ID(int(sample_list_id))
+        sample.stages[stage_name].status = SampleStatus.INACTIVE
+        trigger_sample_status_update(lambda: 1)
 
-    return make_response({sample_list_id: validation}, 200)
+    return make_response({sample_list_id: validation, 'error': error}, 200)
 
 @trigger_samples_update
 def _delete_sample(sample: Sample) -> None:
@@ -51,6 +56,7 @@ def PutSampleData():
     sample_id = int(data['sampleData']['runData'][0]['sampleListID'])
     method_number = int(data['sampleData']['runData'][0]['iteration']) - 1
     method_name = data['sampleData']['runData'][0]['methodName']
+    #print(sample_id, method_number, method_name)
 
     # check that run was successful
     if any([('completed successfully' in notification) for notification in data['sampleData']['resultNotifications']['notifications'].values()]):
@@ -58,6 +64,7 @@ def PutSampleData():
         sample, stage_name = samples.getSampleStagebyLH_ID(sample_id)
         assert sample is not None and stage_name is not None, "unknown sample"
         methodlist = sample.stages[stage_name]
+        #print(methodlist.__dict__)
         method = methodlist.run_methods[method_number]
 
         # double check that correct method is being referenced
