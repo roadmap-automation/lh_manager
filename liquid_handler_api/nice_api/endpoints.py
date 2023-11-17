@@ -56,7 +56,7 @@ def RunSample(sample_name, uuid, slotID, stage) -> Response:
 def RunSamplewithUUID() -> Response:
     """Runs a sample by name, giving it a UUID. Returns error if sample not found or sample is already active or completed."""
     data = request.get_json(force=True)
-
+    #print(data)
     # check for proper format
     if validate_format(data):
 
@@ -181,6 +181,20 @@ def Stop() -> Response:
     LHqueue.stop()
 
     return make_response({'result': 'success', 'number_operations_canceled': init_size, 'message': f'{init_size} pending LH operations canceled'}, 200)
+
+@nice_blueprint.route('/NICE/Inactivate/', methods=['GET', 'POST'])
+@trigger_run_queue_update
+@trigger_sample_status_update
+def Inactivate() -> Response:
+    """Stops operation by emptying liquid handler queue.
+    
+        Ignores request data."""
+
+    active_stage_list = [sample.stages[stage_name] for sample in samples.samples for stage_name in sample.stages if sample.stages[stage_name].status in (SampleStatus.ACTIVE, SampleStatus.PENDING)]
+    for stage in active_stage_list:
+        stage.status = SampleStatus.INACTIVE
+
+    return make_response({'result': 'success', 'number_operations_inactivated': len(active_stage_list), 'message': f'{len(active_stage_list)} pending LH operations canceled'}, 200)
 
 @nice_blueprint.route('/NICE/Pause/', methods=['GET', 'POST'])
 def Pause() -> Response:
