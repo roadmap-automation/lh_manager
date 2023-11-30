@@ -207,17 +207,8 @@ class Sample:
         assert stage_name in self.stages, "Must use stage from calling sample!"
 
         stage = self.stages[stage_name]
-        if entry:
-            expose_methods = None
-        else:
-            stage.prepare_run_methods(layout)
-            expose_methods = []
-            for m in stage.run_methods:
-                expose_methods += m.render_lh_method(sample_name=self.name,
-                                              sample_description=self.description,
-                                              layout=layout)
 
-        return asdict(SampleList(
+        d = asdict(SampleList(
             name=self.name,
             id=f'{stage.LH_id}',
             createdBy='System',
@@ -225,8 +216,33 @@ class Sample:
             createDate=str(stage.createdDate),
             startDate=str(stage.createdDate),
             endDate=str(stage.createdDate),
-            columns=expose_methods
+            columns=None
         ))
+        
+        if not entry:
+            stage.prepare_run_methods(layout)
+            expose_methods = []
+            for m in stage.run_methods:
+                expose_methods += m.render_lh_method(sample_name=self.name,
+                                              sample_description=self.description,
+                                              layout=layout)
+
+            # Convert expose_methods to dictionary
+            expose_methods = [asdict(m) for m in expose_methods]
+
+            # Get unique keys across all the methods
+            all_columns = set.union(*(set(m.keys()) for m in expose_methods))
+
+            # Ensure that all keys exist in all dictionaries
+            for m in expose_methods:
+                for column in all_columns:
+                    if column not in m:
+                        m[column] = None
+
+            # Update the SampleList columns
+            d.update(columns=expose_methods)
+
+        return d
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
