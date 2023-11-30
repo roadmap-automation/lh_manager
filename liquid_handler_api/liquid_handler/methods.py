@@ -1,6 +1,7 @@
-from dataclasses import fields, field
+from dataclasses import fields, field, asdict
 from pydantic.v1.dataclasses import dataclass
 from enum import Enum
+from copy import copy
 from typing import Dict, List, Literal, Union, Set
 from .bedlayout import LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
@@ -31,6 +32,21 @@ class BaseMethod:
         SAMPLEDESCRIPTION: str
         METHODNAME: str
 
+        def to_dict(self) -> dict:
+            """Creates dictionary representation; all custom field keys are prepended with a hash (#)
+
+            Returns:
+                dict: dictionary representation
+            """
+
+            d = asdict(self)
+            d2 = copy(d)
+            for key in d.keys():
+                if key not in ('SAMPLENAME', 'SAMPLEDESCRIPTION', 'METHODNAME'):
+                    d2['#' + key] = d2.pop(key)
+
+            return d2
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""
         return None
@@ -53,7 +69,7 @@ class BaseMethod:
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[lh_method]:
+                         layout: LHBedLayout) -> List[dict]:
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
         return []
