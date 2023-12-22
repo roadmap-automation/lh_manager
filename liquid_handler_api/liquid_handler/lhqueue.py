@@ -67,6 +67,8 @@ class RunQueue(DryRunQueue):
                 # reset status of sample stage to INACTIVE
                 sample.stages[data.stage].status = SampleStatus.INACTIVE
 
+            self.clear_active_sample()
+
     def run_next(self) -> None:
         """Runs next item in queue if queue is not busy and there are items to run.
         Otherwise, does nothing"""
