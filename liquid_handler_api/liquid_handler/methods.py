@@ -1,6 +1,7 @@
-from dataclasses import fields, field
+from dataclasses import fields, field, asdict
 from pydantic.v1.dataclasses import dataclass
 from enum import Enum
+from copy import copy
 from typing import Dict, List, Literal, Union, Set
 from .bedlayout import LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
@@ -30,6 +31,23 @@ class BaseMethod:
         SAMPLENAME: str
         SAMPLEDESCRIPTION: str
         METHODNAME: str
+
+        def to_dict(self) -> dict:
+            """Creates dictionary representation; all custom field keys are prepended with a hash (#)
+            Returns:
+                dict: dictionary representation
+            """
+
+            d2 = asdict(self)
+
+            # Following lines prepend all non-fixed fields with hashes
+            #d = asdict(self)
+            #d2 = copy(d)
+            #for key in d.keys():
+            #    if key not in ('SAMPLENAME', 'SAMPLEDESCRIPTION', 'METHODNAME'):
+            #        d2['#' + key] = d2.pop(key)
+
+            return d2
 
     def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""

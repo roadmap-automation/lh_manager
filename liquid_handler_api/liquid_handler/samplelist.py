@@ -223,12 +223,16 @@ class Sample:
             stage.prepare_run_methods(layout)
             expose_methods = []
             for m in stage.run_methods:
-                expose_methods += m.render_lh_method(sample_name=self.name,
+                expose_methods += [m2.to_dict()
+                                   for m2 in m.render_lh_method(sample_name=self.name,
                                               sample_description=self.description,
-                                              layout=layout)
+                                              layout=layout)]
+                #expose_methods += m.render_lh_method(sample_name=self.name,
+                #                              sample_description=self.description,
+                #                              layout=layout)
 
             # Convert expose_methods to dictionary
-            expose_methods = [asdict(m) for m in expose_methods]
+            #expose_methods = [asdict(m) for m in expose_methods]
 
             # Get unique keys across all the methods
             all_columns = set.union(*(set(m.keys()) for m in expose_methods))
