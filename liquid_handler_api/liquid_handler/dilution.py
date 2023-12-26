@@ -25,7 +25,7 @@ class SerialDilution(MethodContainer):
     number_of_dilutions: int = 10
     initial_dilution_factor: float = 1.0
     dilution_factor: float = 2.0
-    target_volume: float = 1.0
+    volume: float = 1.0
     transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
     mix_template: MixMethod = field(default_factory=MixWithRinse)
 
@@ -41,7 +41,7 @@ class SerialDilution(MethodContainer):
         success = True
         # if number_of_dilutions is infinite, total volume required per well is up to
         # self.target_volume * (1 + 1 / (dilution_factor - 1)).
-        max_volume_required = self.target_volume * (1 + 1. / (self.dilution_factor - 1))
+        max_volume_required = self.volume * (1 + 1. / (self.dilution_factor - 1))
 
         rack_max_volume = layout.racks[self.first_target_well.rack_id].max_volume
         if max_volume_required > rack_max_volume:
@@ -55,13 +55,13 @@ class SerialDilution(MethodContainer):
 
         # total required to make next dilution (last one is just the target_volume) and leave
         # the appropriate target volume behind
-        total_volumes = [self.target_volume]
+        total_volumes = [self.volume]
         previous_dilution_volume = 0.0
 
         # start from the last one and work backwards
         for df in dilution_factors[::-1]:
-            previous_dilution_volume = (self.target_volume + previous_dilution_volume) / df
-            total_volumes.append(self.target_volume + previous_dilution_volume)
+            previous_dilution_volume = (self.volume + previous_dilution_volume) / df
+            total_volumes.append(self.volume + previous_dilution_volume)
 
         total_volumes = total_volumes[::-1]
 
@@ -110,6 +110,54 @@ class SerialDilution(MethodContainer):
                 target_well = WellLocation(target_well.rack_id, target_well.well_number + 1)
 
         return methods
+
+@register
+@dataclass
+class SerialDilutionVariableVolume(SerialDilution):
+
+    # Defined from BaseMethod
+    # complete: bool
+    method_name: Literal['SerialDilutionVariableVolume'] = 'SerialDilutionVariableVolume'
+    display_name: Literal['Serial DilutionVariableVolume'] = 'Serial DilutionVariableVolume'
+    max_volume: float = 1.0
+
+    def __post_init__(self):
+        for attr_name in ('mix_template', 'transfer_template'):
+            attr = getattr(self, attr_name)
+            if isinstance(attr, dict):
+                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
+
+    def _find_dilution_volumes(self,
+                              layout: LHBedLayout):
+        
+        success = True
+        # if number_of_dilutions is infinite, total volume required per well is up to
+        # self.target_volume * (1 + 1 / (dilution_factor - 1)).
+
+        # 1. Calculate total volume required in each well
+
+        # dilution factors
+        dilution_factors = [self.dilution_factor] * (self.number_of_dilutions - 1)
+
+        # total required to make next dilution (last one is just the target_volume) and leave
+        # the appropriate target volume behind
+        total_volumes = [self.max_volume]
+        previous_dilution_volume = 0.0
+        previous_target_volume = self.max_volume
+
+        # start from the last one and work backwards
+        for df in dilution_factors[::-1]:
+            #print(df, previous_target_volume, previous_dilution_volume, total_volumes[-1])
+            previous_dilution_volume = (previous_target_volume + previous_dilution_volume) / df
+            previous_target_volume = max(previous_target_volume / df, self.volume)
+            total_volumes.append(previous_target_volume + previous_dilution_volume)
+
+        total_volumes = total_volumes[::-1]
+
+        # 2. Calculate diluent fractions for each well
+        diluent_fractions = [1.0 - 1.0 / self.initial_dilution_factor] + [1.0 - 1.0 / self.dilution_factor] * (self.number_of_dilutions - 1)
+
+        return total_volumes, diluent_fractions, success
 
 if __name__ == '__main__':
 
