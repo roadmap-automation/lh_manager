@@ -59,7 +59,6 @@ def UpdateSample() -> Response:
 
 @gui_blueprint.route('/GUI/ExplodeSample/', methods=['POST'])
 @trigger_samples_update
-@trigger_sample_status_update
 def ExplodeSample() -> Response:
     """Explodes an existing sample"""
     data = request.get_json(force=True)
@@ -79,6 +78,27 @@ def ExplodeSample() -> Response:
     """ exploding sample """
     sample.stages[stage].explode(layout)
     return make_response({'sample exploded': id}, 200)
+
+@gui_blueprint.route('/GUI/RemoveSample/', methods=['POST'])
+@trigger_samples_update
+def RemoveSample() -> Response:
+    """Deletes an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't delete")
+        return make_response({'error': "no id in sample, can't delete"}, 200)
+
+    sample_index, sample = samples.getSampleById(id)
+    print(data, sample)
+    if sample is None or sample_index is None:
+        """ sample not found """
+        return make_response({'error': "sample not found, can't delete"}, 200)
+    else:
+        """ archive sample """
+        samples.deleteSample(sample)
+        return make_response({'sample removed': id}, 200)
 
 @gui_blueprint.route('/GUI/ArchiveandRemoveSample/', methods=['POST'])
 @trigger_samples_update
