@@ -305,11 +305,24 @@ export async function refreshMethodDefs() {
   console.log({methods});
 }
 
-export function remove_sample(id) {
-  const idx_to_remove = samples.value.findIndex((s) => s.id == id);
-  if (idx_to_remove != null) {
-    samples.value.splice(idx_to_remove, 1);
-  }
+export async function remove_sample(sample_id: string) {
+  const update_result = await fetch("/GUI/RemoveSample/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({id: sample_id})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function duplicate_sample(sample_id: string) {
+  const update_result = await fetch("/GUI/DuplicateSample/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({id: sample_id})
+  });
+  const response_body = await update_result.json();
+  return response_body;
 }
 
 export async function refreshComponents() {
