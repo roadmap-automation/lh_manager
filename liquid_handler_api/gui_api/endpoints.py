@@ -57,6 +57,29 @@ def UpdateSample() -> Response:
         samples.samples[sample_index] = new_sample
         return make_response({'sample updated': id}, 200)
 
+@gui_blueprint.route('/GUI/ExplodeSample/', methods=['POST'])
+@trigger_samples_update
+@trigger_sample_status_update
+def ExplodeSample() -> Response:
+    """Explodes an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't explode")
+        return make_response({'error': "no id in sample, can't explode"}, 200)
+    
+    stage = data.get("stage", None)
+    if stage is None:
+        warnings.warn("no stage specified, can't explode")
+        return make_response({'error': "no stage specified, can't explode"}, 200)
+
+    _, sample = samples.getSampleById(id)
+    print(data, sample)
+    """ exploding sample """
+    sample.stages[stage].explode(layout)
+    return make_response({'sample exploded': id}, 200)
+
 @gui_blueprint.route('/GUI/ArchiveandRemoveSample/', methods=['POST'])
 @trigger_samples_update
 def ArchiveandRemoveSample() -> Response:

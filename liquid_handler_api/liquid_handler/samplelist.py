@@ -87,8 +87,9 @@ class MethodList:
             layout (LHBedLayout): layout to use to generate exploded methods
         """
 
-        self.prepare_run_methods(layout)
-        self.methods = self.run_methods
+        #self.prepare_run_methods(layout)
+        new_methods = [m.get_methods(layout) for m in self.methods]
+        self.methods = new_methods
 
     def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
         """Executes all methods. Used for dry running. Returns list of
