@@ -79,6 +79,36 @@ def ExplodeSample() -> Response:
     sample.stages[stage].explode(layout)
     return make_response({'sample exploded': id}, 200)
 
+@gui_blueprint.route('/GUI/DuplicateSample/', methods=['POST'])
+@trigger_samples_update
+def DuplicateSample() -> Response:
+    """Duplicates an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't duplicate")
+        return make_response({'error': "no id in sample, can't duplicate"}, 200)
+
+    sample_index, sample = samples.getSampleById(id)
+    print(data, sample)
+    if sample is None or sample_index is None:
+        """ sample not found """
+        return make_response({'error': "sample not found, can't duplicate"}, 200)
+    else:
+        """ archive sample """
+        new_sample_data = asdict(sample)
+        new_sample_data['id'] = None
+
+        # add "copy" until the name is unique:
+        while samples.getSamplebyName(new_sample_data['name']) is not None:
+            new_sample_data['name'] = new_sample_data['name'] + ' copy'
+
+        new_sample = Sample(**new_sample_data)
+        samples.samples.insert(sample_index + 1, new_sample)
+
+        return make_response({'sample duplicated': new_sample.id}, 200)
+
 @gui_blueprint.route('/GUI/RemoveSample/', methods=['POST'])
 @trigger_samples_update
 def RemoveSample() -> Response:
