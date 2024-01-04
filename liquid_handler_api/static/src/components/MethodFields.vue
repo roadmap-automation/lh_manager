@@ -167,7 +167,7 @@ function activateSelector({name, type}) {
         </div>
       </td>
       <td v-if="param.type === '#/definitions/TransferMethod' || param.type === '#/definitions/MixMethod' || param.type === '#/definitions/InjectMethod'">
-        <select v-model="param.value.method_name" @change="send_changes(param)">
+        <select v-model="param.value.method_name" @change="param.value = {method_name: param.value.method_name}; send_changes(param)">
             <option v-for="mname of get_template_names(param.type, param.schema)" >
               {{ mname }}</option>
         </select>
