@@ -112,6 +112,10 @@ function activateSelector({name, type}) {
         <input class="number px-1 py-0" v-model.number="param.value" :name="`param_${param.name}`"
           @keydown.enter="send_changes(param)" @blur="send_changes(param)" />
       </td>
+      <td v-if="param.type === 'string'">
+        <input class="string" v-model="param.value" :name="`param_${param.name}`"
+          @keydown.enter="send_changes(param)" @blur="send_changes(param)" />
+      </td>
       <td v-if="param.type === 'boolean'">
         <input type="checkbox" v-model="param.value" :name="`param_${param.name}`" @change="send_changes(param)" />
       </td>
