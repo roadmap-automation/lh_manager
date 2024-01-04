@@ -6,7 +6,7 @@ from flask import make_response, request, Response
 from typing import List, Tuple, Optional
 
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.samplelist import Sample, StageName
+from ..liquid_handler.samplelist import Sample, StageName, SampleStatus, MethodList
 from ..liquid_handler.methods import method_manager
 from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
@@ -81,6 +81,7 @@ def ExplodeSample() -> Response:
 
 @gui_blueprint.route('/GUI/DuplicateSample/', methods=['POST'])
 @trigger_samples_update
+@trigger_sample_status_update
 def DuplicateSample() -> Response:
     """Duplicates an existing sample"""
     data = request.get_json(force=True)
@@ -96,15 +97,21 @@ def DuplicateSample() -> Response:
         """ sample not found """
         return make_response({'error': "sample not found, can't duplicate"}, 200)
     else:
-        """ archive sample """
-        new_sample_data = asdict(sample)
-        new_sample_data['id'] = None
+        """ duplicate sample, resetting all statuses """
+        new_sample = deepcopy(sample)
 
-        # add "copy" until the name is unique:
-        while samples.getSamplebyName(new_sample_data['name']) is not None:
-            new_sample_data['name'] = new_sample_data['name'] + ' copy'
+        # generate new unique ID
+        new_sample.generate_new_id()
 
-        new_sample = Sample(**new_sample_data)
+        # make sure sample name is unique
+        while samples.getSamplebyName(new_sample.name) is not None:
+            new_sample.name = new_sample.name + ' copy'
+
+        # reset method lists and statuses
+        for key, mlist in new_sample.stages.items():
+            new_sample.stages[key] = MethodList(methods=mlist.methods)
+
+        # add to sample list immediately after the duplicated sample
         samples.samples.insert(sample_index + 1, new_sample)
 
         return make_response({'sample duplicated': new_sample.id}, 200)
