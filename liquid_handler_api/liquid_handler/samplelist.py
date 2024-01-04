@@ -88,7 +88,7 @@ class MethodList:
         """
 
         #self.prepare_run_methods(layout)
-        new_methods = [m.get_methods(layout) for m in self.methods]
+        new_methods = [im for m in self.methods for im in m.get_methods(layout)]
         self.methods = new_methods
 
     def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
