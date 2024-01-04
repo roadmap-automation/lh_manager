@@ -139,7 +139,6 @@ class SerialDilutionInject(SerialDilution):
     method_name: Literal['SerialDilutionInject'] = 'SerialDilutionInject'
     display_name: Literal['Serial Dilution with Injection'] = 'Serial Dilution with Injection'
     inject_template: InjectMethod = field(default_factory=InjectWithRinse)
-    inject_immediately: bool = True
 
     def __post_init__(self):
         for attr_name in ('mix_template', 'transfer_template', 'inject_template'):
@@ -163,14 +162,8 @@ class SerialDilutionInject(SerialDilution):
                 new_inject.Volume = volume
                 inject_methods.append([new_inject])
 
-            # if inject_immediately, interleave inject methods with transfer and mix methods;
-            #    otherwise lump them all at the end.
-            if self.inject_immediately:
-                nested_methods = [tm + mm + im for tm, mm, im in zip(transfer_methods, mix_methods, inject_methods)]
-                
-            else:
-                nested_methods = [tm + mm for tm, mm in zip(transfer_methods, mix_methods)] + inject_methods
-
+            # make everything first, then inject in reverse order
+            nested_methods = [tm + mm for tm, mm in zip(transfer_methods, mix_methods)] + inject_methods[::-1]
 
             methods = [item for mlist in nested_methods for item in mlist]
 

@@ -135,7 +135,11 @@ class Sample:
     def __post_init__(self) -> None:
 
         if self.id is None:
-            self.id = str(uuid4())
+            self.generate_new_id()
+
+    def generate_new_id(self) -> None:
+
+        self.id = str(uuid4())
 
     def get_LH_ids(self) -> list[int | None]:
 
