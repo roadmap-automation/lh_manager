@@ -131,6 +131,7 @@ class InjectWithRinseSync(InjectMethod):
                          layout: LHBedLayout) -> List[BaseMethod.lh_method]:
         
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
@@ -144,7 +145,7 @@ class InjectWithRinseSync(InjectMethod):
             Extra_Volume=f'{self.Extra_Volume}',
             Air_Gap=f'{self.Air_Gap}',
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-            Tag_Name=self.Tag_Name,
+            Tag_Name=self.Tag_Name + ' ' + repr(well.composition),
             Record_Time=f'{self.Record_Time}',
             Equilibration_Time=f'{self.Equilibration_Time}'
         )]
@@ -195,6 +196,7 @@ class InjectDoubleSync(InjectMethod):
                          layout: LHBedLayout) -> List[BaseMethod.lh_method]:
         
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
@@ -210,7 +212,7 @@ class InjectDoubleSync(InjectMethod):
             Extra_Volume=f'{self.Extra_Volume}',
             Air_Gap=f'{self.Air_Gap}',
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-            Tag_Name=self.Tag_Name,
+            Tag_Name=self.Tag_Name + ' ' + repr(well.composition),
             Record_Time=f'{self.Record_Time}',
             Equilibration_Time=f'{self.Equilibration_Time}'
         )]
