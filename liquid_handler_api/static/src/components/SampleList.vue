@@ -4,7 +4,7 @@ import Modal from 'bootstrap/js/src/modal';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
 // import { socket_emit } from '../store.ts';
-import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample, remove_sample, duplicate_sample } from '../store';
+import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample, remove_sample, duplicate_sample, explode_stage } from '../store';
 import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
 
 const emit = defineEmits(['update_sample']);
@@ -137,11 +137,20 @@ const status_class_map: {[status in StatusType]: string} = {
         <div v-if="sindex === active_sample_index" class="accordion-body py-0">
           <div v-for="(stage, stage_name) of sample.stages">
             <h6 :class="status_class_map[sample_status?.[sample.id]?.[stage_name]?.status ?? 'inactive']">{{ stage_name }}:
+              <button
+                v-if="sample_status?.[sample.id]?.stages?.[stage_name]?.status === 'inactive'"
+                type="button"
+                class="btn-close btn-sm align-middle expand-up-down"
+                aria-label="explode"
+                title="explode"
+                @click.stop="explode_stage(sample, stage_name)">
+              </button>
               <button 
                 v-if="sample_status?.[sample.id]?.stages?.[stage_name]?.status === 'inactive'"
                 type="button"
                 class="btn-close btn-sm align-middle start"
                 aria-label="Run stage"
+                title="Run stage"
                 @click.stop="run_stage(sample, [stage_name])">
               </button>
             </h6>
@@ -207,6 +216,6 @@ const status_class_map: {[status in StatusType]: string} = {
 }
 
 .btn-close.expand-up-down {
-  background-image: url('data:image/svg+xml,<svg fill="#000000" height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xml:space="preserve"><g><g><g><path d="M199.541,365.792c-4.237-4.093-10.99-3.976-15.083,0.262c-3.993,4.134-3.993,10.687,0,14.821l64,64c4.157,4.174,10.911,4.187,15.085,0.03c0.01-0.01,0.02-0.02,0.03-0.03l64-64c4.093-4.237,3.976-10.99-0.261-15.083c-4.134-3.993-10.688-3.993-14.821,0l-45.824,45.792V100.416l45.792,45.792c4.237,4.093,10.99,3.976,15.083-0.262c3.993-4.134,3.993-10.687,0-14.821l-64-64c-4.157-4.174-10.911-4.187-15.085-0.03c-0.01,0.01-0.02,0.02-0.03,0.03l-64,64c-4.093,4.237-3.975,10.99,0.262,15.083c4.134,3.992,10.687,3.992,14.82,0l45.824-45.792v311.168L199.541,365.792z"/><path d="M394.667,490.667H117.333c-5.891,0-10.667,4.776-10.667,10.667S111.442,512,117.333,512h277.333c5.891,0,10.667-4.776,10.667-10.667S400.558,490.667,394.667,490.667z"/><path d="M117.333,21.333h277.333c5.891,0,10.667-4.776,10.667-10.667C405.333,4.776,400.558,0,394.667,0H117.333c-5.891,0-10.667,4.776-10.667,10.667C106.667,16.558,111.442,21.333,117.333,21.333z"/></g></g></g></svg>')
+  background-image: url('data:image/svg+xml,<svg height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xml:space="preserve"><g><g><g><path d="M199.541,365.792c-4.237-4.093-10.99-3.976-15.083,0.262c-3.993,4.134-3.993,10.687,0,14.821l64,64c4.157,4.174,10.911,4.187,15.085,0.03c0.01-0.01,0.02-0.02,0.03-0.03l64-64c4.093-4.237,3.976-10.99-0.261-15.083c-4.134-3.993-10.688-3.993-14.821,0l-45.824,45.792V100.416l45.792,45.792c4.237,4.093,10.99,3.976,15.083-0.262c3.993-4.134,3.993-10.687,0-14.821l-64-64c-4.157-4.174-10.911-4.187-15.085-0.03c-0.01,0.01-0.02,0.02-0.03,0.03l-64,64c-4.093,4.237-3.975,10.99,0.262,15.083c4.134,3.992,10.687,3.992,14.82,0l45.824-45.792v311.168L199.541,365.792z"/><path d="M394.667,490.667H117.333c-5.891,0-10.667,4.776-10.667,10.667S111.442,512,117.333,512h277.333c5.891,0,10.667-4.776,10.667-10.667S400.558,490.667,394.667,490.667z"/><path d="M117.333,21.333h277.333c5.891,0,10.667-4.776,10.667-10.667C405.333,4.776,400.558,0,394.667,0H117.333c-5.891,0-10.667,4.776-10.667,10.667C106.667,16.558,111.442,21.333,117.333,21.333z"/></g></g></g></svg>')
 }
 </style>

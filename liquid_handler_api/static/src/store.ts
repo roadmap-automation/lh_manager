@@ -255,6 +255,17 @@ export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep
   return response_body;
 }
 
+export async function explode_stage(sample_obj: Sample, stage: StageName): Promise<object> {
+  const { id } = sample_obj;
+  const data = { id, stage };
+  const update_result = await fetch("/GUI/ExplodeSample/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
 
 export async function refreshLayout() {
   const new_layout = await (await fetch("/GUI/GetLayout/")).json();
