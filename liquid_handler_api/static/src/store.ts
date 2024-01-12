@@ -170,6 +170,33 @@ export function update_method(sample_id: string, stage_name: StageName, method_i
   }
 }
 
+export function get_number_of_methods(sample_id: string, stage_name: StageName) {
+    const sample = get_sample_by_id(sample_id);
+    if (sample !== undefined) {
+      const s: Sample = structuredClone(toRaw(sample));
+      const { stages } = s;
+      const stage = stages[stage_name];
+      return stage.methods.length
+    }
+    
+    return 0
+  }
+
+export function move_method(sample_id: string, stage_name: StageName, method_index: number, new_index: number) {
+    const sample = get_sample_by_id(sample_id);
+    if (sample !== undefined) {
+      const s: Sample = structuredClone(toRaw(sample));
+      const { stages } = s;
+      const stage = stages[stage_name];
+      if (new_index >= 0 && new_index < stage.methods.length) {
+        var deleted_method = stage.methods.splice(method_index, 1);
+        stage.methods.splice(new_index, 0, deleted_method[0])
+        update_sample(s);
+        active_method_index.value = new_index
+      }
+    }
+  }
+
 export function remove_method(sample_id: string, stage_name: StageName, method_index: number) {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {
