@@ -12,8 +12,8 @@ class Zone(str, Enum):
 # Physical racks that are present
 racks={'Solvent': {'columns': 3, 'rows': 1, 'max_volume': 700.0, 'style': 'grid'},
        'Samples': {'columns': 4, 'rows': 15, 'max_volume': 2, 'style': 'grid'},
-       'Stock':   {'columns': 2, 'rows': 7, 'max_volume': 20, 'style': 'grid'},
-       'Mix':     {'columns': 4, 'rows': 20, 'max_volume': 9, 'style': 'staggered'},
+       'Stock':   {'columns': 2, 'rows': 7, 'max_volume': 40, 'style': 'grid'},
+       'Mix':     {'columns': 4, 'rows': 20, 'max_volume': 8.5, 'style': 'staggered'},
        'MTPlateTop': {'columns': 8, 'rows': 12, 'max_volume': 0.28, 'style': 'grid'},
        'MTPlateBottom': {'columns': 8, 'rows': 12, 'max_volume': 0.28, 'style': 'grid'},
     }
