@@ -123,7 +123,7 @@ def PutSampleData():
         return make_response({'error': 'no active jobs'}, 200)
     if sample_id != job.LH_id:
         return make_response({'error': f'PutSampleData job ID {sample_id} does not match active job ID {job.LH_id}'}, 200)
-    if job.samplelist['columns'][method_number]['METHODNAME'] != method_name
+    if job.samplelist['columns'][method_number]['METHODNAME'] != method_name:
         return make_response({'error': f'PutSampleData method name {method_name} does not match corresponding method name {job.samplelist['columns']['METHODNAME']}'}, 200)
 
     job.results.append(data)
