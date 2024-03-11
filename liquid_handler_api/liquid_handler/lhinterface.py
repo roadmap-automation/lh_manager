@@ -32,10 +32,11 @@ class InterfaceStatus(str, Enum):
 class LHJob:
     """Container for a single liquid handler sample list"""
     id: str
-    LH_id: int
     samplelist: dict
+    LH_id: int | None = None
     validation: dict = field(default_factory=dict)
     results: list = field(default_factory=list)
+    estimated_times: List[float] = field(default_factory=list)
     
     def get_validation_status(self) -> Tuple[ValidationStatus, dict | None]:
         """Returns true if validation exists """
@@ -53,19 +54,30 @@ class LHJob:
         if not len(self.results):
             return ResultStatus.EMPTY
         
+        results = self.get_results()
+
         # check for any failures in existing results
-        if any([('completed successfully' not in notification)
-                for result in self.results
-                for notification in result['sampleData']['resultNotifications']['notifications'].values()]):
-            
+        if ResultStatus.FAIL in results:
             return ResultStatus.FAIL
 
         # check for incomplete results (should be one per method in columns)
-        if len(self.results) < len(self.samplelist['columns']):
+        if ResultStatus.INCOMPLETE in results:
             return ResultStatus.INCOMPLETE
         
         # if all checks pass, we were successful
         return ResultStatus.SUCCESS
+    
+    def get_number_of_methods(self) -> int:
+        return len(self.samplelist['columns'])
+
+    def get_results(self) -> List[ResultStatus]:
+        results = [ResultStatus.SUCCESS if ('completed successfully' in notification) else ResultStatus.FAIL
+                for result in self.results
+                for notification in result['sampleData']['resultNotifications']['notifications'].values()]
+        
+        results += [ResultStatus.INCOMPLETE for _ in range(self.get_number_of_methods() - len(self.results))]
+
+        return results
     
     def get_samplelist(self, listonly=False) -> dict:
         """Gets the sample list formatted for Gilson LH.
