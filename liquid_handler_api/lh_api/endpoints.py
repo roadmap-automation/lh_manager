@@ -1,4 +1,6 @@
-"""Gilson Trilution LH 4.0 Endpoints"""
+"""Gilson Trilution LH 4.0 Endpoints
+
+    Designed to operate as an independent web interface; does not depend on sample list state"""
 from dataclasses import asdict
 from flask import make_response, Response, request
 
@@ -8,8 +10,7 @@ from ..sio import socketio
 from . import lh_blueprint
 
 def broadcast_job_update(job: LHJob) -> None:
-    """Sends signal with job ID. Clients can access /LH/GetJob to 
-        get the updated job information.
+    """Sends signal with job ID.
 
     Args:
         job (LHJob): job to be updated
@@ -25,9 +26,9 @@ def GetJob(job_id: str) -> Response:
         job = history.get_job_by_uuid(job_id)
 
     if job is not None:
-        return make_response({'success': asdict(job)})
+        return make_response({'success': asdict(job)}, 200)
     else:
-        return make_response({'error': f'job {job_id} does not exist'})
+        return make_response({'error': f'job {job_id} does not exist'}, 400)
 
 @lh_blueprint.route('/LH/SubmitJob/', methods=['POST'])
 def SubmitJob() -> Response:
@@ -36,7 +37,7 @@ def SubmitJob() -> Response:
 
     # Ensure lh_interface is ready to receive a job
     if lh_interface.get_status() != InterfaceStatus.UP:
-        return make_response({'error': 'job rejected, LH interface busy'})
+        return make_response({'error': 'job rejected, LH interface busy'}, 400)
 
     # attempt deserialization, raise error if it fails
     data = request.get_json(force=True)
@@ -44,13 +45,13 @@ def SubmitJob() -> Response:
     try:
         job = LHJob(**data)
     except:
-        return make_response({'error': 'job rejected, cannot be deserialized'})
+        return make_response({'error': 'job rejected, cannot be deserialized'}, 400)
 
     # activate the job
     lh_interface.activate_job(job)
     broadcast_job_update(job)
 
-    return make_response({'success': 'job accepted'})
+    return make_response({'success': 'job accepted'}, 200)
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:
@@ -77,9 +78,9 @@ def GetSampleList(sample_list_id: str) -> Response:
     """
     job = lh_interface.get_active_job()
     if job is None:
-        return make_response({'error': 'no active jobs'}, 200)
+        return make_response({'error': 'no active jobs'}, 400)
     if int(sample_list_id) != job.LH_id:
-        return make_response({'error': f'requested job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 200)
+        return make_response({'error': f'requested job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 400)
 
     sample_list = [job.get_samplelist(listonly=False)]
 
@@ -92,9 +93,9 @@ def PutSampleListValidation(sample_list_id):
     job = lh_interface.get_active_job()
 
     if job is None:
-        return make_response({'error': 'no active jobs'}, 200)
+        return make_response({'error': 'no active jobs'}, 400)
     if int(sample_list_id) != job.LH_id:
-        return make_response({'error': f'validation job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 200)
+        return make_response({'error': f'validation job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 400)
 
     job.validation = data
     lh_interface.update_job(job)
@@ -120,11 +121,11 @@ def PutSampleData():
     job = lh_interface.get_active_job()
 
     if job is None:
-        return make_response({'error': 'no active jobs'}, 200)
+        return make_response({'error': 'no active jobs'}, 400)
     if sample_id != job.LH_id:
-        return make_response({'error': f'PutSampleData job ID {sample_id} does not match active job ID {job.LH_id}'}, 200)
+        return make_response({'error': f'PutSampleData job ID {sample_id} does not match active job ID {job.LH_id}'}, 400)
     if job.samplelist['columns'][method_number]['METHODNAME'] != method_name:
-        return make_response({'error': f'PutSampleData method name {method_name} does not match corresponding method name {job.samplelist['columns']['METHODNAME']}'}, 200)
+        return make_response({'error': f'PutSampleData method name {method_name} does not match corresponding method name {job.samplelist['columns']['METHODNAME']}'}, 400)
 
     job.results.append(data)
     lh_interface.update_job(job)
