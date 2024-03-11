@@ -11,7 +11,7 @@ from ..liquid_handler.methods import method_manager
 from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
-from ..liquid_handler.lhqueue import LHqueue, RunQueue
+from ..liquid_handler.lhqueue import LHqueue, JobQueue
 from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update
 from . import gui_blueprint
 
@@ -27,7 +27,7 @@ def AddSample() -> Response:
 
     # dry run (testing only)
     test_layout = deepcopy(layout)
-    for method in new_sample.stages[StageName.PREP].get_methods(test_layout):
+    for method in new_sample.stages[StageName.PREP].methods:
         method.execute(test_layout)
 
     return make_response({'new sample': new_sample.toSampleList(StageName.PREP, test_layout), 'layout': asdict(test_layout)}, 200)
@@ -188,9 +188,9 @@ def UpdateRunQueue() -> Response:
 
     data = request.get_json(force=True)
     assert isinstance(data, dict)
-    new_queue = RunQueue(**data)
+    new_queue = JobQueue(**data)
     with LHqueue.lock:
-        LHqueue.stages = new_queue.stages
+        LHqueue.jobs = new_queue.jobs
 
     return make_response({'run queue updated': None}, 200)
 

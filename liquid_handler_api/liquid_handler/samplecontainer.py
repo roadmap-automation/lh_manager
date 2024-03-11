@@ -5,7 +5,8 @@ from .history import History
 from .samplelist import Sample, StageName, SampleStatus
 from .bedlayout import LHBedLayout
 from .dryrun import DryRunQueue
-from .items import Item, MethodError
+from .items import Item
+from .error import MethodError
 
 @dataclass
 class SampleContainer:
@@ -22,16 +23,6 @@ class SampleContainer:
     def _getNames(self) -> list[str]:
 
         return [s.name for s in self.samples]
-
-    def getSampleStagebyLH_ID(self, id: int) -> Tuple[Sample | None, StageName | None]:
-        """Return sample with specific id"""
-
-        for sample in self.samples:
-            if id in sample.get_LH_ids():
-                return sample, sample.getStageByID(id)
-
-        return None, None
-        #raise ValueError(f"Sample ID {id} not found!")
 
     def getSampleById(self, id: str) -> Tuple[int, Sample] | Tuple[None, None]:
         return next(((i,s) for i,s in enumerate(self.samples) if s.id == id), (None, None))

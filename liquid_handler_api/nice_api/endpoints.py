@@ -5,13 +5,13 @@ from flask import make_response, Response, request
 from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.items import Item
+from ..liquid_handler.items import Item, StageName
 from ..liquid_handler.history import History
 from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
 from . import nice_blueprint
 
-def _run_sample(data) -> Response:
+def _run_sample(data: dict) -> Response:
     """ Generic function for processing a run request"""
 
     if 'id' in data:
@@ -26,10 +26,18 @@ def _run_sample(data) -> Response:
             if sample.stages[stage].status != SampleStatus.INACTIVE:
                 return make_response({'result': 'error', 'message': f'stage {stage} of sample {data["name"]} is not inactive'}, 400)
             
-            # create new run command specific to stage and add to queue
-            #stagedata = {**data, 'stage': [stage]}
-            LHqueue.put_safe(Item(sample.id, stage, data))
-            LHqueue.run_next()
+            # only if an injection operation, set sample NICE_uuid and NICE_slotID
+            if data['stage'] == StageName.INJECT:
+                sample.NICE_uuid = data.get('uuid', None)
+                slot_id = data.get('slotID', 0)
+                sample.NICE_slotID = int(slot_id) if slot_id is not None else None
+
+            # submit everything
+            sample.stages[stage].prepare_run_methods(layout, name=sample.name, description=sample.description)
+            sample.stages[stage].status = SampleStatus.PENDING
+            print(sample.stages[stage].run_methods)
+            for job in sample.stages[stage].run_methods.values():
+                LHqueue.submit(job)
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 
@@ -71,10 +79,10 @@ def RunSamplewithUUID() -> Response:
 def _getActiveSample() -> str:
     """Gets the currently active sample with the earliest createdDate."""
 
-    active_sample = LHqueue.active_sample
+    active_job = LHqueue.active_job
 
-    if active_sample is not None:
-        return samples.getSampleById(active_sample.id)[1].name
+    if active_job is not None:
+        return samples.getSampleById(active_job.parent.id)[1].name
 
     return ''
 
@@ -175,7 +183,7 @@ def Stop() -> Response:
         TODO: Remove GET for production"""
 
     with LHqueue.lock:
-        init_size = len(LHqueue.stages)
+        init_size = len(LHqueue.jobs)
 
     LHqueue.stop()
 
@@ -188,6 +196,8 @@ def Inactivate() -> Response:
     """Stops operation by emptying liquid handler queue.
     
         Ignores request data."""
+
+    # TODO: Figure out what to do here.
 
     active_stage_list = [sample.stages[stage_name] for sample in samples.samples for stage_name in sample.stages if sample.stages[stage_name].status in (SampleStatus.ACTIVE, SampleStatus.PENDING)]
     for stage in active_stage_list:

@@ -3,11 +3,17 @@ import copy
 import json
 import sqlite3
 
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Tuple
 from dataclasses import asdict, field
 from pydantic.v1.dataclasses import dataclass
+
+from .methods import BaseMethod
+from .items import Item
+
+DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 LH_JOB_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'lh_jobs.sqlite'
 
@@ -29,6 +35,19 @@ class InterfaceStatus(str, Enum):
     ERROR = 'error'
 
 @dataclass
+class SampleList:
+    """Class representing a sample list in JSON
+        serializable format for Gilson Trilution LH Web Service """
+    name: str
+    id: str | None
+    createdBy: str
+    description: str
+    createDate: str
+    startDate: str
+    endDate: str
+    columns: list[BaseMethod.lh_method] | None
+
+@dataclass
 class LHJob:
     """Container for a single liquid handler sample list"""
     id: str
@@ -37,6 +56,7 @@ class LHJob:
     validation: dict = field(default_factory=dict)
     results: list = field(default_factory=list)
     estimated_times: List[float] = field(default_factory=list)
+    parent: Item | None = None
     
     def get_validation_status(self) -> Tuple[ValidationStatus, dict | None]:
         """Returns true if validation exists """
@@ -68,7 +88,10 @@ class LHJob:
         return ResultStatus.SUCCESS
     
     def get_number_of_methods(self) -> int:
-        return len(self.samplelist['columns'])
+        if self.samplelist['columns'] is None:
+            return 0
+        else:
+            return len(self.samplelist['columns'])
 
     def get_results(self) -> List[ResultStatus]:
         results = [ResultStatus.SUCCESS if ('completed successfully' in notification) else ResultStatus.FAIL
@@ -131,13 +154,12 @@ class LHJobHistory:
         Args:
             job (LHJob): liquid handler job to update or insert into the history
         """
-
         res = self.db.execute(f"""\
-            INSERT INTO {self.table_name}(uuid, LH_id, job) VALUES (?, ?)
+            INSERT INTO {self.table_name}(uuid, LH_id, job) VALUES (?, ?, ?)
             ON CONFLICT(uuid) DO UPDATE SET 
               LH_id=excluded.LH_id,
               job=excluded.job;
-        """, (job.id, json.dumps(asdict(job))))
+        """, (job.id, job.LH_id, json.dumps(asdict(job))))
         
         self.db.commit()
 
@@ -239,7 +261,10 @@ class LHInterface:
         
         # assign new ID
         job.LH_id = max_LH_id + 1
-        job.samplelist['LH_id'] = job.LH_id
+        job.samplelist['id'] = job.LH_id
+
+        # set created date
+        job.samplelist['createDate'] = datetime.now().strftime(DATE_FORMAT)
         
         # activate job
         self._active_job = job

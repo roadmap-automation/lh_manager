@@ -1,12 +1,13 @@
 """Internal queue for feeding LH operations one at a time"""
+from typing import Dict, Callable, List
 from threading import Lock
+from dataclasses import field
 from pydantic.v1.dataclasses import dataclass
 from datetime import datetime
 
 from .state import samples
-from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
-from .dryrun import DryRunQueue
-from .items import Item
+from .samplelist import SampleStatus
+from .lhinterface import LHJob, ResultStatus, ValidationStatus, lh_interface
 
 def validate_format(data: dict) -> bool:
     """Checks format of data input"""
@@ -14,106 +15,85 @@ def validate_format(data: dict) -> bool:
     return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
 
 @dataclass
-class RunQueue(DryRunQueue):
+class JobQueue:
+    """Hub for interfacing (upstream) samples object to (downstream) running of jobs.
+        Use submit_callbacks to link submission to downstream activities. Also provides
+        an interface for the upstream objects based on validation and run results"""
 
-    running: bool = True
-    active_sample: Item | None = None
+    jobs: Dict[str, LHJob] = field(default_factory=dict)
+    # all jobs that have been submitted
 
     def __post_init__(self) -> None:
-
+        
         self.lock = Lock()
+        self.active_job: LHJob | None = None
+        self.submit_callbacks: List[Callable] = []
 
-    def pause(self):
-        """Pauses operations
-        """
+        # TODO: Reconstruct from history (find all pending samples??)
 
-        self.running = False
-
-    def resume(self):
-        """Resumes operations"""
-
-        self.running = True
-
-    def put_safe(self, item: Item) -> None:
-        """Safe put that ignores duplicate requests.
+    def submit(self, job: LHJob, force=False) -> None:
+        """Safe put that ignores duplicate requests unless force is False
         
             Important for handling NICE stop/pause/restart requests"""
 
         with self.lock:
-            if item not in self.stages:
-                _, sample = samples.getSampleById(item.id)
-                sample.stages[item.stage].status = SampleStatus.PENDING
-                self.stages.append(item)
+            if not (job.id in self.jobs.keys()) | force:
 
-    def put_first(self, item: Item) -> None:
-        """Safe put that ignores duplicate requests.
-        
-            Important for handling NICE stop/pause/restart requests"""
+                self.jobs[job.id] = job
 
+                # route the job appropriately, e.g. self.submit_callbacks.append(lh_interface.activate_job)
+                for callback in self.submit_callbacks:
+                    callback(job)
+
+                #lh_interface.activate_job(job)
+
+    def update_job(self, job: LHJob) -> None:
+        """Update job; if it's successful, remove from active list; otherwise,
+            update sample stage status
+
+        Args:
+            job (LHJob): job to update
+        """
         with self.lock:
-            if item not in self.stages:
-                _, sample = samples.getSampleById(item.id)
-                sample.stages[item.stage].status = SampleStatus.PENDING
-                self.stages.insert(0, item)
+            # update local copy
+            self.jobs[job.id] = job
 
-    def stop(self) -> int:
-        """Empties queue and resets status of incomplete methods to INACTIVE"""
+            # update samples copy
+            _, sample = samples.getSampleById(job.id)
+            sample.stages[job.parent.stage].run_methods[job.id] = job
 
-        with self.lock:
-            while len(self.stages):
-                data = self.stages.pop(0)
-                _, sample = samples.getSampleById(data.id)
-                
-                # reset status of sample stage to INACTIVE
-                sample.stages[data.stage].status = SampleStatus.INACTIVE
+            if job.get_result_status() == ResultStatus.SUCCESS:
+                self.jobs.pop(job.id)
+                sample.stages[job.parent.stage].update_status()
+                self.clear_active_job()
+                return
+            elif job.get_result_status() == ResultStatus.FAIL:
+                self.jobs.pop(job.id)
+                sample.stages[job.parent.stage].status = SampleStatus.FAILED
+                self.clear_active_job()
+                return
+            # NOTE: if ResultStatus.INCOMPLETE, don't do anything
+            elif job.get_result_status() == ResultStatus.EMPTY:
+                if job.get_validation_status() == ValidationStatus.SUCCESS:
+                    sample.stages[job.parent.stage].status = SampleStatus.ACTIVE
+                    self.active_job = job
+                elif job.get_validation_status() == ValidationStatus.FAIL:
+                    sample.stages[job.parent.stage].status = SampleStatus.FAILED
+                else:
+                    print('Received ValidationStatus.UNVALIDATED; this should not happen')
 
-            self.clear_active_sample()
-
-    def run_next(self) -> None:
-        """Runs next item in queue if queue is not busy and there are items to run.
-        Otherwise, does nothing"""
-
-        if self.running:
-            with self.lock:
-                # if there is something to run and there is no active sample
-                if len(self.stages) & (self.active_sample is None):
-                    # get next item in queue
-                    item = self.stages.pop(0)
-
-                    # get sample name
-                    # NOTE: checks for inactivity, etc. are done when the sample is enqueued.
-                    # If anything has changed in the meantime, it will not be captured here
-                    _, sample = samples.getSampleById(item.id)
-
-                    # set stage status to active, set date activated, give LH_id
-                    methodlist = sample.stages[item.stage]
-                    methodlist.status = SampleStatus.ACTIVE
-                    methodlist.createdDate = datetime.now().strftime(DATE_FORMAT)
-
-                    # set ID equal to max id and increment by 1
-                    methodlist.LH_id = samples.max_LH_id + 1
-                    samples.max_LH_id += 1
-
-                    # only if an injection operation, set sample NICE_uuid and NICE_slotID
-                    if item.stage == StageName.INJECT:
-                        sample.NICE_uuid = item.data.get('uuid', None)
-                        slot_id = item.data.get('slotID', 0)
-                        sample.NICE_slotID = int(slot_id) if slot_id is not None else None
-
-                    self.active_sample = item
-
-    def clear_active_sample(self) -> None:
-        """Clears the active sample
+    def clear_active_job(self) -> None:
+        """Clears the active job
         """
 
-        self.active_sample = None
+        self.active_job = None
 
     def repr_queue(self) -> str:
         """Provides a string representation of the queue"""
 
-        return '\n'.join(': '.join((str(i), repr(item))) for i, item in enumerate(self.stages))
+        return '\n'.join(': '.join((str(i), repr(item))) for i, item in enumerate(self.jobs))
 
 
 ## ========== Liquid handler queue initialization ============
 
-LHqueue = RunQueue()
+LHqueue = JobQueue()

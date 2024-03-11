@@ -5,7 +5,7 @@ from copy import copy
 from typing import Dict, List, Literal, Union, Set
 from .bedlayout import LHBedLayout, WellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .items import MethodError
+from .error import MethodError
 
 EXCLUDE_FIELDS = set(["method_name", "display_name", "complete", "method_type"])
 
@@ -436,6 +436,22 @@ class InjectWithRinse(InjectMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
+
+@register
+@dataclass
+class Release(BaseMethod):
+    """Special method that does nothing except "release" the liquid handler, i.e. signal to
+        the software that other higher priority methods can be inserted at this position and run in the interim.
+        
+        Basic usage is that groups of methods that need to be clustered are separated by this method, i.e.      
+        this method is used to separate the individual groups of methods into individual jobs."""
+    
+    display_name: Literal['---release---'] = '---release---'
+    method_name: Literal[''] = ''
+
+    @dataclass
+    class lh_method(BaseMethod.lh_method):
+        pass
 
 @register
 @dataclass
