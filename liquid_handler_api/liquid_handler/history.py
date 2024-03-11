@@ -24,7 +24,13 @@ class History:
     def __init__(self, database_path: str = SAMPLE_HISTORY) -> None:
         self.db_path = database_path
         self.db = None
+
+    def __enter__(self):
         self.open()
+        return self
+    
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.close()
 
     def open(self) -> None:
         db_exists = os.path.exists(self.db_path)

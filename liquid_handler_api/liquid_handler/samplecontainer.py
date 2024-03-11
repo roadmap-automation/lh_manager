@@ -65,9 +65,8 @@ class SampleContainer:
             sample (Sample): sample to archive
         """
 
-        history = History()
-        history.smart_insert(sample)
-        history.close()
+        with History() as history:
+            history.smart_insert(sample)
 
     def dryrun(self, layout: LHBedLayout) -> List[Tuple[Item, List[MethodError]]]:
         """Executes dry run of everything in the queue by copying the layout and

@@ -105,9 +105,8 @@ def GetMetaData(uuid) -> Response:
         # Get samples from history
         # NOTE: it may not be necessary to re-initialize historical data into Sample objects but
         # it makes the code cleaner.
-        history = History()
-        samples_history = history.get_samples_by_NICE_uuid(uuid)
-        history.close()
+        with History() as history:
+            samples_history = history.get_samples_by_NICE_uuid(uuid)
 
         # get currently active samples
         samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
