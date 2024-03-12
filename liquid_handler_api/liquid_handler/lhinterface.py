@@ -10,7 +10,6 @@ from typing import List, Tuple
 from dataclasses import asdict, field
 from pydantic.v1.dataclasses import dataclass
 
-from .methods import BaseMethod
 from .items import Item
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
@@ -45,7 +44,7 @@ class SampleList:
     createDate: str
     startDate: str
     endDate: str
-    columns: list[BaseMethod.lh_method] | None
+    columns: List[dict] | None
 
 @dataclass
 class LHJob:
@@ -55,9 +54,13 @@ class LHJob:
     LH_id: int | None = None
     validation: dict = field(default_factory=dict)
     results: list = field(default_factory=list)
-    estimated_times: List[float] = field(default_factory=list)
     parent: Item | None = None
-    
+
+    def __post_init__(self):
+
+        if isinstance(self.parent, dict):
+            self.parent = Item(**self.parent)
+
     def get_validation_status(self) -> Tuple[ValidationStatus, dict | None]:
         """Returns true if validation exists """
 
@@ -277,7 +280,7 @@ class LHInterface:
 
         self.update_history()
         self._active_job = None
-        
+
 lh_interface = LHInterface()
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ from dataclasses import field
 from pydantic.v1.dataclasses import dataclass
 from datetime import datetime
 
-from .state import samples
+from .state import samples, layout
 from .samplelist import SampleStatus
 from .lhinterface import LHJob, ResultStatus, ValidationStatus, lh_interface
 
@@ -47,7 +47,31 @@ class JobQueue:
 
                 #lh_interface.activate_job(job)
 
-    def update_job(self, job: LHJob) -> None:
+    def update_job_validation(self, job: LHJob, result: ValidationStatus) -> None:
+        """Handles an update to job validation
+
+        Args:
+            job (LHJob): job validated
+            result (ValidationStatus): result of validation
+        """
+
+        with self.lock:
+            _, sample = samples.getSampleById(job.parent.id)
+            self.jobs[job.id] = job
+            sample.stages[job.parent.stage].run_jobs[job.id].job = job
+
+            if result == ValidationStatus.SUCCESS:
+                sample.stages[job.parent.stage].status = SampleStatus.ACTIVE
+                self.active_job = job
+            elif result == ValidationStatus.FAIL:
+                sample.stages[job.parent.stage].status = SampleStatus.FAILED
+                # TODO: Handle error condition
+            elif result == ValidationStatus.UNVALIDATED:
+                print('Received ValidationStatus.UNVALIDATED; this should not happen')
+            else:
+                print(f'Received ValidationStatus {result}; this should not happen')
+
+    def update_job_result(self, job: LHJob, method_number: int, method_name: str, result: ResultStatus) -> None:
         """Update job; if it's successful, remove from active list; otherwise,
             update sample stage status
 
@@ -55,32 +79,31 @@ class JobQueue:
             job (LHJob): job to update
         """
         with self.lock:
-            # update local copy
-            self.jobs[job.id] = job
+            _, sample = samples.getSampleById(job.parent.id)
+            jobcontainer = sample.stages[job.parent.stage].run_jobs[job.id]
+            method = jobcontainer.methods[method_number]
 
-            # update samples copy
-            _, sample = samples.getSampleById(job.id)
-            sample.stages[job.parent.stage].run_methods[job.id] = job
+            assert method_name == method.method_name, f'Wrong method name {method_name} in result, expected {method.method_name}, full output {job}'
 
-            if job.get_result_status() == ResultStatus.SUCCESS:
+            # update local copies
+            jobcontainer.job = job
+
+            if result == ResultStatus.SUCCESS:
+                # if successful, remove from jobs and execute the method (thereby updating layout)
                 self.jobs.pop(job.id)
                 sample.stages[job.parent.stage].update_status()
+                method.execute(layout)
                 self.clear_active_job()
                 return
             elif job.get_result_status() == ResultStatus.FAIL:
+                # if failed, remove from jobs and updated parent status
+                # TODO: Handle errors here
                 self.jobs.pop(job.id)
                 sample.stages[job.parent.stage].status = SampleStatus.FAILED
                 self.clear_active_job()
                 return
-            # NOTE: if ResultStatus.INCOMPLETE, don't do anything
-            elif job.get_result_status() == ResultStatus.EMPTY:
-                if job.get_validation_status() == ValidationStatus.SUCCESS:
-                    sample.stages[job.parent.stage].status = SampleStatus.ACTIVE
-                    self.active_job = job
-                elif job.get_validation_status() == ValidationStatus.FAIL:
-                    sample.stages[job.parent.stage].status = SampleStatus.FAILED
-                else:
-                    print('Received ValidationStatus.UNVALIDATED; this should not happen')
+            else:
+                self.jobs[job.id] = job
 
     def clear_active_job(self) -> None:
         """Clears the active job

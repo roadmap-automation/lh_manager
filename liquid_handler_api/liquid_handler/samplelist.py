@@ -21,12 +21,27 @@ class SampleStatus(str, Enum):
     COMPLETED = 'completed'
 
 @dataclass
+class JobContainer:
+    """Container for an LHJob and the associated (unserialized) methods. Assists with keeping
+        track of job completion"""
+    job: LHJob
+    methods: List[MethodsType]
+
+    def __post_init__(self):
+        for i, method in enumerate(self.methods):
+            if isinstance(method, dict):
+                self.methods[i] = method_manager.get_method_by_name(method['method_name'])(**method)
+
+        if isinstance(self.job, dict):
+            self.job = LHJob(**self.job)
+    
+@dataclass
 class MethodList:
     """Class representing a list of methods representing one LH job. Can be nested
         in a single stage"""
     createdDate: str | None = None
     methods: List[MethodsType] = field(default_factory=list)
-    run_methods: Dict[str, LHJob] | None = None
+    run_jobs: Dict[str, JobContainer] | None = None
     status: SampleStatus = SampleStatus.INACTIVE
 
     def __post_init__(self):
@@ -34,6 +49,11 @@ class MethodList:
         for i, method in enumerate(self.methods):
             if isinstance(method, dict):
                 self.methods[i] = method_manager.get_method_by_name(method['method_name'])(**method)
+
+        if self.run_jobs is not None:
+            for k, v in self.run_jobs.items():
+                if isinstance(v, dict):
+                    self.run_jobs[k] = JobContainer(**v)
 
     def addMethod(self, method: MethodsType) -> None:
         """Adds new method"""
@@ -47,95 +67,22 @@ class MethodList:
             float: total estimated time in default time units
         """
 
-        if self.run_methods is None:
+        if self.run_jobs is None:
             return sum(m.estimated_time(layout) for m in self.methods)
         else:
-            return sum(t for job in self.run_methods.values() for t, complete in zip(job.estimated_times, job.get_results()) if (complete != ResultStatus.SUCCESS))
+            return sum(m.estimated_time(layout)
+                       for jobcontainer in self.run_jobs.values()
+                       for m, complete in zip(jobcontainer.methods, jobcontainer.job.get_results())
+                       if (complete != ResultStatus.SUCCESS))
 
     def update_status(self) -> None:
         """Updates status based on run_methods
         """
 
-        if self.run_methods is not None:
-            completion_status = [(complete == ResultStatus.SUCCESS) for job in self.run_methods.values() for complete in job.get_results()]
+        if self.run_jobs is not None:
+            completion_status = [(complete == ResultStatus.SUCCESS) for jobcontainer in self.run_jobs.values() for complete in jobcontainer.job.get_results()]
             if all(completion_status):
                 self.status = SampleStatus.COMPLETED
-
-    def prepare_run_methods(self, layout: LHBedLayout, name: str | None = None, description: str | None = None):
-        """Prepares the method list for running by populating run_methods and run_methods_complete.
-            List can then be used for dry or wet runs
-        """
-
-        def make_samplelist(method_list: List[MethodsType]) -> LHJob:
-            """Makes an LHJob from a list of methods"""
-
-            createdDate = datetime.now().strftime(DATE_FORMAT)
-
-            d = asdict(SampleList(
-                name=name,
-                id=None,
-                createdBy='System',
-                description=description,
-                createDate=str(createdDate),
-                startDate=str(createdDate),
-                endDate=str(createdDate),
-                columns=None
-            ))
-        
-            expose_methods = []
-            for m in method_list:
-                expose_methods += [m2.to_dict()
-                                   for m2 in m.render_lh_method(sample_name=name,
-                                              sample_description=description,
-                                              layout=layout)]
-
-            # Get unique keys across all the methods
-            all_columns = set.union(*(set(m.keys()) for m in expose_methods))
-
-            # Ensure that all keys exist in all dictionaries
-            for m in expose_methods:
-                for column in all_columns:
-                    if column not in m:
-                        m[column] = None
-
-            d.update(columns=expose_methods)
-
-            print(d)
-
-            return d
-
-        # Generate real-time tasks based on layout
-        all_methods: List[BaseMethod] = []
-        for m in self.methods:
-            all_methods += m.get_methods(layout)
-
-
-        print(all_methods)
-
-        # only create jobs if there are methods (should always be at least one)
-        jobs = []
-        if len(all_methods):
-            # find task release points, add one to the end if none exist
-            release_idxs = [i for i, m in enumerate(all_methods) if isinstance(m, Release)]
-            if not len(release_idxs):
-                release_idxs += [len(all_methods)]
-            
-            # create jobs from groups of tasks between release points
-            jobs = {}
-            start_idx = 0
-            for idx in release_idxs:
-                job_methods = all_methods[start_idx:idx]
-                print(start_idx, idx, job_methods)
-                if len(job_methods):
-                    new_id = str(uuid4())
-                    jobs[new_id] = LHJob(id=new_id,
-                                         samplelist=make_samplelist(job_methods),
-                                         estimated_times=[m.estimated_time(layout) for m in job_methods])
-
-                # skip the release task
-                start_idx = idx + 1
-                
-        self.run_methods = jobs
 
     def explode(self, layout: LHBedLayout):
         """Permanently replaces the original methods with "exploded" methods, i.e. rendered methods
@@ -163,7 +110,7 @@ class MethodList:
     def undo_prepare(self):
         """Undoes the prepare steps"""
 
-        self.run_methods = None
+        self.run_jobs = None
     
     def get_method_completion(self) -> bool:
         """Returns list of method completion status. If prepare_run_methods has not been
@@ -173,8 +120,8 @@ class MethodList:
             bool: Method completion status, one for each method in methods
         """
 
-        if self.run_methods is not None:
-            return all((complete == ResultStatus.SUCCESS) for job in self.run_methods.values() for complete in job.get_results())
+        if self.run_jobs is not None:
+            return all((complete == ResultStatus.SUCCESS) for jobcontainer in self.run_jobs.values() for complete in jobcontainer.job.get_results())
         
         return False
 
@@ -247,6 +194,75 @@ class Sample:
 
             print('Warning: undefined sample status. This should never happen!')
             return None
+
+
+    def prepare_run_methods(self, stage: StageName, layout: LHBedLayout) -> None:
+        """Prepares a method list for running by populating run_methods and run_methods_complete.
+            List can then be used for dry or wet runs
+        """
+
+        def make_samplelist(method_list: List[MethodsType]) -> dict:
+            """Makes an LHJob from a list of methods"""
+
+            createdDate = datetime.now().strftime(DATE_FORMAT)
+
+            expose_methods: List[dict] = []
+            for m in method_list:
+                expose_methods += [m2.to_dict()
+                                    for m2 in m.render_lh_method(sample_name=self.name,
+                                                sample_description=self.description,
+                                                layout=layout)]
+
+            # Get unique keys across all the methods
+            all_columns = set.union(*(set(m.keys()) for m in expose_methods))
+
+            # Ensure that all keys exist in all dictionaries
+            for m in expose_methods:
+                for column in all_columns:
+                    if column not in m:
+                        m[column] = None
+
+            d = asdict(SampleList(
+                name=self.name,
+                id=None,
+                createdBy='System',
+                description=self.description,
+                createDate=str(createdDate),
+                startDate=str(createdDate),
+                endDate=str(createdDate),
+                columns=expose_methods
+            ))
+
+            return d
+
+        # Generate real-time tasks based on layout
+        all_methods: List[BaseMethod] = []
+        for m in self.stages[stage].methods:
+            all_methods += m.get_methods(layout)
+
+        # only create jobs if there are methods (should always be at least one)
+        jobs = {}
+        if len(all_methods):
+            # find task release points, add one to the end if none exist
+            release_idxs = [i for i, m in enumerate(all_methods) if isinstance(m, Release)]
+            if not len(release_idxs):
+                release_idxs += [len(all_methods)]
+            
+            # create jobs from groups of tasks between release points
+            start_idx = 0
+            for idx in release_idxs:
+                job_methods = all_methods[start_idx:idx]
+                print(start_idx, idx, job_methods)
+                if len(job_methods):
+                    new_id = str(uuid4())
+                    jobs[new_id] = JobContainer(job=LHJob(id=new_id,
+                                                          samplelist=make_samplelist(job_methods)),
+                                                methods=job_methods)
+
+                # skip the release task
+                start_idx = idx + 1
+                
+        self.stages[stage].run_jobs = jobs
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
