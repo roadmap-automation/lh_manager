@@ -9,14 +9,46 @@ from ..sio import socketio
 
 from . import lh_blueprint
 
-def broadcast_job_update(job: LHJob) -> None:
-    """Sends signal with job ID.
+def broadcast_job_activation(job: LHJob) -> None:
+    """Sends activation signal
 
     Args:
-        job (LHJob): job to be updated
+        job (LHJob): job activated
     """
 
-    socketio.emit('job_updated', {'job_id': job.id}, include_self=True)
+    socketio.emit('job_activation',
+                  {'job_id': job.id},
+                  include_self=True)
+
+def broadcast_job_validation(job: LHJob, result: ValidationStatus) -> None:
+    """Sends validation signal
+
+    Args:
+        job (LHJob): job validated
+    """
+
+    socketio.emit('job_validation',
+                  {'job_id': job.id,
+                   'result': result},
+                  include_self=True)
+
+def broadcast_job_result(job: LHJob, method_number: int, method_name: str, result: ResultStatus) -> None:
+    """Sends result signal
+
+    Args:
+        job (LHJob): job updated
+        method_number (int): index of method corresponding to result
+        method_name (str): name of method
+        result (ResultStatus): nature of result
+    """
+
+    socketio.emit('job_validation',
+                  {'job_id': job.id,
+                   'method_number': method_number,
+                   'method_name': method_name,
+                   'result': result},
+                  include_self=True)
+
 
 @lh_blueprint.route('/LH/GetJob/<job_id>', methods=['GET'])
 def GetJob(job_id: str) -> Response:
@@ -49,7 +81,7 @@ def SubmitJob() -> Response:
 
     # activate the job
     lh_interface.activate_job(job)
-    broadcast_job_update(job)
+    broadcast_job_activation(job)
 
     return make_response({'success': 'job accepted'}, 200)
 
@@ -99,7 +131,7 @@ def PutSampleListValidation(sample_list_id):
 
     job.validation = data
     lh_interface.update_job(job)
-    broadcast_job_update(job)
+    broadcast_job_validation(job, job.get_validation_status()[0])
 
     error = None
     if job.get_validation_status() != ValidationStatus.SUCCESS:
@@ -129,7 +161,7 @@ def PutSampleData():
 
     job.results.append(data)
     lh_interface.update_job(job)
-    broadcast_job_update(job)
+    broadcast_job_result(job, method_number, method_name, job.get_result_status())
 
     error = None
     if job.get_result_status() == ResultStatus.FAIL:
