@@ -7,6 +7,9 @@ from flask import make_response, Response, request
 from ..liquid_handler.lhinterface import lh_interface, LHJob, ValidationStatus, ResultStatus, LHJobHistory, InterfaceStatus
 from ..sio import socketio
 
+# TODO: Break this link so lhinterface is standalone; then, activate broadcasting
+from ..liquid_handler.lhqueue import LHqueue
+
 from . import lh_blueprint
 
 def broadcast_job_activation(job: LHJob) -> None:
@@ -15,7 +18,6 @@ def broadcast_job_activation(job: LHJob) -> None:
     Args:
         job (LHJob): job activated
     """
-
     socketio.emit('job_activation',
                   {'job_id': job.id},
                   include_self=True)
@@ -81,7 +83,10 @@ def SubmitJob() -> Response:
 
     # activate the job
     lh_interface.activate_job(job)
-    broadcast_job_activation(job)
+    #broadcast_job_activation(job)
+    #emit('job_activation',
+    #              dict({'job_id': job.id}),
+    #              broadcast=True, include_self=True)
 
     return make_response({'success': 'job accepted'}, 200)
 
@@ -131,7 +136,8 @@ def PutSampleListValidation(sample_list_id):
 
     job.validation = data
     lh_interface.update_job(job)
-    broadcast_job_validation(job, job.get_validation_status()[0])
+    LHqueue.update_job_validation(job, job.get_validation_status()[0])
+    #broadcast_job_validation(job, job.get_validation_status()[0])
 
     error = None
     if job.get_validation_status() != ValidationStatus.SUCCESS:
@@ -161,7 +167,8 @@ def PutSampleData():
 
     job.results.append(data)
     lh_interface.update_job(job)
-    broadcast_job_result(job, method_number, method_name, job.get_result_status())
+    LHqueue.update_job_result(job, method_number, method_name, job.get_result_status())
+    #broadcast_job_result(job, method_number, method_name, job.get_result_status())
 
     error = None
     if job.get_result_status() == ResultStatus.FAIL:
