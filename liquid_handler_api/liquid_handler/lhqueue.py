@@ -45,8 +45,6 @@ class JobQueue:
                 for callback in self.submit_callbacks:
                     callback(job)
 
-                #lh_interface.activate_job(job)
-
     def update_job_validation(self, job: LHJob, result: ValidationStatus) -> None:
         """Handles an update to job validation
 
@@ -120,3 +118,7 @@ class JobQueue:
 ## ========== Liquid handler queue initialization ============
 
 LHqueue = JobQueue()
+
+# Add appropriate functions to lh_interface callbacks
+lh_interface.results_callbacks.append(LHqueue.update_job_result)
+lh_interface.validation_callbacks.append(LHqueue.update_job_validation)

@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 from dataclasses import asdict, field
 from pydantic.v1.dataclasses import dataclass
 
@@ -132,8 +132,8 @@ class LHJobHistory:
         ) WITHOUT ROWID;"""
     
     def __init__(self, database_path: str = LH_JOB_HISTORY) -> None:
-        self.db_path = database_path
-        self.db = None
+        self.db_path: str = database_path
+        self.db: sqlite3.Connection | None = None
 
     def __enter__(self):
         self.open()
@@ -207,6 +207,8 @@ class LHInterface:
     def __init__(self) -> None:
         self._active_job: LHJob | None = None
         self.running: bool = True
+        self.validation_callbacks: List[Callable] = []
+        self.results_callbacks: List[Callable] = []
 
     def update_history(self) -> None:
         """Updates the active job in history
@@ -245,6 +247,29 @@ class LHInterface:
     
         self._active_job = job
         self.update_history()
+
+    def update_job_result(self, job: LHJob, *args, **kwargs):
+        """Handles updates specifically to job results. Triggers callbacks, which
+            must have syntax f(job, *args, **kwargs)
+
+        Args:
+            job (LHJob): updated job
+        """
+
+        self.update_job(job)
+        for callback in self.results_callbacks:
+            callback(job, *args, **kwargs)
+
+    def update_job_validation(self, job: LHJob, *args, **kwargs):
+        """Handles updates specifically to job validation. Triggers callbacks, which
+            must have syntax f(job, *args, **kwargs)
+        Args:
+            job (LHJob): updated job
+        """
+
+        self.update_job(job)
+        for callback in self.validation_callbacks:
+            callback(job, *args, **kwargs)
 
     def activate_job(self, job: LHJob):
         """Activates an LHJob"""

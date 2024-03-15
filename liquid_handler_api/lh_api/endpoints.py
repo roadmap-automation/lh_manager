@@ -6,10 +6,6 @@ from flask import make_response, Response, request
 
 from ..liquid_handler.lhinterface import lh_interface, LHJob, ValidationStatus, ResultStatus, LHJobHistory, InterfaceStatus
 from ..sio import socketio
-
-# TODO: Break this link so lhinterface is standalone; then, activate broadcasting
-from ..liquid_handler.lhqueue import LHqueue
-
 from . import lh_blueprint
 
 def broadcast_job_activation(job: LHJob) -> None:
@@ -51,6 +47,9 @@ def broadcast_job_result(job: LHJob, method_number: int, method_name: str, resul
                    'result': result},
                   include_self=True)
 
+# Signal updates to results and validation
+lh_interface.results_callbacks.append(broadcast_job_result)
+lh_interface.validation_callbacks.append(broadcast_job_validation)
 
 @lh_blueprint.route('/LH/GetJob/<job_id>', methods=['GET'])
 def GetJob(job_id: str) -> Response:
@@ -83,7 +82,7 @@ def SubmitJob() -> Response:
 
     # activate the job
     lh_interface.activate_job(job)
-    #broadcast_job_activation(job)
+    broadcast_job_activation(job)
     #emit('job_activation',
     #              dict({'job_id': job.id}),
     #              broadcast=True, include_self=True)
@@ -135,8 +134,7 @@ def PutSampleListValidation(sample_list_id):
         return make_response({'error': f'validation job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 400)
 
     job.validation = data
-    lh_interface.update_job(job)
-    LHqueue.update_job_validation(job, job.get_validation_status()[0])
+    lh_interface.update_job_validation(job, job.get_validation_status()[0])
     #broadcast_job_validation(job, job.get_validation_status()[0])
 
     error = None
@@ -166,8 +164,7 @@ def PutSampleData():
         return make_response({'error': f'PutSampleData method name {method_name} does not match corresponding method name {job.samplelist['columns']['METHODNAME']}'}, 400)
 
     job.results.append(data)
-    lh_interface.update_job(job)
-    LHqueue.update_job_result(job, method_number, method_name, job.get_result_status())
+    lh_interface.update_job_result(job, method_number, method_name, job.get_result_status())
     #broadcast_job_result(job, method_number, method_name, job.get_result_status())
 
     error = None
