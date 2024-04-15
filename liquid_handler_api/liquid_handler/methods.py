@@ -25,30 +25,6 @@ class BaseMethod:
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
-    @dataclass
-    class lh_method:
-        """Base class for representation in Trilution LH sample lists"""
-        SAMPLENAME: str
-        SAMPLEDESCRIPTION: str
-        METHODNAME: str
-
-        def to_dict(self) -> dict:
-            """Creates dictionary representation; all custom field keys are prepended with a hash (#)
-            Returns:
-                dict: dictionary representation
-            """
-
-            d2 = asdict(self)
-
-            # Following lines prepend all non-fixed fields with hashes
-            #d = asdict(self)
-            #d2 = copy(d)
-            #for key in d.keys():
-            #    if key not in ('SAMPLENAME', 'SAMPLEDESCRIPTION', 'METHODNAME'):
-            #        d2['#' + key] = d2.pop(key)
-
-            return d2
-
     def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""
         return None
@@ -71,10 +47,10 @@ class BaseMethod:
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[lh_method]:
+                         layout: LHBedLayout) -> List[dict]:
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
-        return []
+        return [{}]
 
 @dataclass
 class MethodContainer(BaseMethod):
@@ -108,7 +84,7 @@ class MethodContainer(BaseMethod):
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[dict]:
         
         rendered_methods = []
         for m in self.get_methods(layout):
@@ -189,10 +165,4 @@ class Release(BaseMethod):
     
     display_name: Literal['---release---'] = '---release---'
     method_name: Literal[''] = ''
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        pass
-
-
 

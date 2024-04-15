@@ -15,6 +15,7 @@ class LHMethodType(str, Enum):
     MIX = 'mix'
     INJECT = 'inject'
 
+@register_device
 @dataclass
 class LHDevice(DeviceBase):
     """Liquid Handler device
@@ -75,10 +76,10 @@ class BaseLHMethod(BaseMethod):
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[lh_method]:
+                         layout: LHBedLayout) -> List[dict]:
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
-        return []
+        return [{}]
 
 @dataclass
 class InjectMethod(BaseLHMethod):
@@ -219,7 +220,7 @@ class TransferWithRinse(TransferMethod):
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
             Target_Zone=target_zone,
             Target_Well=target_well
-        )]
+        ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate
@@ -276,7 +277,7 @@ class MixWithRinse(MixMethod):
             Repeats=f'{self.Repeats}',
             Target_Zone=target_zone,
             Target_Well=target_well
-        )]
+        ).to_dict()]
 
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
@@ -339,7 +340,7 @@ class InjectWithRinse(InjectMethod):
             Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
             Air_Gap=f'{self.Air_Gap}',
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}'
-        )]
+        ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
@@ -368,7 +369,7 @@ class Sleep(BaseLHMethod):
             SAMPLEDESCRIPTION=sample_description,
             METHODNAME=self.method_name,
             Time=f'{self.Time}'
-        )]
+        ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return float(self.Time)
@@ -397,7 +398,7 @@ class Sleep2(BaseLHMethod):
             SAMPLEDESCRIPTION=sample_description,
             METHODNAME=self.method_name,
             Time2=f'{self.Time2}'
-        )]
+        ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return float(self.Time2)
@@ -429,7 +430,7 @@ class Prime(BaseLHMethod):
             METHODNAME=self.method_name,
             Volume=f'{self.Volume}',
             Repeats=f'{self.Repeats:0.0f}'
-        )]
+        ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         flow_rate = 10.0 # mL/min
