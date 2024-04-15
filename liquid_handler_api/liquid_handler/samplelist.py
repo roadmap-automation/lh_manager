@@ -3,11 +3,13 @@ from pydantic.v1.dataclasses import dataclass
 from enum import Enum
 from uuid import uuid4
 from typing import Dict, List, Union
+
+from .lhmethods import Sleep
 from .bedlayout import LHBedLayout
 from .lhinterface import LHJob, ResultStatus, DATE_FORMAT, SampleList
 from .items import StageName
 from .error import MethodError
-from .methods import MethodsType, BaseMethod, method_manager, Sleep, Release
+from .methods import MethodsType, BaseMethod, method_manager, Release
 from datetime import datetime
 
 # =============== Sample list handling =================

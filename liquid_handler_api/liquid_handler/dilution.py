@@ -5,9 +5,10 @@ from pydantic.v1.dataclasses import dataclass
 
 import numpy as np
 
+from .lhmethods import InjectMethod, InjectWithRinse, MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
+
 from .bedlayout import LHBedLayout, WellLocation
-from .methods import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
-            TransferMethod, MixMethod, InjectMethod, InjectWithRinse, register, method_manager
+from .methods import MethodContainer, MethodsType, register, method_manager
 
 @register
 @dataclass

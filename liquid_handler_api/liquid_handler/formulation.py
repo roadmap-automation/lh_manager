@@ -5,11 +5,12 @@ from scipy.optimize import nnls
 from dataclasses import field
 from pydantic.v1.dataclasses import dataclass
 
+from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
+
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
 from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import example_sample_list, StageName
-from .methods import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
-            TransferMethod, MixMethod, register, method_manager
+from .methods import MethodContainer, MethodsType, register, method_manager
 
 ZERO_VOLUME_TOLERANCE = 1e-8
 
