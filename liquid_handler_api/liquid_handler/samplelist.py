@@ -4,12 +4,15 @@ from enum import Enum
 from uuid import uuid4
 from typing import Dict, List, Union
 
+from .job import ResultStatus, JobBase
+from .devices import device_manager
 from .lhmethods import Sleep
 from .bedlayout import LHBedLayout
-from .lhinterface import LHJob, ResultStatus, DATE_FORMAT, SampleList
+from .lhinterface import DATE_FORMAT
 from .items import StageName
 from .error import MethodError
 from .methods import MethodsType, BaseMethod, method_manager, Release
+from .task import Task, TaskType, TaskData
 from datetime import datetime
 
 # =============== Sample list handling =================
@@ -24,19 +27,11 @@ class SampleStatus(str, Enum):
 
 @dataclass
 class JobContainer:
-    """Container for an LHJob and the associated (unserialized) methods. Assists with keeping
+    """Container for jobs and the associated (unserialized) methods. Assists with keeping
         track of job completion"""
-    job: LHJob
+    job: JobBase
     methods: List[MethodsType]
 
-    def __post_init__(self):
-        for i, method in enumerate(self.methods):
-            if isinstance(method, dict):
-                self.methods[i] = method_manager.get_method_by_name(method['method_name'])(**method)
-
-        if isinstance(self.job, dict):
-            self.job = LHJob(**self.job)
-    
 @dataclass
 class MethodList:
     """Class representing a list of methods representing one LH job. Can be nested
@@ -52,6 +47,7 @@ class MethodList:
             if isinstance(method, dict):
                 self.methods[i] = method_manager.get_method_by_name(method['method_name'])(**method)
 
+        # will probably never happen
         if self.run_jobs is not None:
             for k, v in self.run_jobs.items():
                 if isinstance(v, dict):
@@ -197,74 +193,42 @@ class Sample:
             print('Warning: undefined sample status. This should never happen!')
             return None
 
-
-    def prepare_run_methods(self, stage: StageName, layout: LHBedLayout) -> None:
+    def prepare_run_methods(self, stage: StageName, layout: LHBedLayout) -> List[Task]:
         """Prepares a method list for running by populating run_methods and run_methods_complete.
             List can then be used for dry or wet runs
         """
 
-        def make_samplelist(method_list: List[MethodsType]) -> dict:
-            """Makes an LHJob from a list of methods"""
-
-            createdDate = datetime.now().strftime(DATE_FORMAT)
-
-            expose_methods: List[dict] = []
-            for m in method_list:
-                expose_methods += [m2.to_dict()
-                                    for m2 in m.render_lh_method(sample_name=self.name,
-                                                sample_description=self.description,
-                                                layout=layout)]
-
-            # Get unique keys across all the methods
-            all_columns = set.union(*(set(m.keys()) for m in expose_methods))
-
-            # Ensure that all keys exist in all dictionaries
-            for m in expose_methods:
-                for column in all_columns:
-                    if column not in m:
-                        m[column] = None
-
-            d = asdict(SampleList(
-                name=self.name,
-                id=None,
-                createdBy='System',
-                description=self.description,
-                createDate=str(createdDate),
-                startDate=str(createdDate),
-                endDate=str(createdDate),
-                columns=expose_methods
-            ))
-
-            return d
-
         # Generate real-time tasks based on layout
-        all_methods: List[BaseMethod] = []
+        all_methods: List[MethodsType] = []
         for m in self.stages[stage].methods:
             all_methods += m.get_methods(layout)
 
-        # only create jobs if there are methods (should always be at least one)
-        jobs = {}
-        if len(all_methods):
-            # find task release points, add one to the end if none exist
-            release_idxs = [i for i, m in enumerate(all_methods) if isinstance(m, Release)]
-            if not len(release_idxs):
-                release_idxs += [len(all_methods)]
-            
-            # create jobs from groups of tasks between release points
-            start_idx = 0
-            for idx in release_idxs:
-                job_methods = all_methods[start_idx:idx]
-                print(start_idx, idx, job_methods)
-                if len(job_methods):
-                    new_id = str(uuid4())
-                    jobs[new_id] = JobContainer(job=LHJob(id=new_id,
-                                                          samplelist=make_samplelist(job_methods)),
-                                                methods=job_methods)
+        # render all the methods
+        rendered_methods: List[dict] = [m2
+                                        for m in all_methods
+                                        for m2 in m.render_lh_method(sample_name=self.name,
+                                                        sample_description=self.description,
+                                                        layout=layout)]
 
-                # skip the release task
-                start_idx = idx + 1
-                
-        self.stages[stage].run_jobs = jobs
+        # create tasks, one per method
+        tasks: List[Task] = []
+        for method in rendered_methods:
+            new_task = Task(id=str(uuid4()),
+                            tasks=[TaskData(device=device_name,
+                                            channel=self.channel,
+                                            method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
+                                    for device_name in method.keys()])
+            
+            if len(new_task.tasks) > 1:
+                # transfer method
+                new_task.task_type = TaskType.TRANSFER
+            else:
+                # TODO: figure out how to signal this
+                new_task.task_type = TaskType.PREPARE
+
+            tasks.append(new_task)
+        
+        return tasks
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore

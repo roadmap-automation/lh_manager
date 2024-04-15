@@ -33,10 +33,11 @@ def _run_sample(data: dict) -> Response:
                 sample.NICE_slotID = int(slot_id) if slot_id is not None else None
 
             # submit everything
-            sample.prepare_run_methods(stage, layout)
+            tasks = sample.prepare_run_methods(stage, layout)
             sample.stages[stage].status = SampleStatus.PENDING
-            for jobcontainer in sample.stages[stage].run_jobs.values():
-                LHqueue.submit(jobcontainer.job)
+            for task in tasks:
+                print([t for t in task.tasks])
+                #LHqueue.submit(jobcontainer.job)
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 

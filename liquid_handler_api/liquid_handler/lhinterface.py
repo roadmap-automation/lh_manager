@@ -6,26 +6,15 @@ import sqlite3
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Tuple, Callable
-from dataclasses import asdict, field
+from typing import List, Callable, Tuple
+from dataclasses import asdict
 from pydantic.v1.dataclasses import dataclass
 
-from .items import Item
+from .job import JobBase, ResultStatus, ValidationStatus
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 LH_JOB_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'lh_jobs.sqlite'
-
-class ValidationStatus(str, Enum):
-    UNVALIDATED = 'unvalidated',
-    SUCCESS = 'success',
-    FAIL = 'failed'
-
-class ResultStatus(str, Enum):
-    EMPTY = 'empty',
-    INCOMPLETE = 'incomplete',
-    SUCCESS = 'success',
-    FAIL = 'failed'
 
 class InterfaceStatus(str, Enum):
     UP = 'up'
@@ -34,49 +23,27 @@ class InterfaceStatus(str, Enum):
     ERROR = 'error'
 
 @dataclass
-class SampleList:
-    """Class representing a sample list in JSON
-        serializable format for Gilson Trilution LH Web Service """
-    name: str
-    id: str | None
-    createdBy: str
-    description: str
-    createDate: str
-    startDate: str
-    endDate: str
-    columns: List[dict] | None
-
-@dataclass
-class LHJob:
+class LHJob(JobBase):
     """Container for a single liquid handler sample list"""
-    id: str
-    samplelist: dict
+
     LH_id: int | None = None
-    validation: dict = field(default_factory=dict)
-    results: list = field(default_factory=list)
-    parent: Item | None = None
-
-    def __post_init__(self):
-
-        if isinstance(self.parent, dict):
-            self.parent = Item(**self.parent)
 
     def get_validation_status(self) -> Tuple[ValidationStatus, dict | None]:
         """Returns true if validation exists """
 
         if not len(self.validation):
             return ValidationStatus.UNVALIDATED, None
-        
+
         if self.validation['validation']['validationType'] == 'SUCCESS':
             return ValidationStatus.SUCCESS, None
         else:
             return ValidationStatus.FAIL, self.validation
-        
+
     def get_result_status(self) -> ResultStatus:
         # if no results
         if not len(self.results):
             return ResultStatus.EMPTY
-        
+
         results = self.get_results()
 
         # check for any failures in existing results
@@ -86,28 +53,28 @@ class LHJob:
         # check for incomplete results (should be one per method in columns)
         if ResultStatus.INCOMPLETE in results:
             return ResultStatus.INCOMPLETE
-        
+
         # if all checks pass, we were successful
         return ResultStatus.SUCCESS
-    
+
     def get_number_of_methods(self) -> int:
-        if self.samplelist['columns'] is None:
+        if self.method_data['columns'] is None:
             return 0
         else:
-            return len(self.samplelist['columns'])
+            return len(self.method_data['columns'])
 
     def get_results(self) -> List[ResultStatus]:
         results = [ResultStatus.SUCCESS if ('completed successfully' in notification) else ResultStatus.FAIL
                 for result in self.results
                 for notification in result['sampleData']['resultNotifications']['notifications'].values()]
-        
+
         results += [ResultStatus.INCOMPLETE for _ in range(self.get_number_of_methods() - len(self.results))]
 
         return results
-    
-    def get_samplelist(self, listonly=False) -> dict:
+
+    def get_method_data(self, listonly=False) -> dict:
         """Gets the sample list formatted for Gilson LH.
-        
+
         Args:
             listonly (bool, optional): Only return header information. Defaults to False.
 
@@ -115,11 +82,12 @@ class LHJob:
             dict: sample list prepared for Gilson LH
         """
 
-        samplelist = copy.copy(self.samplelist)
+        samplelist = copy.copy(self.method_data)
         if listonly:
             samplelist['columns'] = None
 
         return samplelist
+
 
 class LHJobHistory:
     table_name = 'lh_job_record'
@@ -289,10 +257,10 @@ class LHInterface:
         
         # assign new ID
         job.LH_id = max_LH_id + 1
-        job.samplelist['id'] = job.LH_id
+        job.method_data['id'] = job.LH_id
 
         # set created date
-        job.samplelist['createDate'] = datetime.now().strftime(DATE_FORMAT)
+        job.method_data['createDate'] = datetime.now().strftime(DATE_FORMAT)
         
         # activate job
         self._active_job = job

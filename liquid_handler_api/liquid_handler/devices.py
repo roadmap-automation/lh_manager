@@ -1,8 +1,7 @@
-from dataclasses import fields, field, asdict
+from dataclasses import fields
 from pydantic.v1.dataclasses import dataclass
-from enum import Enum
-from copy import copy
 from typing import Dict, List, Literal, Union, Set
+from .job import JobBase
 
 EXCLUDE_FIELDS = set([])
 
@@ -11,19 +10,23 @@ class DeviceBase:
     """Base class for device definitions
     """
 
-    device_name: Literal['none'] = 'none'
+    device_name: str = 'none'
 
-    def create_task_data(self, method_data: dict) -> dict:
+    @dataclass
+    class Job(JobBase):
+        pass
+
+    def create_job_data(method_list: List[dict]) -> dict:
         """Creates a task formatted for the appropriate device
 
         Args:
-            method_data (dict): method data to format
+            method_list (List[dict]): method data to format
 
         Returns:
             dict: task data
         """
 
-        raise NotImplementedError
+        return {}
 
 ### =========== Methods manager ==============
 

@@ -5,9 +5,11 @@ from dataclasses import field
 from pydantic.v1.dataclasses import dataclass
 from datetime import datetime
 
+from .job import ResultStatus, ValidationStatus
+
 from .state import samples, layout
 from .samplelist import SampleStatus
-from .lhinterface import LHJob, ResultStatus, ValidationStatus, lh_interface
+from .lhinterface import LHJob, lh_interface
 
 def validate_format(data: dict) -> bool:
     """Checks format of data input"""

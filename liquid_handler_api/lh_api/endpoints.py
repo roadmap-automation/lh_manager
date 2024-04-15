@@ -4,7 +4,9 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..liquid_handler.lhinterface import lh_interface, LHJob, ValidationStatus, ResultStatus, LHJobHistory, InterfaceStatus
+from ..liquid_handler.job import ResultStatus, ValidationStatus
+
+from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
 from ..sio import socketio
 from . import lh_blueprint
 
@@ -160,8 +162,8 @@ def PutSampleData():
         return make_response({'error': 'no active jobs'}, 400)
     if sample_id != job.LH_id:
         return make_response({'error': f'PutSampleData job ID {sample_id} does not match active job ID {job.LH_id}'}, 400)
-    if job.samplelist['columns'][method_number]['METHODNAME'] != method_name:
-        return make_response({'error': f'PutSampleData method name {method_name} does not match corresponding method name {job.samplelist['columns']['METHODNAME']}'}, 400)
+    if job.method_data['columns'][method_number]['METHODNAME'] != method_name:
+        return make_response({'error': f'PutSampleData method name {method_name} does not match corresponding method name {job.method_data['columns']['METHODNAME']}'}, 400)
 
     job.results.append(data)
     lh_interface.update_job_result(job, method_number, method_name, job.get_result_status())

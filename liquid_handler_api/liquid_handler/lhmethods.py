@@ -1,19 +1,35 @@
 from .bedlayout import LHBedLayout, WellLocation
 from .error import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .methods import BaseMethod, MethodType, register
+from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, register_device
+from .lhinterface import LHJob, DATE_FORMAT
+from .task import TaskData
 
 from pydantic.v1.dataclasses import dataclass
 
 from dataclasses import field, asdict
 from typing import List, Literal
 from enum import Enum
+from datetime import datetime
 
 class LHMethodType(str, Enum):
     TRANSFER = 'transfer'
     MIX = 'mix'
     INJECT = 'inject'
+
+@dataclass
+class SampleList:
+    """Class representing a sample list in JSON
+        serializable format for Gilson Trilution LH Web Service """
+    name: str
+    id: str | None
+    createdBy: str
+    description: str
+    createDate: str
+    startDate: str
+    endDate: str
+    columns: List[dict] | None
 
 @register_device
 @dataclass
@@ -21,7 +37,38 @@ class LHDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: Literal['Gilson 271 Liquid Handler'] = Literal['Gilson 271 Liquid Handler']
+    device_name: str = 'Gilson 271 Liquid Handler'
+
+    @dataclass
+    class Job(LHJob):
+        pass
+
+    def create_job_data(method_list: List[dict]) -> dict:
+        """Makes an LHJob from a list of methods"""
+
+        createdDate = datetime.now().strftime(DATE_FORMAT)
+
+        # Get unique keys across all the methods
+        all_columns = set.union(*(set(m.keys()) for m in method_list))
+
+        # Ensure that all keys exist in all dictionaries
+        for m in method_list:
+            for column in all_columns:
+                if column not in m:
+                    m[column] = None
+
+        d = asdict(SampleList(
+            name=method_list[0]['SAMPLENAME'],
+            id=None,
+            createdBy='System',
+            description=method_list[0]['SAMPLEDESCRIPTION'],
+            createDate=str(createdDate),
+            startDate=str(createdDate),
+            endDate=str(createdDate),
+            columns=method_list
+        ))
+
+        return d
 
 @dataclass
 class BaseLHMethod(BaseMethod):
@@ -43,7 +90,7 @@ class BaseLHMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = {LHDevice.device_name: asdict(self)}
+            d2 = {LHDevice.device_name: [asdict(self)]}
 
             # Following lines prepend all non-fixed fields with hashes
             #d = asdict(self)
