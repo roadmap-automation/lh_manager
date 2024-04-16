@@ -16,6 +16,7 @@ class DeviceBase:
     class Job(JobBase):
         pass
 
+    @staticmethod
     def create_job_data(method_list: List[dict]) -> dict:
         """Creates a task formatted for the appropriate device
 

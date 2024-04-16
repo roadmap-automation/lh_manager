@@ -43,6 +43,7 @@ class LHDevice(DeviceBase):
     class Job(LHJob):
         pass
 
+    @staticmethod
     def create_job_data(method_list: List[dict]) -> dict:
         """Makes an LHJob from a list of methods"""
 
