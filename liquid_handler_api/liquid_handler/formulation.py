@@ -126,18 +126,19 @@ class Formulation(MethodContainer):
                 new_transfer.Volume = volume
                 methods.append(new_transfer)
 
-            # Add a mix method. Use 90% of total volume in well, unless mix volume is too small.
+            # Add a mix method, only if there's more than one transfer. Use 90% of total volume in well, unless mix volume is too small.
             # Assumes well contains more than min_mix_volume
-            total_volume = sum(volumes)
-            min_mix_volume = 0.1
-            mix_volume = 0.9 * total_volume
-            if mix_volume < min_mix_volume:
-                mix_volume = min_mix_volume
+            if len(volumes) > 1:
+                total_volume = sum(volumes)
+                min_mix_volume = 0.1
+                mix_volume = 0.9 * total_volume
+                if mix_volume < min_mix_volume:
+                    mix_volume = min_mix_volume
 
-            new_mix = copy(self.mix_template)
-            new_mix.Target = self.Target
-            new_mix.Volume = mix_volume
-            methods.append(new_mix)
+                new_mix = copy(self.mix_template)
+                new_mix.Target = self.Target
+                new_mix.Volume = mix_volume
+                methods.append(new_mix)
 
         return methods
     
