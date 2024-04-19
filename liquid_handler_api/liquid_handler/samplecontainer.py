@@ -13,6 +13,7 @@ class SampleContainer:
     """Specialized sample dictionary allowing convenient referencing by sample ID or sample name"""
 
     samples: list[Sample] = field(default_factory=list)
+    n_channels: int = 1
     dryrun_queue: DryRunQueue = field(default_factory=DryRunQueue)
     max_LH_id: int = 1
 
