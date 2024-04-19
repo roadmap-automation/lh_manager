@@ -38,6 +38,7 @@ export type StageName = 'prep' | 'inject';
 export type WellFieldName = 'Source' | 'Target';
 
 export interface Sample {
+  channel: number,
   id: string,
   name: string,
   description: string,
@@ -91,6 +92,7 @@ export const source_components = ref<SourceComponents>();
 export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
 export const well_to_edit = ref<WellLocation>();
+export const num_channels = ref<number>(1);
 
 // export const layout_with_contents = computed(() => {
 //   const layout_copy = structuredClone(toRaw(layout.value));
@@ -319,8 +321,10 @@ export async function refreshWells() {
 }
 
 export async function refreshSamples() {
-  const { samples: { samples: new_samples_in } } = await (await fetch('/GUI/GetSamples/')).json() as { samples: { samples: Sample[] }};
+  const { samples: { samples: new_samples_in,  n_channels: num_channels_in } } = await (await fetch('/GUI/GetSamples/')).json() as { samples: { samples: Sample[], n_channels: number } };
   samples.value = new_samples_in;
+  num_channels.value = num_channels_in;
+  console.log({num_channels_in});
   console.log({new_samples_in});
   // filter samples to extract only what the GUI will edit:
   // const new_samples = new_samples_in.map((s) => {

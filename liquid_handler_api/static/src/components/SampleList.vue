@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import Modal from 'bootstrap/js/src/modal';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
 // import { socket_emit } from '../store.ts';
 import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample, remove_sample, duplicate_sample, explode_stage } from '../store';
 import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
+
+const props = defineProps<{
+  channel: number,
+}>();
 
 const emit = defineEmits(['update_sample']);
 
@@ -15,6 +19,11 @@ const modal = ref<Modal>();
 const name_input = ref<HTMLInputElement>();
 const modal_title = ref("Edit Sample Name and Description")
 const sample_to_edit = ref<Partial<Sample>>({ name: '', description: '', id: '' });
+const channel_samples = computed(() => {
+  const filtered_samples = samples.value.filter(s => s.channel === props.channel);
+  console.log('filtered_samples', filtered_samples, samples.value, props.channel);
+  return filtered_samples;
+});
 
 function toggleItem(index) {
   active_sample_index.value = (index === active_sample_index.value) ? null : index;
@@ -29,7 +38,7 @@ function add_sample() {
   const name = "";
   const description = "";
   modal_title.value = "Create New Sample";
-  sample_to_edit.value = { id, name, description };
+  sample_to_edit.value = { id, name, description, channel: props.channel };
   modal.value?.show();
 }
 
@@ -87,9 +96,9 @@ const status_class_map: {[status in StatusType]: string} = {
 </script>
 
 <template>
-  <button class="btn btn-outline-primary btn-sm" @click="add_sample">+ Add sample</button>
+  <button class="btn btn-outline-primary btn-sm" @click="add_sample">+ Add sample in channel {{ props.channel }}</button>
   <div class="accordion">
-    <div class="accordion-item" v-for="(sample, sindex) of samples" :key="sample.id">
+    <div class="accordion-item" v-for="(sample, sindex) of channel_samples" :key="sample.id">
       <div class="accordion-header">
         <button class="accordion-button p-1"
           :class="{ collapsed: sindex !== active_sample_index, [status_class_map[sample_status[sample.id]?.status ?? 'inactive']]: true }" type="button"

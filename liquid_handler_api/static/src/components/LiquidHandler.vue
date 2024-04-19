@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { onMounted } from 'vue';
 import Mixture from './Mixture.vue';
 import BedLayout from './BedLayout.vue';
-import SampleList from './SampleList.vue';
+import SampleChannels from './SampleChannels.vue';
 import { samples, sample_status, wells } from '../store';
 import EditWellContents from './EditWellContents.vue';
 
@@ -71,7 +71,7 @@ function openMixture() {
           <div class="card-body">
             <h5 class="card-title">Samples</h5>
           </div>
-          <SampleList />
+          <SampleChannels />
         </div>
       </div>
 
