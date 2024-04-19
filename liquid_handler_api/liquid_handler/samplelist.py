@@ -246,6 +246,8 @@ example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
 example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
 example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.INACTIVE
+example_sample_list[5].channel = 1
+
 #example_sample = Sample('12', 'testsample12', 'test sample description')
 #example_sample.methods.append(example_method)
 #print(methods)

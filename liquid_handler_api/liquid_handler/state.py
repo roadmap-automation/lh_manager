@@ -49,7 +49,7 @@ if samples is None:
 
     ## ======= Initialize samples =========
     # samples is sent to the GUI
-    samples = SampleContainer()
+    samples = SampleContainer(n_channels=2)
 
     # TODO: remove for production
     for example_sample in example_sample_list:
