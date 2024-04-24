@@ -114,8 +114,9 @@ class Formulation(MethodContainer):
 
         if success:
             # sort by volume (largest first)
-            sorted_volumes = sorted(volumes)[::-1]
-            sort_index = [volumes.index(sv) for sv in sorted_volumes]
+            sort_index = np.argsort(volumes)[::-1]
+            sorted_volumes = [volumes[si] for si in sort_index]
+            #sort_index = [volumes.index(sv) for sv in sorted_volumes]
             sorted_wells = [wells[si] for si in sort_index]
 
             # Add transfer methods
