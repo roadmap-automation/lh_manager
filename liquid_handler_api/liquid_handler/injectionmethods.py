@@ -69,7 +69,53 @@ class BaseInjectionSystemMethod(BaseMethod):
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
         return [{}]
-    
+
+@register
+@dataclass
+class RoadmapChannelInit(BaseInjectionSystemMethod):
+    """Initialize QCMD instrument"""
+    display_name: Literal['Init Injection System'] = 'Init Injection System'
+    method_name: Literal['RoadmapChannelInit'] = 'RoadmapChannelInit'
+
+    @dataclass
+    class sub_method(BaseInjectionSystemMethod.sub_method):
+        pass
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [self.sub_method().to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
+        return 0.0
+
+
+@register
+@dataclass
+class RoadmapChannelSleep(BaseInjectionSystemMethod):
+    """Initialize QCMD instrument"""
+    display_name: Literal['Sleep Injection System'] = 'Sleep Injection System'
+    method_name: Literal['RoadmapChannelSleep'] = 'RoadmapChannelSleep'
+    sleep_time: float = 1.0
+
+    @dataclass
+    class sub_method(BaseInjectionSystemMethod.sub_method):
+        sleep_time: float
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [self.sub_method(self.sleep_time).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
+        return self.sleep_time
+
 @register
 @dataclass
 class PrimeLoop(BaseInjectionSystemMethod):
