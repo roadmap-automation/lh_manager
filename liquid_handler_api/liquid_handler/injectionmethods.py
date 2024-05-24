@@ -3,8 +3,8 @@ from .error import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, register_device
-from .lhinterface import LHJob, DATE_FORMAT
-from .task import TaskData
+from .job import JobBase
+from .lhmethods import BaseLHMethod, InjectMethod
 
 from pydantic.v1.dataclasses import dataclass
 
@@ -22,12 +22,12 @@ class InjectionSystemDevice(DeviceBase):
     device_name: str = 'Multichannel Injection System'
 
     @dataclass
-    class Job(LHJob):
+    class Job(JobBase):
         pass
 
     @staticmethod
     def create_job_data(method_list: List[dict]) -> dict:
-        """Makes an LHJob from a list of methods"""
+        """Makes an Job from a list of methods"""
 
         return {'method_data': [method_list]}
 
@@ -41,6 +41,8 @@ class BaseInjectionSystemMethod(BaseMethod):
     @dataclass
     class sub_method:
         """Base class for representation in sample lists"""
+        method_name: str
+        method_data: dict
 
         def to_dict(self) -> dict:
             """Creates dictionary representation; all custom field keys are prepended with a hash (#)
@@ -121,7 +123,7 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
 class PrimeLoop(BaseInjectionSystemMethod):
     """Prime a loop"""
     number_of_primes: int = 3
-    display_name: Literal['Prime Loop'] = 'Prime Loop'
+    display_name: Literal['Prime Injection System Loop'] = 'Prime Injection System Loop'
     method_name: Literal['PrimeLoop'] = 'PrimeLoop'
 
     @dataclass
@@ -138,3 +140,88 @@ class PrimeLoop(BaseInjectionSystemMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return 0.0
+    
+@register
+@dataclass
+class InjectLoop(BaseInjectionSystemMethod):
+    """Inject contents of injection system loop"""
+    Volume: float = 0
+    Flow_Rate: float = 1
+    display_name: Literal['Inject Injection System Loop'] = 'Inject Injection System Loop'
+    method_name: Literal['ROADMAP_InjectLoop'] = 'ROADMAP_InjectLoop'
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
+        
+        return [
+            self.sub_method(
+                method_name='InjectLoop',
+                method_data={'name': 'InjectLoop',
+                                'pump_volume': self.Volume,
+                                'pump_flow_rate': self.Flow_Rate}
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return self.Volume / self.Flow_Rate
+
+@register
+@dataclass
+class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
+    """Inject with rinse"""
+    #Source: WellLocation defined in InjectMethod
+    #Volume: float defined in InjectMethod
+    Aspirate_Flow_Rate: float = 2.5
+    Flow_Rate: float = 2.5
+    Outside_Rinse_Volume: float = 0.5
+    Extra_Volume: float = 0.1
+    Air_Gap: float = 0.1
+    Use_Liquid_Level_Detection: bool = True
+    pump_volume: float = 0
+    pump_flow_rate: float = 1
+    display_name: Literal['Load Injection System Loop'] = 'Load Injection System Loop'
+    method_name: Literal['ROADMAP_LoadLoop'] = 'ROADMAP_LoadLoop'
+
+    @dataclass
+    class lh_method(BaseLHMethod.lh_method):
+        Source_Zone: Zone
+        Source_Well: str
+        Volume: str
+        Aspirate_Flow_Rate: str
+        Flow_Rate: str
+        Outside_Rinse_Volume: str
+        Extra_Volume: str
+        Air_Gap: str
+        Use_Liquid_Level_Detection: str
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
+        
+        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+            
+        return [self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Source_Zone=source_zone,
+            Source_Well=source_well,
+            Volume=f'{self.Volume}',
+            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
+            Flow_Rate=f'{self.Flow_Rate}',
+            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
+            Extra_Volume=f'{self.Extra_Volume}',
+            Air_Gap=f'{self.Air_Gap}',
+            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
+        ).to_dict() | 
+            self.sub_method(
+                method_name='LoadLoop',
+                method_data={'name': 'LoadLoop',
+                                'pump_volume': self.Volume,
+                                'pump_flow_rate': self.pump_flow_rate}
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Volume / self.pump_volume
