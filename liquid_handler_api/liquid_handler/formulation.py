@@ -245,6 +245,57 @@ class Formulation(MethodContainer):
                 for w in rack.wells
                 if LayoutWell2ZoneWell(w.rack_id, w.well_number)[0] in self.include_zones]
 
+# TODO: NEEDS TESTING
+
+@register
+@dataclass
+class SoluteFormulation(Formulation):
+    """Subclass of Formulation. In target_composition, specify only the solutes
+        of interest; any missing volume will be filled in with the diluent. Diluent
+        must already exist"""
+    
+    method_name: Literal['SoluteFormulation'] = 'SoluteFormulation'
+    display_name: Literal['SoluteFormulation'] = 'SoluteFormulation'
+    exact_match: bool = False
+    diluent: Composition | None = None
+
+    def formulate(self,
+                layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
+        """Create a formulation from a target composition with a target volume
+
+        Args:
+            layout (LHBedLayout): _description_
+
+
+        Returns:
+            Tuple[List[float], List[Well], bool]: _description_
+        """
+
+        volumes, wells, success = super().formulate(layout)
+
+        try:
+            diluent_well = next(well
+                                for well in self.get_all_wells(layout)
+                                    if all(well.composition.has_component(cmp)
+                                        for cmp in (self.diluent.get_solute_names() + self.diluent.get_solvent_names())))
+        except StopIteration:
+            print(f'Diluent ({self.diluent}) not available on bed')
+            return [], [], False
+
+        
+        diluent_volume = self.target_volume - sum(volumes)
+
+        if diluent_volume < 0:
+            print(f'Diluent volume less than zero; should never happen')
+            return [], [], False
+        
+        if not np.isclose(diluent_volume, 0.0, atol=1e-9):
+            volumes += [diluent_volume]
+            wells += [diluent_well]
+
+        return volumes, wells, success
+
+
 target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
 
 transfer = TransferWithRinse(Flow_Rate=2.0)
