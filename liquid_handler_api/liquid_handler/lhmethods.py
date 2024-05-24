@@ -4,7 +4,6 @@ from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, register_device
 from .lhinterface import LHJob, DATE_FORMAT
-from .task import TaskData
 
 from pydantic.v1.dataclasses import dataclass
 
