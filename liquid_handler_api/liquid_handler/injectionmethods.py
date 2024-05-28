@@ -88,7 +88,12 @@ class RoadmapChannelInit(BaseInjectionSystemMethod):
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        return [self.sub_method().to_dict()]
+        return [
+            self.sub_method(
+                method_name='RoadmapChannelInit',
+                method_data={'name': 'RoadmapChannelInit',
+                                }
+            ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
@@ -105,14 +110,19 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
 
     @dataclass
     class sub_method(BaseInjectionSystemMethod.sub_method):
-        sleep_time: float
+        pass
 
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        return [self.sub_method(self.sleep_time).to_dict()]
+        return [
+            self.sub_method(
+                method_name='RoadmapChannelSleep',
+                method_data={'name': 'RoadmapChannelSleep',
+                                'sleep_time': self.sleep_time}
+            ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
@@ -135,7 +145,12 @@ class PrimeLoop(BaseInjectionSystemMethod):
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        return [self.sub_method(self.number_of_primes).to_dict()]
+        return [
+            self.sub_method(
+                method_name='PrimeLoop',
+                method_data={'name': 'PrimeLoop',
+                             'number_of_primes': self.number_of_primes}
+            ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
