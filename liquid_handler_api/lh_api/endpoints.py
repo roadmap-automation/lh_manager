@@ -4,6 +4,8 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
+from autocontrol.status import Status
+
 from ..liquid_handler.job import ResultStatus, ValidationStatus
 
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
@@ -52,6 +54,20 @@ def broadcast_job_result(job: LHJob, method_number: int, method_name: str, resul
 # Signal updates to results and validation
 lh_interface.results_callbacks.append(broadcast_job_result)
 lh_interface.validation_callbacks.append(broadcast_job_validation)
+
+@lh_blueprint.route('/LH/GetStatus', methods=['GET'])
+def GetStatus() -> Response:
+    """Gets Autocontrol status code"""
+
+    status_map = {InterfaceStatus.BUSY: Status.BUSY,
+                 InterfaceStatus.DOWN: Status.DOWN,
+                 InterfaceStatus.UP: Status.UP}
+    
+    print(lh_interface.get_status())
+
+    return make_response(dict(status=status_map[lh_interface.get_status()],
+                              channel_status=[])
+                              , 200)
 
 @lh_blueprint.route('/LH/GetJob/<job_id>', methods=['GET'])
 def GetJob(job_id: str) -> Response:
@@ -120,9 +136,9 @@ def GetSampleList(sample_list_id: str) -> Response:
     if int(sample_list_id) != job.LH_id:
         return make_response({'error': f'requested job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 400)
 
-    sample_list = [job.get_method_data(listonly=False)]
+    sample_list = job.get_method_data(listonly=False)
 
-    return make_response({'sampleLists': sample_list}, 200)
+    return make_response({'sampleList': sample_list}, 200)
 
 @lh_blueprint.route('/LH/PutSampleListValidation/<sample_list_id>', methods=['POST'])
 def PutSampleListValidation(sample_list_id):
@@ -140,7 +156,7 @@ def PutSampleListValidation(sample_list_id):
     #broadcast_job_validation(job, job.get_validation_status()[0])
 
     error = None
-    if job.get_validation_status() != ValidationStatus.SUCCESS:
+    if job.get_validation_status()[0] != ValidationStatus.SUCCESS:
         error = f'Error in validation. Full message: ' + data['validation']['message']
         lh_interface.deactivate()
 
