@@ -29,7 +29,8 @@ class InjectionSystemDevice(DeviceBase):
     def create_job_data(method_list: List[dict]) -> dict:
         """Makes an Job from a list of methods"""
 
-        return {'method_data': [method_list]}
+        # only allow one method per list for now
+        return {'method_list': method_list}
 
 @dataclass
 class BaseInjectionSystemMethod(BaseMethod):
@@ -42,7 +43,7 @@ class BaseInjectionSystemMethod(BaseMethod):
     class sub_method:
         """Base class for representation in sample lists"""
         method_name: str
-        method_data: dict
+        method_data: dict = field(default_factory=dict)
 
         def to_dict(self) -> dict:
             """Creates dictionary representation; all custom field keys are prepended with a hash (#)
@@ -79,10 +80,6 @@ class RoadmapChannelInit(BaseInjectionSystemMethod):
     display_name: Literal['Init Injection System'] = 'Init Injection System'
     method_name: Literal['RoadmapChannelInit'] = 'RoadmapChannelInit'
 
-    @dataclass
-    class sub_method(BaseInjectionSystemMethod.sub_method):
-        pass
-
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
@@ -90,9 +87,7 @@ class RoadmapChannelInit(BaseInjectionSystemMethod):
         
         return [
             self.sub_method(
-                method_name='RoadmapChannelInit',
-                method_data={'name': 'RoadmapChannelInit',
-                                }
+                method_name='RoadmapChannelInit'
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
@@ -108,10 +103,6 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
     method_name: Literal['RoadmapChannelSleep'] = 'RoadmapChannelSleep'
     sleep_time: float = 1.0
 
-    @dataclass
-    class sub_method(BaseInjectionSystemMethod.sub_method):
-        pass
-
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
@@ -120,8 +111,7 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
         return [
             self.sub_method(
                 method_name='RoadmapChannelSleep',
-                method_data={'name': 'RoadmapChannelSleep',
-                                'sleep_time': self.sleep_time}
+                method_data={'sleep_time': self.sleep_time}
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
@@ -136,10 +126,6 @@ class PrimeLoop(BaseInjectionSystemMethod):
     display_name: Literal['Prime Injection System Loop'] = 'Prime Injection System Loop'
     method_name: Literal['PrimeLoop'] = 'PrimeLoop'
 
-    @dataclass
-    class sub_method(BaseInjectionSystemMethod.sub_method):
-        number_of_primes: int
-
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
@@ -148,8 +134,7 @@ class PrimeLoop(BaseInjectionSystemMethod):
         return [
             self.sub_method(
                 method_name='PrimeLoop',
-                method_data={'name': 'PrimeLoop',
-                             'number_of_primes': self.number_of_primes}
+                method_data={'number_of_primes': self.number_of_primes}
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
@@ -173,9 +158,8 @@ class InjectLoop(BaseInjectionSystemMethod):
         return [
             self.sub_method(
                 method_name='InjectLoop',
-                method_data={'name': 'InjectLoop',
-                                'pump_volume': self.Volume,
-                                'pump_flow_rate': self.Flow_Rate}
+                method_data={'pump_volume': self.Volume,
+                             'pump_flow_rate': self.Flow_Rate}
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
@@ -233,9 +217,8 @@ class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
         ).to_dict() | 
             self.sub_method(
                 method_name='LoadLoop',
-                method_data={'name': 'LoadLoop',
-                                'pump_volume': self.Volume,
-                                'pump_flow_rate': self.pump_flow_rate}
+                method_data={'pump_volume': self.Volume,
+                             'pump_flow_rate': self.pump_flow_rate}
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
