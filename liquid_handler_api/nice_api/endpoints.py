@@ -2,6 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
+from ..liquid_handler.autocontrol import async_submit
 from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
@@ -36,8 +37,9 @@ def _run_sample(data: dict) -> Response:
             tasks = sample.prepare_run_methods(stage, layout)
             sample.stages[stage].status = SampleStatus.PENDING
             for task in tasks:
-                print([t for t in task.tasks])
-                #LHqueue.submit(jobcontainer.job)
+                #print([t for t in task.tasks])
+                async_submit(task)
+                #LHqueue.submit(task)
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 
