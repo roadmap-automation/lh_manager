@@ -100,7 +100,7 @@ def GetListofSampleLists() -> Response:
     """
 
     job: LHJob | None = lh_interface.get_active_job()
-    sample_list = [] if job is None else [job.get_samplelist(listonly=True)]
+    sample_list = [] if job is None else [job.get_method_data(listonly=True)]
 
     return make_response({'sampleLists': sample_list}, 200)
 
@@ -120,7 +120,7 @@ def GetSampleList(sample_list_id: str) -> Response:
     if int(sample_list_id) != job.LH_id:
         return make_response({'error': f'requested job ID {sample_list_id} does not match active job ID {job.LH_id}'}, 400)
 
-    sample_list = [job.get_samplelist(listonly=False)]
+    sample_list = [job.get_method_data(listonly=False)]
 
     return make_response({'sampleLists': sample_list}, 200)
 
