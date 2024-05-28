@@ -123,4 +123,5 @@ LHqueue = JobQueue()
 
 # Add appropriate functions to lh_interface callbacks
 lh_interface.results_callbacks.append(LHqueue.update_job_result)
-lh_interface.validation_callbacks.append(LHqueue.update_job_validation)
+#lh_interface.validation_callbacks.append(LHqueue.update_job_validation)
+lh_interface.validation_callbacks.append(print)
