@@ -36,10 +36,7 @@ def _run_sample(data: dict) -> Response:
             # submit everything
             tasks = sample.prepare_run_methods(stage, layout)
             sample.stages[stage].status = SampleStatus.PENDING
-            for task in tasks:
-                #print([t for t in task.tasks])
-                async_submit(task)
-                #LHqueue.submit(task)
+            async_submit(tasks)
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 
