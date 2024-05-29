@@ -214,18 +214,13 @@ class Sample:
         tasks: List[Task] = []
         for method in rendered_methods:
             new_task = Task(id=str(uuid4()),
-                            tasks=[TaskData(device=device_name,
+                            task_type=TaskType.NOCHANNEL,
+                            tasks=[TaskData(id=uuid4(),
+                                            device=device_name,
                                             channel=self.channel,
                                             method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
                                     for device_name in method.keys()])
             
-            if len(new_task.tasks) > 1:
-                # transfer method
-                new_task.task_type = TaskType.TRANSFER
-            else:
-                # TODO: figure out how to signal this
-                new_task.task_type = TaskType.PREPARE
-
             tasks.append(new_task)
         
         return tasks
