@@ -44,7 +44,7 @@ def broadcast_job_result(job: LHJob, method_number: int, method_name: str, resul
         result (ResultStatus): nature of result
     """
 
-    socketio.emit('job_validation',
+    socketio.emit('job_result',
                   {'job_id': job.id,
                    'method_number': method_number,
                    'method_name': method_name,
