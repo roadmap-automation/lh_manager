@@ -4,7 +4,7 @@ from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, register_device
 from .job import JobBase
-from .lhmethods import BaseLHMethod, InjectMethod
+from .lhmethods import BaseLHMethod, InjectMethod, Sleep
 
 from pydantic.v1.dataclasses import dataclass
 
@@ -164,6 +164,35 @@ class InjectLoop(BaseInjectionSystemMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
+
+@register
+@dataclass
+class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
+    display_name: Literal['IS + LH Sleep'] = 'IS + LH Sleep'
+    method_name: Literal['IS_LH_Sleep'] = 'IS_LH_Sleep'
+    Injection_System_Sleep_Time: float = 1.0
+    LH_Sleep_Time: float = 1.0
+
+    @dataclass
+    class lh_method(BaseLHMethod.lh_method):
+        Time: str
+    
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
+        
+        return [self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME='NCNR_Sleep',
+            Time=f'{self.LH_Sleep_Time}'
+        ).to_dict() | 
+            self.sub_method(
+                method_name='RoadmapChannelSleep',
+                method_data={'sleep_time': self.Injection_System_Sleep_Time}
+            ).to_dict()]    
+
 
 @register
 @dataclass
