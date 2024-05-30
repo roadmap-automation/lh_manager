@@ -36,11 +36,7 @@ def _run_sample(data: dict) -> Response:
             # submit everything
             tasks = sample.prepare_run_methods(stage, layout)
             sample.stages[stage].status = SampleStatus.PENDING
-            init_time = time.time()
             submit_tasks(tasks)
-            #async_submit(tasks)
-            print('Elapsed time: ', time.time() - init_time)
-
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 

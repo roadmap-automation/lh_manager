@@ -61,7 +61,7 @@ def GetStatus() -> Response:
 
     status_map = {InterfaceStatus.BUSY: Status.BUSY,
                  InterfaceStatus.DOWN: Status.DOWN,
-                 InterfaceStatus.UP: Status.UP}
+                 InterfaceStatus.UP: Status.IDLE}
     
     print(lh_interface.get_status())
 
