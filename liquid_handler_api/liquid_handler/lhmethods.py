@@ -37,6 +37,9 @@ class LHDevice(DeviceBase):
     """
 
     device_name: str = 'Gilson 271 Liquid Handler'
+    multichannel: bool = False
+    address: str = 'http://localhost:5001'
+
 
     @dataclass
     class Job(LHJob):

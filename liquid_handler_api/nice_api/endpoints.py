@@ -2,7 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..liquid_handler.autocontrol import async_submit
+from ..liquid_handler.autocontrol import submit_tasks, init_devices
 from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
@@ -36,7 +36,11 @@ def _run_sample(data: dict) -> Response:
             # submit everything
             tasks = sample.prepare_run_methods(stage, layout)
             sample.stages[stage].status = SampleStatus.PENDING
-            async_submit(tasks)
+            init_time = time.time()
+            submit_tasks(tasks)
+            #async_submit(tasks)
+            print('Elapsed time: ', time.time() - init_time)
+
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 

@@ -217,10 +217,16 @@ class Sample:
                             task_type=TaskType.NOCHANNEL,
                             tasks=[TaskData(id=uuid4(),
                                             device=device_name,
-                                            channel=self.channel,
+                                            channel=(self.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
                                             method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
                                     for device_name in method.keys()])
             
+            # transfer task
+            if len(new_task.tasks) > 1:
+                new_task.task_type = TaskType.TRANSFER
+            elif new_task.tasks[0].channel is not None:
+                new_task.task_type = TaskType.MEASURE
+
             tasks.append(new_task)
         
         return tasks

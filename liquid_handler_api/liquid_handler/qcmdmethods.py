@@ -20,6 +20,8 @@ class QCMDMeasurementDevice(DeviceBase):
     """
 
     device_name: str = 'QCMD Measurement Device'
+    multichannel: bool = True
+    address: str = 'http://localhost:5011'
 
     @dataclass
     class Job(LHJob):

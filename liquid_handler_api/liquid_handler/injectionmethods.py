@@ -20,6 +20,8 @@ class InjectionSystemDevice(DeviceBase):
     """
 
     device_name: str = 'Multichannel Injection System'
+    multichannel: bool = True
+    address: str = 'http://localhost:5003'
 
     @dataclass
     class Job(JobBase):

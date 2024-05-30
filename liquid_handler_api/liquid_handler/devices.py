@@ -11,6 +11,18 @@ class DeviceBase:
     """
 
     device_name: str = 'none'
+    multichannel: bool = False
+    address: str = 'http://0.0.0.0:0000'
+
+    @classmethod
+    def is_multichannel(cls) -> bool:
+        """Determines if device is a multichannel device
+
+        Returns:
+            bool: True if multichannel, False if not
+        """
+
+        return cls.multichannel
 
     @dataclass
     class Job(JobBase):
