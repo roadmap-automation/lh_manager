@@ -2,7 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..liquid_handler.autocontrol import submit_tasks, init_devices
+from ..liquid_handler.autocontrol import submit_tasks
 from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout

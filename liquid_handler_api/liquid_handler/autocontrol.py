@@ -38,5 +38,3 @@ def init_devices():
                   for device in device_manager.device_list]
     
     submit_tasks(init_tasks)
-
-init_devices()

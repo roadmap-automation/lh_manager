@@ -3,6 +3,7 @@ from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .nice_api import nice_blueprint
 from .sio import socketio
+from .liquid_handler.autocontrol import init_devices
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -34,6 +35,7 @@ def test_emit():
     return render_template('test_emit.html')
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5002, debug=True)
+    init_devices()
+    socketio.run(app, host='localhost', port=5002, debug=True)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)
