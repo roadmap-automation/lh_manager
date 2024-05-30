@@ -20,6 +20,7 @@ class QCMDMeasurementDevice(DeviceBase):
     """
 
     device_name: str = 'QCMD Measurement Device'
+    device_type: str = 'qcmd'
     multichannel: bool = True
     address: str = 'http://localhost:5011'
 

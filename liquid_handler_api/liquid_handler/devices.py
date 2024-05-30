@@ -11,6 +11,7 @@ class DeviceBase:
     """
 
     device_name: str = 'none'
+    device_type: str = 'none'
     multichannel: bool = False
     address: str = 'http://0.0.0.0:0000'
 

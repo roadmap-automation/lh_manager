@@ -33,6 +33,7 @@ def submit_tasks(tasks: List[Task]):
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
                        tasks=[TaskData(device=device.device_name,
+                                       device_type=device.device_type,
                                        device_address=device.address,
                                        number_of_channels=(samples.n_channels if device.is_multichannel() else 0))])
                   for device in device_manager.device_list]
