@@ -175,6 +175,7 @@ class LHInterface:
     def __init__(self) -> None:
         self._active_job: LHJob | None = None
         self.running: bool = True
+        self.activation_callbacks: List[Callable] = []
         self.validation_callbacks: List[Callable] = []
         self.results_callbacks: List[Callable] = []
 
@@ -239,7 +240,7 @@ class LHInterface:
         for callback in self.validation_callbacks:
             callback(job, *args, **kwargs)
 
-    def activate_job(self, job: LHJob):
+    def activate_job(self, job: LHJob, *args, **kwargs):
         """Activates an LHJob"""
 
         # check that interface is idle
@@ -266,6 +267,10 @@ class LHInterface:
         self._active_job = job
 
         self.update_history()
+        
+        # run callbacks
+        for callback in self.activation_callbacks:
+            callback(job, *args, **kwargs)
         
     def deactivate(self):
         """Removes current job and goes idle

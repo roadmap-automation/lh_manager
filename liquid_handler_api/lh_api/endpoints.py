@@ -54,6 +54,7 @@ def broadcast_job_result(job: LHJob, method_number: int, method_name: str, resul
 # Signal updates to results and validation
 lh_interface.results_callbacks.append(broadcast_job_result)
 lh_interface.validation_callbacks.append(broadcast_job_validation)
+lh_interface.activation_callbacks.append(broadcast_job_activation)
 
 @lh_blueprint.route('/LH/GetStatus', methods=['GET'])
 def GetStatus() -> Response:
@@ -100,10 +101,6 @@ def SubmitJob() -> Response:
 
     # activate the job
     lh_interface.activate_job(job)
-    broadcast_job_activation(job)
-    #emit('job_activation',
-    #              dict({'job_id': job.id}),
-    #              broadcast=True, include_self=True)
 
     return make_response({'success': 'job accepted'}, 200)
 
