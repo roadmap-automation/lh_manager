@@ -38,7 +38,7 @@ class MethodList:
         in a single stage"""
     createdDate: str | None = None
     methods: List[MethodsType] = field(default_factory=list)
-    run_jobs: Dict[str, JobContainer] | None = None
+    run_jobs: List[str] | None = None
     status: SampleStatus = SampleStatus.INACTIVE
 
     def __post_init__(self):
@@ -47,39 +47,27 @@ class MethodList:
             if isinstance(method, dict):
                 self.methods[i] = method_manager.get_method_by_name(method['method_name'])(**method)
 
-        # will probably never happen
-        if self.run_jobs is not None:
-            for k, v in self.run_jobs.items():
-                if isinstance(v, dict):
-                    self.run_jobs[k] = JobContainer(**v)
-
     def addMethod(self, method: MethodsType) -> None:
         """Adds new method"""
         self.methods.append(method)
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        """Generates estimated time of all methods in list. If list has been prepared for run,
-            use estimated time only from those methods that have not completed
+        """Generates estimated time of all methods in list. Does not track method completion
 
         Returns:
             float: total estimated time in default time units
         """
 
-        if self.run_jobs is None:
-            return sum(m.estimated_time(layout) for m in self.methods)
-        else:
-            return sum(m.estimated_time(layout)
-                       for jobcontainer in self.run_jobs.values()
-                       for m, complete in zip(jobcontainer.methods, jobcontainer.job.get_results())
-                       if (complete != ResultStatus.SUCCESS))
+        # NOTE: Does not currently update estimated time based on completion
+
+        return sum(m.estimated_time(layout) for m in self.methods)
 
     def update_status(self) -> None:
         """Updates status based on run_methods
         """
 
         if self.run_jobs is not None:
-            completion_status = [(complete == ResultStatus.SUCCESS) for jobcontainer in self.run_jobs.values() for complete in jobcontainer.job.get_results()]
-            if all(completion_status):
+            if len(self.run_jobs) == 0:
                 self.status = SampleStatus.COMPLETED
 
     def explode(self, layout: LHBedLayout):
@@ -111,16 +99,12 @@ class MethodList:
         self.run_jobs = None
     
     def get_method_completion(self) -> bool:
-        """Returns list of method completion status. If prepare_run_methods has not been
-            run (i.e. run_methods is None), returns False
+        """Method completion is not currently being tracked. Returns False
 
         Returns:
-            bool: Method completion status, one for each method in methods
+            bool: False
         """
 
-        if self.run_jobs is not None:
-            return all((complete == ResultStatus.SUCCESS) for jobcontainer in self.run_jobs.values() for complete in jobcontainer.job.get_results())
-        
         return False
 
 @dataclass
@@ -212,6 +196,7 @@ class Sample:
 
         # create tasks, one per method
         tasks: List[Task] = []
+        self.stages[stage].run_jobs = []
         for method in rendered_methods:
             new_task = Task(id=str(uuid4()),
                             task_type=TaskType.NOCHANNEL,
@@ -221,11 +206,13 @@ class Sample:
                                             method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
                                     for device_name in method.keys()])
             
-            # transfer task
+            # detect transfer tasks
             if len(new_task.tasks) > 1:
                 new_task.task_type = TaskType.TRANSFER
             elif new_task.tasks[0].channel is not None:
                 new_task.task_type = TaskType.MEASURE
+
+            self.stages[stage].run_jobs += [str(task.id) for task in new_task.tasks]
 
             tasks.append(new_task)
         
