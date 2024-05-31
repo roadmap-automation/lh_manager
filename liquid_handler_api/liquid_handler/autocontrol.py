@@ -1,23 +1,30 @@
 """Interface for autocontrol"""
 
-from typing import List
+from typing import List, Dict
 import requests
 import threading
+import time
 from autocontrol.task_struct import Task, TaskData, TaskType
 
 from .devices import device_manager
 from .state import samples
+from .samplecontainer import SampleStatus
+
+ACTIVE_STATUS = [SampleStatus.PENDING, SampleStatus.PARTIAL, SampleStatus.ACTIVE]
+active_tasks: Dict[str, List[str]] = {'active_tasks': []}
 
 port = 5004
 
-def to_thread(f):
-    """Decorator that starts target function in a new thread"""
-    def wrap(*args, **kwargs):
-        threading.Thread(target=f, args=args, kwargs=kwargs).start()
-    wrap.__name__ = f.__name__
-    return wrap
+def to_thread(**thread_kwargs):
+    def decorator_to_thread(f):
+        """Decorator that starts target function in a new thread"""
+        def wrap(*args, **kwargs):
+            threading.Thread(target=f, args=args, kwargs=kwargs, **thread_kwargs).start()
+        wrap.__name__ = f.__name__
+        return wrap
+    return decorator_to_thread
 
-@to_thread
+@to_thread()
 def submit_tasks(tasks: List[Task]):
     #print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + 'Sample: ' + str(task.sample_id) + '\n')
     for task in tasks:
@@ -39,3 +46,18 @@ def init_devices():
                   for device in device_manager.device_list]
     
     submit_tasks(init_tasks)
+
+@to_thread(daemon=True)
+def synchronize_status(poll_delay: 5, active_tasks: Dict[str, List[str]]):
+
+    def check_status_completion(task) -> bool:
+        # send task id to autocontrol to get status
+        pass
+
+    while True:
+
+        for task in active_tasks['active_tasks']:
+            if check_status_completion(task):
+                active_tasks['active_tasks'].pop(task)
+
+        time.sleep(poll_delay)
