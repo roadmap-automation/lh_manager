@@ -13,10 +13,11 @@ from autocontrol.status import Status
 from ..gui_api.events import trigger_sample_status_update
 
 from ..liquid_handler.devices import device_manager
+from ..liquid_handler.lhqueue import submit_handler
 from ..liquid_handler.methods import MethodsType
 from ..liquid_handler.bedlayout import LHBedLayout
 from ..liquid_handler.samplelist import Sample, StageName
-from ..liquid_handler.state import samples
+from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
 
@@ -67,11 +68,29 @@ def launch_autocontrol_interface(poll_delay: int = 5):
     # check that autocontrol is running
     if verify_connection():
 
+        # register callback
+        submit_handler.submit_callbacks.append(submission_callback)
+
         # initialize devices
         init_devices()
 
         # start synchronization code
         synchronize_status(poll_delay)
+
+def submission_callback(data: dict):
+    """Submission handler callback
+
+    Args:
+        data (dict): dictionary of submission data
+    """
+
+    if 'id' in data:
+        _, sample = samples.getSampleById(data['id'])
+    else:
+        sample = samples.getSamplebyName(data['name'])
+
+    for stage in data['stage']:
+        prepare_and_submit(sample, stage, layout)
 
 def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
     """Prepares a method list for running by populating run_methods and run_methods_complete.
@@ -182,3 +201,4 @@ def synchronize_status(poll_delay: int = 5):
 
 
         time.sleep(poll_delay)
+

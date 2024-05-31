@@ -16,6 +16,22 @@ def validate_format(data: dict) -> bool:
     print('data in: ', list(data.keys()))
     return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
 
+class JobRunner:
+    """Routes jobs to submission callbacks. Serves to enable plugins for various interfaces.
+        Callbacks should accept data of the validate_format variety.
+    """
+
+    def __init__(self, submit_callbacks: List[Callable] = []) -> None:
+        self.submit_callbacks = submit_callbacks
+
+    def submit(self, data: dict, *args, **kwargs) -> List:
+        """Runs submission callbacks
+        """
+
+        results = []
+        for callback in self.submit_callbacks:
+            results.append(callback(data, *args, **kwargs))
+
 @dataclass
 class JobQueue:
     """Hub for interfacing (upstream) samples object to (downstream) running of jobs.
@@ -120,6 +136,8 @@ class JobQueue:
 ## ========== Liquid handler queue initialization ============
 
 LHqueue = JobQueue()
+
+submit_handler = JobRunner()
 
 # Add appropriate functions to lh_interface callbacks
 lh_interface.results_callbacks.append(LHqueue.update_job_result)
