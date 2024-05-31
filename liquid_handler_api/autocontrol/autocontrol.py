@@ -6,9 +6,9 @@ import threading
 import time
 from autocontrol.task_struct import Task, TaskData, TaskType
 
-from .devices import device_manager
-from .state import samples
-from .samplecontainer import SampleStatus
+from ..liquid_handler.devices import device_manager
+from ..liquid_handler.state import samples
+from ..liquid_handler.samplecontainer import SampleStatus
 
 ACTIVE_STATUS = [SampleStatus.PENDING, SampleStatus.PARTIAL, SampleStatus.ACTIVE]
 active_tasks: Dict[str, List[str]] = {'active_tasks': []}
