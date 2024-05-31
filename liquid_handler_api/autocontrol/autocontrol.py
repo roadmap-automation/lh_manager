@@ -116,8 +116,8 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
     # render all the methods
     rendered_methods: List[dict] = [m2
                                     for m in all_methods
-                                    for m2 in m.render_lh_method(sample_name=self.name,
-                                                    sample_description=self.description,
+                                    for m2 in m.render_lh_method(sample_name=sample.name,
+                                                    sample_description=sample.description,
                                                     layout=layout)]
 
     # create tasks, one per method
@@ -127,7 +127,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
         new_task = Task(id=str(uuid4()),
                         sample_id=sample.id,
                         task_type=TaskType.NOCHANNEL,
-                        tasks=[TaskData(id=uuid4(),
+                        tasks=[TaskData(id=str(uuid4()),
                                         device=device_name,
                                         channel=(sample.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
                                         method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
@@ -142,7 +142,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
         # reserve active_tasks (and sample.stages[stage])
         with active_tasks.lock:
             sample.stages[stage].run_jobs.append([task.id for task in new_task.tasks])
-            active_tasks.active.update({task.id: Item(sample.id, stage) for task in new_task.tasks})
+            active_tasks.pending.update({task.id: Item(sample.id, stage) for task in new_task.tasks})
 
         tasks.append(new_task)
     
@@ -164,13 +164,14 @@ def submit_tasks(tasks: List[Task]):
         data = task.model_dump_json()
         response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=data)
         print('Autocontrol response: ', response.status_code)
-        with active_tasks.lock:
-            if response.ok:
-                for taskdata in task.tasks:
-                    active_tasks.active.update({taskdata.id: active_tasks.active.pop(taskdata.id)})
-            else:
-                for taskdata in task.tasks:
-                    active_tasks.rejected.update({taskdata.id: active_tasks.active.pop(taskdata.id)})
+        if task.task_type != TaskType.INIT:
+            with active_tasks.lock:
+                if response.ok:
+                    for taskdata in task.tasks:
+                        active_tasks.active.update({taskdata.id: active_tasks.pending.pop(taskdata.id)})
+                else:
+                    for taskdata in task.tasks:
+                        active_tasks.rejected.update({taskdata.id: active_tasks.active.pop(taskdata.id)})
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
@@ -179,7 +180,7 @@ def init_devices():
                                        device_address=device.address,
                                        number_of_channels=(samples.n_channels if device.is_multichannel() else None))])
                   for device in device_manager.device_list]
-    
+
     submit_tasks(init_tasks)
 
 @to_thread(daemon=True)
@@ -202,7 +203,7 @@ def synchronize_status(poll_delay: int = 5):
 
         # reserve active_tasks (and samples)
         with active_tasks.lock:
-            for taskdata_id in copy.copy(active_tasks.active.keys()):
+            for taskdata_id in copy.copy(list(active_tasks.active.keys())):
                 if check_status_completion(taskdata_id):
                     parent_item = active_tasks.active.pop(taskdata_id)
                     _, sample = samples.getSampleById(parent_item.id)
