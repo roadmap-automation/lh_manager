@@ -1,4 +1,5 @@
 """Internal queue for feeding LH operations one at a time"""
+from flask import make_response, Response
 from typing import Dict, Callable, List
 from threading import Lock
 from dataclasses import field
@@ -18,19 +19,21 @@ def validate_format(data: dict) -> bool:
 
 class JobRunner:
     """Routes jobs to submission callbacks. Serves to enable plugins for various interfaces.
-        Callbacks should accept data of the validate_format variety.
+        Callbacks should accept data of the validate_format variety and be non-blocking.
     """
 
     def __init__(self, submit_callbacks: List[Callable] = []) -> None:
         self.submit_callbacks = submit_callbacks
 
-    def submit(self, data: dict, *args, **kwargs) -> List:
-        """Runs submission callbacks
+    def submit(self, data: dict, *args, **kwargs) -> Response:
+        """Runs submission callbacks and returns any errors
         """
 
         results = []
         for callback in self.submit_callbacks:
             results.append(callback(data, *args, **kwargs))
+        
+        return results
 
 @dataclass
 class JobQueue:

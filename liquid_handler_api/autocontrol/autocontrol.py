@@ -89,8 +89,19 @@ def submission_callback(data: dict):
     else:
         sample = samples.getSamplebyName(data['name'])
 
-    for stage in data['stage']:
-        prepare_and_submit(sample, stage, layout)
+    # check that sample name exists
+    if sample is not None:
+        # check that requested stages are inactive
+        for stage in data['stage']:
+            if sample.stages[stage].status != SampleStatus.INACTIVE:
+                return f'stage {stage} of sample {data["name"]} is not inactive'
+            
+            sample.stages[stage].status = SampleStatus.PENDING
+            prepare_and_submit(sample, stage, layout)
+
+        return
+
+    return 'sample not found'
 
 def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
     """Prepares a method list for running by populating run_methods and run_methods_complete.

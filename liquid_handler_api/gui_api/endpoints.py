@@ -11,8 +11,8 @@ from ..liquid_handler.methods import method_manager
 from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
-from ..liquid_handler.lhqueue import LHqueue, JobQueue
-from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update
+from ..liquid_handler.lhqueue import LHqueue, JobQueue, submit_handler, validate_format
+from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update, trigger_run_queue_update
 from . import gui_blueprint
 
 @gui_blueprint.route('/webform/AddSample/', methods=['POST'])
@@ -158,6 +158,31 @@ def ArchiveandRemoveSample() -> Response:
         samples.archiveSample(sample)
         samples.deleteSample(sample)
         return make_response({'sample archived and removed': id}, 200)
+
+@gui_blueprint.route('/GUI/RunSample/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_sample_status_update
+def RunSample() -> Response:
+    """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
+    data = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data):
+
+        # catch null UUID
+        if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
+            data['uuid'] = None
+
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
+
 
 @gui_blueprint.route('/GUI/UpdateDryRunQueue/', methods=['POST'])
 @trigger_samples_update

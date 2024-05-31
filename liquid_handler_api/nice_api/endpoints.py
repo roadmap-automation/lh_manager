@@ -2,8 +2,8 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..autocontrol.autocontrol import prepare_and_submit
 from ..liquid_handler.lhqueue import LHqueue, validate_format, submit_handler
+from ..liquid_handler.lhmethods import LHJob
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item, StageName
@@ -12,7 +12,7 @@ from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_upd
 
 from . import nice_blueprint
 
-def _run_sample(data: dict) -> Response:
+def _run_sample(data: dict) -> str | None:
     """ Generic function for processing a run request"""
 
     if 'id' in data:
@@ -25,7 +25,7 @@ def _run_sample(data: dict) -> Response:
         # check that requested stages are inactive
         for stage in data['stage']:
             if sample.stages[stage].status != SampleStatus.INACTIVE:
-                return make_response({'result': 'error', 'message': f'stage {stage} of sample {data["name"]} is not inactive'}, 400)
+                return f'stage {stage} of sample {data["name"]} is not inactive'
             
             # only if an injection operation, set sample NICE_uuid and NICE_slotID
             if data['stage'] == StageName.INJECT:
@@ -37,11 +37,11 @@ def _run_sample(data: dict) -> Response:
             # TODO: make a generic sample runner that is callback based for plugging in a NICE API or AutoControl API
 
             sample.stages[stage].status = SampleStatus.PENDING
-            submit_handler.submit(data)
+            # TODO: figure out the NICE queue here
 
-        return make_response({'result': 'success', 'message': 'success'}, 200)
+        return
 
-    return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+    return 'sample not found'
 
 @nice_blueprint.route('/NICE/RunSample/<sample_name>/<uuid>/<slotID>/<stage>/', methods=['GET'])
 @trigger_run_queue_update
@@ -72,8 +72,14 @@ def RunSamplewithUUID() -> Response:
         if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
             data['uuid'] = None
 
-        return _run_sample(data)
-    
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
     return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
 
 def _getActiveSample() -> str:
