@@ -275,7 +275,7 @@ export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep
   const slotID = NICE_slotID ?? null; // don't send undefined.
   const data = { name, id, uuid, slotID, stage };
   console.log({data});
-  const update_result = await fetch("/NICE/RunSamplewithUUID/", {
+  const update_result = await fetch("/GUI/RunSample/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
