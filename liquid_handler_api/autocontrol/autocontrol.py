@@ -20,6 +20,7 @@ from ..liquid_handler.samplelist import Sample, StageName
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
+from ..liquid_handler.lhinterface import lh_interface, LHJob, ResultStatus
 
 AUTOCONTROL_PORT = 5004
 AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
@@ -103,6 +104,17 @@ def submission_callback(data: dict):
 
     return 'sample not found'
 
+@trigger_sample_status_update
+def results_callback(job: LHJob, *args, **kwargs):
+
+    if job.get_result_status() == ResultStatus.SUCCESS:
+        parent_item = active_tasks.active.pop(job.id)
+        _, sample = samples.getSampleById(parent_item.id)
+        sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(str(job.id)))
+        sample.stages[parent_item.stage].update_status()
+
+lh_interface.results_callbacks.append(results_callback)
+
 def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
     """Prepares a method list for running by populating run_methods and run_methods_complete.
         List can then be used for dry or wet runs
@@ -142,7 +154,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
         # reserve active_tasks (and sample.stages[stage])
         with active_tasks.lock:
             sample.stages[stage].run_jobs += [str(task.id) for task in new_task.tasks]
-            active_tasks.pending.update({task.id: Item(sample.id, stage) for task in new_task.tasks})
+            active_tasks.pending.update({str(task.id): Item(sample.id, stage) for task in new_task.tasks})
 
         tasks.append(new_task)
     
@@ -168,10 +180,10 @@ def submit_tasks(tasks: List[Task]):
             with active_tasks.lock:
                 if response.ok:
                     for taskdata in task.tasks:
-                        active_tasks.active.update({taskdata.id: active_tasks.pending.pop(taskdata.id)})
+                        active_tasks.active.update({str(taskdata.id): active_tasks.pending.pop(str(taskdata.id))})
                 else:
                     for taskdata in task.tasks:
-                        active_tasks.rejected.update({taskdata.id: active_tasks.active.pop(taskdata.id)})
+                        active_tasks.rejected.update({str(taskdata.id): active_tasks.active.pop(str(taskdata.id))})
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
@@ -207,7 +219,7 @@ def synchronize_status(poll_delay: int = 5):
                 if check_status_completion(taskdata_id):
                     parent_item = active_tasks.active.pop(taskdata_id)
                     _, sample = samples.getSampleById(parent_item.id)
-                    sample.stages[parent_item.stage].run_jobs.pop(str(taskdata_id))
+                    sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(taskdata_id))
                     sample.stages[parent_item.stage].update_status()
                     trigger_sample_status_update(lambda: None)
 
