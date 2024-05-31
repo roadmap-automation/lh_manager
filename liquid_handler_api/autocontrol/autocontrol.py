@@ -4,16 +4,61 @@ from typing import List, Dict
 import requests
 import threading
 import time
+from uuid import uuid4
 from autocontrol.task_struct import Task, TaskData, TaskType
 
 from ..liquid_handler.devices import device_manager
+from ..liquid_handler.methods import MethodsType
+from ..liquid_handler.bedlayout import LHBedLayout
+from ..liquid_handler.samplelist import MethodList
 from ..liquid_handler.state import samples
 from ..liquid_handler.samplecontainer import SampleStatus
 
+AUTOCONTROL_PORT = 5004
 ACTIVE_STATUS = [SampleStatus.PENDING, SampleStatus.PARTIAL, SampleStatus.ACTIVE]
+
 active_tasks: Dict[str, List[str]] = {'active_tasks': []}
 
-port = 5004
+def prepare_run_methods(stage: MethodList, layout: LHBedLayout) -> List[Task]:
+    """Prepares a method list for running by populating run_methods and run_methods_complete.
+        List can then be used for dry or wet runs
+    """
+
+    # Generate real-time tasks based on layout
+    all_methods: List[MethodsType] = []
+    for m in stage.methods:
+        all_methods += m.get_methods(layout)
+
+    # render all the methods
+    rendered_methods: List[dict] = [m2
+                                    for m in all_methods
+                                    for m2 in m.render_lh_method(sample_name=self.name,
+                                                    sample_description=self.description,
+                                                    layout=layout)]
+
+    # create tasks, one per method
+    tasks: List[Task] = []
+    stage.run_jobs = []
+    for method in rendered_methods:
+        new_task = Task(id=str(uuid4()),
+                        task_type=TaskType.NOCHANNEL,
+                        tasks=[TaskData(id=uuid4(),
+                                        device=device_name,
+                                        channel=(self.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
+                                        method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
+                                for device_name in method.keys()])
+        
+        # detect transfer tasks
+        if len(new_task.tasks) > 1:
+            new_task.task_type = TaskType.TRANSFER
+        elif new_task.tasks[0].channel is not None:
+            new_task.task_type = TaskType.MEASURE
+
+        stage.run_jobs += [str(task.id) for task in new_task.tasks]
+
+        tasks.append(new_task)
+    
+    return tasks
 
 def to_thread(**thread_kwargs):
     def decorator_to_thread(f):
@@ -48,7 +93,7 @@ def init_devices():
     submit_tasks(init_tasks)
 
 @to_thread(daemon=True)
-def synchronize_status(poll_delay: 5, active_tasks: Dict[str, List[str]]):
+def synchronize_status(poll_delay: 5):
 
     def check_status_completion(task) -> bool:
         # send task id to autocontrol to get status

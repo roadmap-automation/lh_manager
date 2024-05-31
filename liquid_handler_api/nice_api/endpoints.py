@@ -2,7 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..liquid_handler.autocontrol import submit_tasks
+from ..autocontrol.autocontrol import submit_tasks, prepare_run_methods
 from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
@@ -34,7 +34,7 @@ def _run_sample(data: dict) -> Response:
                 sample.NICE_slotID = int(slot_id) if slot_id is not None else None
 
             # submit everything
-            tasks = sample.prepare_run_methods(stage, layout)
+            tasks = prepare_run_methods(sample.stages[stage], layout)
             sample.stages[stage].status = SampleStatus.PENDING
             submit_tasks(tasks)
 

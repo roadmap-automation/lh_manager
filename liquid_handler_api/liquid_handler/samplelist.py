@@ -177,47 +177,6 @@ class Sample:
             print('Warning: undefined sample status. This should never happen!')
             return None
 
-    def prepare_run_methods(self, stage: StageName, layout: LHBedLayout) -> List[Task]:
-        """Prepares a method list for running by populating run_methods and run_methods_complete.
-            List can then be used for dry or wet runs
-        """
-
-        # Generate real-time tasks based on layout
-        all_methods: List[MethodsType] = []
-        for m in self.stages[stage].methods:
-            all_methods += m.get_methods(layout)
-
-        # render all the methods
-        rendered_methods: List[dict] = [m2
-                                        for m in all_methods
-                                        for m2 in m.render_lh_method(sample_name=self.name,
-                                                        sample_description=self.description,
-                                                        layout=layout)]
-
-        # create tasks, one per method
-        tasks: List[Task] = []
-        self.stages[stage].run_jobs = []
-        for method in rendered_methods:
-            new_task = Task(id=str(uuid4()),
-                            task_type=TaskType.NOCHANNEL,
-                            tasks=[TaskData(id=uuid4(),
-                                            device=device_name,
-                                            channel=(self.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
-                                            method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
-                                    for device_name in method.keys()])
-            
-            # detect transfer tasks
-            if len(new_task.tasks) > 1:
-                new_task.task_type = TaskType.TRANSFER
-            elif new_task.tasks[0].channel is not None:
-                new_task.task_type = TaskType.MEASURE
-
-            self.stages[stage].run_jobs += [str(task.id) for task in new_task.tasks]
-
-            tasks.append(new_task)
-        
-        return tasks
-
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
 example_method = Sleep(Time=0.1)
