@@ -4,29 +4,83 @@ from typing import List, Dict
 import requests
 import threading
 import time
+import copy
 from uuid import uuid4
+
 from autocontrol.task_struct import Task, TaskData, TaskType
+from autocontrol.status import Status
+
+from ..gui_api.events import trigger_sample_status_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.methods import MethodsType
 from ..liquid_handler.bedlayout import LHBedLayout
-from ..liquid_handler.samplelist import MethodList
+from ..liquid_handler.samplelist import Sample, StageName
 from ..liquid_handler.state import samples
+from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
 
 AUTOCONTROL_PORT = 5004
+AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
+DEFAULT_HEADERS = {'Content-Type': 'application/json'}
 ACTIVE_STATUS = [SampleStatus.PENDING, SampleStatus.PARTIAL, SampleStatus.ACTIVE]
 
-active_tasks: Dict[str, List[str]] = {'active_tasks': []}
+class ActiveTasks:
+    """Active tasks, used for communication with threads. Structure is
+        active_tasks: {task_data_id: Item(sample_id, stage_name)}
+        pending_tasks: <same>
+        rejected_tasks: <same>
 
-def prepare_run_methods(stage: MethodList, layout: LHBedLayout) -> List[Task]:
+    This is essentially a lookup table to keep track of MethodList.run_jobs for completion status
+    """
+
+    lock: threading.Lock = threading.Lock()
+    pending: Dict[str, Item] = {}
+    active: Dict[str, Item] = {}
+    rejected: Dict[str, Item] = {}
+
+active_tasks = ActiveTasks()
+
+def verify_connection() -> bool:
+    """Verifies that Autocontrol is alive
+
+    Returns:
+        bool: False if any issues, otherwise True
+    """
+    print('Connecting to AutoControl server...')
+    try:
+        response = requests.get(AUTOCONTROL_URL)
+    except requests.ConnectionError:
+        print('Autocontrol connection failed')
+        return False
+    
+    if not response.ok:
+        print(f'Autocontrol connection error, response code {response.status_code}')
+        return False
+
+    return True
+
+def launch_autocontrol_interface(poll_delay: int = 5):
+    """Launches autocontrol-based threads
+    """
+
+    # check that autocontrol is running
+    if verify_connection():
+
+        # initialize devices
+        init_devices()
+
+        # start synchronization code
+        synchronize_status(poll_delay)
+
+def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
     """Prepares a method list for running by populating run_methods and run_methods_complete.
         List can then be used for dry or wet runs
     """
-
+   
     # Generate real-time tasks based on layout
     all_methods: List[MethodsType] = []
-    for m in stage.methods:
+    for m in sample.stages[stage].methods:
         all_methods += m.get_methods(layout)
 
     # render all the methods
@@ -38,13 +92,14 @@ def prepare_run_methods(stage: MethodList, layout: LHBedLayout) -> List[Task]:
 
     # create tasks, one per method
     tasks: List[Task] = []
-    stage.run_jobs = []
+    sample.stages[stage].run_jobs = []
     for method in rendered_methods:
         new_task = Task(id=str(uuid4()),
+                        sample_id=sample.id,
                         task_type=TaskType.NOCHANNEL,
                         tasks=[TaskData(id=uuid4(),
                                         device=device_name,
-                                        channel=(self.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
+                                        channel=(sample.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
                                         method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
                                 for device_name in method.keys()])
         
@@ -54,11 +109,14 @@ def prepare_run_methods(stage: MethodList, layout: LHBedLayout) -> List[Task]:
         elif new_task.tasks[0].channel is not None:
             new_task.task_type = TaskType.MEASURE
 
-        stage.run_jobs += [str(task.id) for task in new_task.tasks]
+        # reserve active_tasks (and sample.stages[stage])
+        with active_tasks.lock:
+            sample.stages[stage].run_jobs.append([task.id for task in new_task.tasks])
+            active_tasks.active.update({task.id: Item(sample.id, stage) for task in new_task.tasks})
 
         tasks.append(new_task)
     
-    return tasks
+    submit_tasks(tasks)
 
 def to_thread(**thread_kwargs):
     def decorator_to_thread(f):
@@ -71,16 +129,18 @@ def to_thread(**thread_kwargs):
 
 @to_thread()
 def submit_tasks(tasks: List[Task]):
-    #print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + 'Sample: ' + str(task.sample_id) + '\n')
     for task in tasks:
         print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
-        url = 'http://localhost:' + str(port) + '/put'
-        headers = {'Content-Type': 'application/json'}
         data = task.model_dump_json()
-        response = requests.post(url, headers=headers, data=data)
-        print('Autocontrol response: ', response)
-
-    # TODO: keep track of unsuccessfully submitted tasks and re-expose them in the gui. Requires a callback function somewhere.
+        response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=data)
+        print('Autocontrol response: ', response.status_code)
+        with active_tasks.lock:
+            if response.ok:
+                for taskdata in task.tasks:
+                    active_tasks.active.update({taskdata.id: active_tasks.active.pop(taskdata.id)})
+            else:
+                for taskdata in task.tasks:
+                    active_tasks.rejected.update({taskdata.id: active_tasks.active.pop(taskdata.id)})
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
@@ -93,16 +153,32 @@ def init_devices():
     submit_tasks(init_tasks)
 
 @to_thread(daemon=True)
-def synchronize_status(poll_delay: 5):
+def synchronize_status(poll_delay: int = 5):
+    """Thread to periodically query sample status and update
 
-    def check_status_completion(task) -> bool:
+    Args:
+        poll_delay (Optional, int): Poll delay in seconds. Default 5
+    """
+
+    def check_status_completion(id: str) -> bool:
         # send task id to autocontrol to get status
-        pass
+        return False
+
+        response = requests.get(AUTOCONTROL_URL + '/check_status', headers=DEFAULT_HEADERS, data={'id': id})
+        
+        return response.json()['status']
 
     while True:
 
-        for task in active_tasks['active_tasks']:
-            if check_status_completion(task):
-                active_tasks['active_tasks'].pop(task)
+        # reserve active_tasks (and samples)
+        with active_tasks.lock:
+            for taskdata_id in copy.copy(active_tasks.active.keys()):
+                if check_status_completion(taskdata_id):
+                    parent_item = active_tasks.active.pop(taskdata_id)
+                    _, sample = samples.getSampleById(parent_item.id)
+                    sample.stages[parent_item.stage].run_jobs.pop(taskdata_id)
+                    sample.stages[parent_item.stage].update_status()
+                    trigger_sample_status_update(lambda: None)
+
 
         time.sleep(poll_delay)

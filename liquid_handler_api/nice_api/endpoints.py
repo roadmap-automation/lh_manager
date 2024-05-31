@@ -2,7 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..autocontrol.autocontrol import submit_tasks, prepare_run_methods
+from ..autocontrol.autocontrol import prepare_and_submit
 from ..liquid_handler.lhqueue import LHqueue, validate_format
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
@@ -34,9 +34,10 @@ def _run_sample(data: dict) -> Response:
                 sample.NICE_slotID = int(slot_id) if slot_id is not None else None
 
             # submit everything
-            tasks = prepare_run_methods(sample.stages[stage], layout)
+            # TODO: make a generic sample runner that is callback based for plugging in a NICE API or AutoControl API
+            
             sample.stages[stage].status = SampleStatus.PENDING
-            submit_tasks(tasks)
+            prepare_and_submit(sample.stages[stage], layout)
 
         return make_response({'result': 'success', 'message': 'success'}, 200)
 
