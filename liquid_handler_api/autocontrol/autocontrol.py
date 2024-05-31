@@ -127,7 +127,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
         new_task = Task(id=str(uuid4()),
                         sample_id=sample.id,
                         task_type=TaskType.NOCHANNEL,
-                        tasks=[TaskData(id=str(uuid4()),
+                        tasks=[TaskData(id=uuid4(),
                                         device=device_name,
                                         channel=(sample.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
                                         method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
@@ -141,7 +141,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
 
         # reserve active_tasks (and sample.stages[stage])
         with active_tasks.lock:
-            sample.stages[stage].run_jobs.append([task.id for task in new_task.tasks])
+            sample.stages[stage].run_jobs += [str(task.id) for task in new_task.tasks]
             active_tasks.pending.update({task.id: Item(sample.id, stage) for task in new_task.tasks})
 
         tasks.append(new_task)
@@ -207,7 +207,7 @@ def synchronize_status(poll_delay: int = 5):
                 if check_status_completion(taskdata_id):
                     parent_item = active_tasks.active.pop(taskdata_id)
                     _, sample = samples.getSampleById(parent_item.id)
-                    sample.stages[parent_item.stage].run_jobs.pop(taskdata_id)
+                    sample.stages[parent_item.stage].run_jobs.pop(str(taskdata_id))
                     sample.stages[parent_item.stage].update_status()
                     trigger_sample_status_update(lambda: None)
 
