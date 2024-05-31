@@ -42,7 +42,6 @@ def save_samples():
 if not parser.parse_args().noload:
     print('loading state!')
     layout, samples = load_state()
-    samples.n_channels = parser.parse_args().channels
 else:
     layout, samples = None, None
 
@@ -55,6 +54,8 @@ if samples is None:
     # TODO: remove for production
     for example_sample in example_sample_list:
         samples.addSample(example_sample)
+
+samples.n_channels = parser.parse_args().channels
 
     ## ======= Initialize bed layout =========
 if layout is None:
