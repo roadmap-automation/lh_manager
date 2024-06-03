@@ -21,7 +21,6 @@ from ..liquid_handler.samplelist import Sample, StageName
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
-from ..liquid_handler.lhinterface import lh_interface, LHJob, ResultStatus
 from ..liquid_handler.lhqueue import ActiveTasks
 
 AUTOCONTROL_PORT = 5004
@@ -90,17 +89,6 @@ def submission_callback(data: dict):
         return
 
     return 'sample not found'
-
-@trigger_sample_status_update
-def results_callback(job: LHJob, *args, **kwargs):
-    # this doesn't work now that we're using the parent task to update things
-    if job.get_result_status() == ResultStatus.SUCCESS:
-        parent_item = active_tasks.active.pop(job.id)
-        _, sample = samples.getSampleById(parent_item.id)
-        sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(str(job.id)))
-        sample.stages[parent_item.stage].update_status()
-
-#lh_interface.results_callbacks.append(results_callback)
 
 def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
     """Prepares a method list for running by populating run_methods and run_methods_complete.
