@@ -43,7 +43,7 @@ function add_sample() {
 }
 
 async function edit_sample_name(index) {
-  const s = samples.value[index];
+  const s = channel_samples.value[index];
   const { id, name, description } = s;
   modal_title.value = "Edit Sample Name and Description";
   sample_to_edit.value = { id, name, description };
