@@ -223,7 +223,7 @@ def synchronize_status(poll_delay: int = 5):
     def check_status_completion(id: str) -> bool:
         # send task id to autocontrol to get status
         try:
-            response = requests.get(AUTOCONTROL_URL + '/get_task_status', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': id}))
+            response = requests.get(AUTOCONTROL_URL + '/get_task_status/' + id)
         except ConnectionError:
             print(f'Warning: Autocontrol not connected')
             return False
