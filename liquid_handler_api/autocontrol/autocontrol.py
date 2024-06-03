@@ -14,14 +14,13 @@ from autocontrol.status import Status
 from ..gui_api.events import trigger_sample_status_update
 
 from ..liquid_handler.devices import device_manager
-from ..liquid_handler.lhqueue import submit_handler
+from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
 from ..liquid_handler.methods import MethodsType
 from ..liquid_handler.bedlayout import LHBedLayout
 from ..liquid_handler.samplelist import Sample, StageName
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
-from ..liquid_handler.lhqueue import ActiveTasks
 
 AUTOCONTROL_PORT = 5004
 AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
@@ -123,6 +122,12 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
         # detect transfer tasks
         if len(new_task.tasks) > 1:
             new_task.task_type = TaskType.TRANSFER
+
+            # required for non-channel devices
+            for task in new_task.tasks:
+                if task.channel is None:
+                    task.non_channel_storage = 'vial'
+
         elif new_task.tasks[0].channel is not None:
             new_task.task_type = TaskType.MEASURE
 
