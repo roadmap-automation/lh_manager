@@ -4,8 +4,6 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from autocontrol.status import Status
-
 from ..liquid_handler.job import ResultStatus, ValidationStatus
 
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
@@ -55,20 +53,6 @@ def broadcast_job_result(job: LHJob, method_number: int, method_name: str, resul
 lh_interface.results_callbacks.append(broadcast_job_result)
 lh_interface.validation_callbacks.append(broadcast_job_validation)
 lh_interface.activation_callbacks.append(broadcast_job_activation)
-
-@lh_blueprint.route('/LH/GetStatus', methods=['GET'])
-def GetStatus() -> Response:
-    """Gets Autocontrol status code"""
-
-    status_map = {InterfaceStatus.BUSY: Status.BUSY,
-                 InterfaceStatus.DOWN: Status.DOWN,
-                 InterfaceStatus.UP: Status.IDLE}
-    
-    print(lh_interface.get_status())
-
-    return make_response(dict(status=status_map[lh_interface.get_status()],
-                              channel_status=[])
-                              , 200)
 
 @lh_blueprint.route('/LH/GetJob/<job_id>', methods=['GET'])
 def GetJob(job_id: str) -> Response:

@@ -12,7 +12,6 @@ from .lhinterface import DATE_FORMAT
 from .items import StageName
 from .error import MethodError
 from .methods import MethodsType, BaseMethod, method_manager, Release
-from autocontrol.task_struct import Task, TaskData, TaskType
 from datetime import datetime
 
 # =============== Sample list handling =================
