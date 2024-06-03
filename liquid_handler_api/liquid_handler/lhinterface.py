@@ -226,11 +226,11 @@ class LHInterface:
         """
 
         self.update_job(job)
-        for callback in self.results_callbacks:
-            callback(job, *args, **kwargs)
-
         if job.get_result_status() == ResultStatus.SUCCESS:
             self.deactivate()
+                    
+        for callback in self.results_callbacks:
+            callback(job, *args, **kwargs)
 
     def update_job_validation(self, job: LHJob, *args, **kwargs):
         """Handles updates specifically to job validation. Triggers callbacks, which
