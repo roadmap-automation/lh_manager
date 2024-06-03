@@ -188,21 +188,23 @@ def synchronize_status(poll_delay: int = 5):
         poll_delay (Optional, int): Poll delay in seconds. Default 5
     """
 
-    def check_status_completion(id: str) -> bool:
+    def check_status_completion(id: str) -> str:
         # send task id to autocontrol to get status
         try:
             response = requests.get(AUTOCONTROL_URL + '/get_task_status/' + id)
         except ConnectionError:
             print(f'Warning: Autocontrol not connected')
-            return False
+            return 'not connected'
 
         if response.ok:
             if response.json()['queue'] == 'history':
-                return True
+                return 'complete'
         else:
+            if 'No task found' in response.text:
+                return 'task not found'
             print(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
         
-        return False
+        return 'uncaught error'
 
     @trigger_sample_status_update
     def mark_complete(id: str) -> None:
@@ -217,7 +219,12 @@ def synchronize_status(poll_delay: int = 5):
         # reserve active_tasks (and samples)
         with active_tasks.lock:
             for task_id in copy.copy(list(active_tasks.active.keys())):
-                if check_status_completion(task_id):
+                result = check_status_completion(task_id)
+                if result == 'complete':
+                    mark_complete(task_id)
+                elif result == 'task not found':
+                    # Remove item without updating parent
+                    print(f'Warning: id {task_id} not found, marking complete anyway')
                     mark_complete(task_id)
 
         time.sleep(poll_delay)
