@@ -7,6 +7,7 @@ from pydantic.v1.dataclasses import dataclass
 from datetime import datetime
 
 from .job import ResultStatus, ValidationStatus
+from .items import Item
 
 from .state import samples, layout
 from .samplelist import SampleStatus
@@ -34,6 +35,39 @@ class JobRunner:
             results.append(callback(data, *args, **kwargs))
         
         return results
+
+class ActiveTasks:
+    """Active tasks, used for communication with threads. Structure is
+        active_tasks: {task_data_id: Item(sample_id, stage_name)}
+        pending_tasks: <same>
+        rejected_tasks: <same>
+
+    This is essentially a lookup table to keep track of MethodList.run_jobs for completion status
+    """
+
+    def __init__(self) -> None:
+        self.lock: Lock = Lock()
+        self.pending: Dict[str, Item] = {}
+        self.active: Dict[str, Item] = {}
+        self.rejected: Dict[str, Item] = {}
+
+        self.populate()
+
+    def populate(self) -> None:
+        """Populates list of active jobs from SampleContainer
+        """
+
+#        self.active.update({
+#            id: Item(sample.id, stagename)
+#                for sample in samples.samples
+#                for stagename, stage in sample.stages.items()
+#                for id in stage.run_jobs if stage.run_jobs is not None
+#        })
+        for sample in samples.samples:
+            for stagename, stage in sample.stages.items():
+                if stage.run_jobs is not None:
+                    self.active.update({id: Item(sample.id, stagename) for id in stage.run_jobs})
+
 
 @dataclass
 class JobQueue:

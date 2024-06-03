@@ -22,43 +22,11 @@ from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
 from ..liquid_handler.lhinterface import lh_interface, LHJob, ResultStatus
+from ..liquid_handler.lhqueue import ActiveTasks
 
 AUTOCONTROL_PORT = 5004
 AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
 DEFAULT_HEADERS = {'Content-Type': 'application/json'}
-
-class ActiveTasks:
-    """Active tasks, used for communication with threads. Structure is
-        active_tasks: {task_data_id: Item(sample_id, stage_name)}
-        pending_tasks: <same>
-        rejected_tasks: <same>
-
-    This is essentially a lookup table to keep track of MethodList.run_jobs for completion status
-    """
-
-    def __init__(self) -> None:
-        self.lock: threading.Lock = threading.Lock()
-        self.pending: Dict[str, Item] = {}
-        self.active: Dict[str, Item] = {}
-        self.rejected: Dict[str, Item] = {}
-
-        self.populate()
-
-    def populate(self) -> None:
-        """Populates list of active jobs from SampleContainer
-        """
-
-#        self.active.update({
-#            id: Item(sample.id, stagename)
-#                for sample in samples.samples
-#                for stagename, stage in sample.stages.items()
-#                for id in stage.run_jobs if stage.run_jobs is not None
-#        })
-        for sample in samples.samples:
-            for stagename, stage in sample.stages.items():
-                if stage.run_jobs is not None:
-                    self.active.update({id: Item(sample.id, stagename) for id in stage.run_jobs})
-
 
 active_tasks = ActiveTasks()
 
