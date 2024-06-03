@@ -214,6 +214,11 @@ def synchronize_status(poll_delay: int = 5):
         sample.stages[parent_item.stage].status = SampleStatus.PARTIAL
         sample.stages[parent_item.stage].update_status()
 
+        # if sample stage is complete, execute all methods
+        if sample.stages[parent_item.stage].status == SampleStatus.COMPLETED:
+            for method in sample.stages[parent_item.stage].methods:
+                method.execute(layout)
+
     while True:
 
         # reserve active_tasks (and samples)
