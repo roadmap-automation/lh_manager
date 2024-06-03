@@ -5,6 +5,7 @@ import requests
 import threading
 import time
 import copy
+import json
 from uuid import uuid4
 
 from autocontrol.task_struct import Task, TaskData, TaskType
@@ -25,7 +26,6 @@ from ..liquid_handler.lhinterface import lh_interface, LHJob, ResultStatus
 AUTOCONTROL_PORT = 5004
 AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
 DEFAULT_HEADERS = {'Content-Type': 'application/json'}
-ACTIVE_STATUS = [SampleStatus.PENDING, SampleStatus.PARTIAL, SampleStatus.ACTIVE]
 
 class ActiveTasks:
     """Active tasks, used for communication with threads. Structure is
@@ -36,10 +36,29 @@ class ActiveTasks:
     This is essentially a lookup table to keep track of MethodList.run_jobs for completion status
     """
 
-    lock: threading.Lock = threading.Lock()
-    pending: Dict[str, Item] = {}
-    active: Dict[str, Item] = {}
-    rejected: Dict[str, Item] = {}
+    def __init__(self) -> None:
+        self.lock: threading.Lock = threading.Lock()
+        self.pending: Dict[str, Item] = {}
+        self.active: Dict[str, Item] = {}
+        self.rejected: Dict[str, Item] = {}
+
+        self.populate()
+
+    def populate(self) -> None:
+        """Populates list of active jobs from SampleContainer
+        """
+
+#        self.active.update({
+#            id: Item(sample.id, stagename)
+#                for sample in samples.samples
+#                for stagename, stage in sample.stages.items()
+#                for id in stage.run_jobs if stage.run_jobs is not None
+#        })
+        for sample in samples.samples:
+            for stagename, stage in sample.stages.items():
+                if stage.run_jobs is not None:
+                    self.active.update({id: Item(sample.id, stagename) for id in stage.run_jobs})
+
 
 active_tasks = ActiveTasks()
 
@@ -106,14 +125,14 @@ def submission_callback(data: dict):
 
 @trigger_sample_status_update
 def results_callback(job: LHJob, *args, **kwargs):
-
+    # this doesn't work now that we're using the parent task to update things
     if job.get_result_status() == ResultStatus.SUCCESS:
         parent_item = active_tasks.active.pop(job.id)
         _, sample = samples.getSampleById(parent_item.id)
         sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(str(job.id)))
         sample.stages[parent_item.stage].update_status()
 
-lh_interface.results_callbacks.append(results_callback)
+#lh_interface.results_callbacks.append(results_callback)
 
 def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
     """Prepares a method list for running by populating run_methods and run_methods_complete.
@@ -153,8 +172,8 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
 
         # reserve active_tasks (and sample.stages[stage])
         with active_tasks.lock:
-            sample.stages[stage].run_jobs += [str(task.id) for task in new_task.tasks]
-            active_tasks.pending.update({str(task.id): Item(sample.id, stage) for task in new_task.tasks})
+            sample.stages[stage].run_jobs += [str(new_task.id)]
+            active_tasks.pending.update({str(new_task.id): Item(sample.id, stage)})
 
         tasks.append(new_task)
     
@@ -179,11 +198,9 @@ def submit_tasks(tasks: List[Task]):
         if task.task_type != TaskType.INIT:
             with active_tasks.lock:
                 if response.ok:
-                    for taskdata in task.tasks:
-                        active_tasks.active.update({str(taskdata.id): active_tasks.pending.pop(str(taskdata.id))})
+                    active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
                 else:
-                    for taskdata in task.tasks:
-                        active_tasks.rejected.update({str(taskdata.id): active_tasks.active.pop(str(taskdata.id))})
+                    active_tasks.rejected.update({str(task.id): active_tasks.pending.pop(str(task.id))})
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
@@ -205,24 +222,35 @@ def synchronize_status(poll_delay: int = 5):
 
     def check_status_completion(id: str) -> bool:
         # send task id to autocontrol to get status
+        try:
+            response = requests.get(AUTOCONTROL_URL + '/get_task_status', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': id}))
+        except ConnectionError:
+            print(f'Warning: Autocontrol not connected')
+            return False
+
+        if response.ok:
+            if response.json()['queue'] == 'history':
+                return True
+        else:
+            print(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
+        
         return False
 
-        response = requests.get(AUTOCONTROL_URL + '/check_status', headers=DEFAULT_HEADERS, data={'id': id})
-        
-        return response.json()['status']
+    @trigger_sample_status_update
+    def mark_complete(id: str) -> None:
+        parent_item = active_tasks.active.pop(id)
+        _, sample = samples.getSampleById(parent_item.id)
+        sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(id))
+        sample.stages[parent_item.stage].status = SampleStatus.PARTIAL
+        sample.stages[parent_item.stage].update_status()
 
     while True:
 
         # reserve active_tasks (and samples)
         with active_tasks.lock:
-            for taskdata_id in copy.copy(list(active_tasks.active.keys())):
-                if check_status_completion(taskdata_id):
-                    parent_item = active_tasks.active.pop(taskdata_id)
-                    _, sample = samples.getSampleById(parent_item.id)
-                    sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(taskdata_id))
-                    sample.stages[parent_item.stage].update_status()
-                    trigger_sample_status_update(lambda: None)
-
+            for task_id in copy.copy(list(active_tasks.active.keys())):
+                if check_status_completion(task_id):
+                    mark_complete(task_id)
 
         time.sleep(poll_delay)
 
