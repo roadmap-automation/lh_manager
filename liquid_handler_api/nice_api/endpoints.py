@@ -2,7 +2,7 @@
 from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..liquid_handler.lhqueue import LHqueue, validate_format, submit_handler
+from ..liquid_handler.lhqueue import validate_format, submit_handler
 from ..liquid_handler.lhmethods import LHJob
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
@@ -11,6 +11,7 @@ from ..liquid_handler.history import History
 from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
 from . import nice_blueprint
+from .nice import LHqueue
 
 def _run_sample(data: dict) -> str | None:
     """ Generic function for processing a run request"""
@@ -32,9 +33,6 @@ def _run_sample(data: dict) -> str | None:
                 sample.NICE_uuid = data.get('uuid', None)
                 slot_id = data.get('slotID', 0)
                 sample.NICE_slotID = int(slot_id) if slot_id is not None else None
-
-            # submit everything
-            # TODO: make a generic sample runner that is callback based for plugging in a NICE API or AutoControl API
 
             sample.stages[stage].status = SampleStatus.PENDING
             # TODO: figure out the NICE queue here
@@ -203,8 +201,6 @@ def Inactivate() -> Response:
     
         Ignores request data."""
 
-    # TODO: Figure out what to do here.
-
     active_stage_list = [sample.stages[stage_name] for sample in samples.samples for stage_name in sample.stages if sample.stages[stage_name].status in (SampleStatus.ACTIVE, SampleStatus.PENDING)]
     for stage in active_stage_list:
         stage.status = SampleStatus.INACTIVE
@@ -227,13 +223,12 @@ def Pause() -> Response:
 @trigger_run_queue_update
 @trigger_sample_status_update
 def Resume() -> Response:
-    """Pauses liquid handler queue.
+    """Resumes liquid handler queue (also runs next).
     
         Ignores request data.
         
         TODO: Remove GET for production"""
 
     LHqueue.resume()
-    LHqueue.run_next()
 
     return make_response({'result': 'success'}, 200)
