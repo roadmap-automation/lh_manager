@@ -306,7 +306,7 @@ example_formulation = Formulation(target_composition=target_composition,
                 Target=WellLocation('Mix', 10),
                 mix_template=mix)
 
-example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
+#example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
 
 if __name__ == '__main__':
 

@@ -178,23 +178,26 @@ class Sample:
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
 Sample.__pydantic_model__.update_forward_refs()  # type: ignore
-example_method = Sleep(Time=0.1)
 example_sample_list: List[Sample] = []
-for i in range(10):
-    example_sample = Sample(name=f'testsample{i}', description='test sample description')
-    example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i)))
-    example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i)))
-    example_sample_list.append(example_sample)
 
-# throw some new statuses in the mix:
-example_sample_list[0].stages[StageName.PREP].status = SampleStatus.INACTIVE
-example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
-example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
-example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
-example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.INACTIVE
-example_sample_list[5].channel = 1
+if False:
+    example_method = Sleep(Time=0.1)
 
-#example_sample = Sample('12', 'testsample12', 'test sample description')
-#example_sample.methods.append(example_method)
-#print(methods)
+    for i in range(10):
+        example_sample = Sample(name=f'testsample{i}', description='test sample description')
+        example_sample.stages[StageName.PREP].addMethod(Sleep(Time=0.01*float(i)))
+        example_sample.stages[StageName.INJECT].addMethod(Sleep(Time=0.011*float(i)))
+        example_sample_list.append(example_sample)
+
+    # throw some new statuses in the mix:
+    example_sample_list[0].stages[StageName.PREP].status = SampleStatus.INACTIVE
+    example_sample_list[1].stages[StageName.PREP].status = SampleStatus.COMPLETED
+    example_sample_list[1].stages[StageName.INJECT].status = SampleStatus.COMPLETED
+    example_sample_list[2].stages[StageName.PREP].status = SampleStatus.COMPLETED
+    example_sample_list[2].stages[StageName.INJECT].status = SampleStatus.INACTIVE
+    example_sample_list[5].channel = 1
+
+    #example_sample = Sample('12', 'testsample12', 'test sample description')
+    #example_sample.methods.append(example_method)
+    #print(methods)
 

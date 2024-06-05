@@ -68,6 +68,6 @@ if layout is None:
     for well in example_wells:
         layout.add_well_to_rack(well.rack_id, well)
 
-samples.dryrun_queue.add_item(Item(example_sample_list[9].id, StageName.PREP))
+#samples.dryrun_queue.add_item(Item(example_sample_list[9].id, StageName.PREP))
 #example_sample_list[1].NICE_uuid = 'test_NICE_uuid'
 #samples.archiveSample(example_sample_list[1])
