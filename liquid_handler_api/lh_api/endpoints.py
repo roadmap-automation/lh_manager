@@ -168,7 +168,7 @@ def PutSampleData():
 
     error = None
     if job.get_result_status() == ResultStatus.FAIL:
-        error = f'Error in results. Full message: ' + data
+        error = f'Error in results. Full message: ' + repr(data)
         lh_interface.deactivate()
 
     return make_response({'data': data}, 200)
