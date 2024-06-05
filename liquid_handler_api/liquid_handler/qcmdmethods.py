@@ -137,3 +137,27 @@ class QCMDRecord(BaseQCMDMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time + self.record_time
+
+@register
+@dataclass
+class QCMDRecordTag(QCMDRecord):
+    """Record QCMD measurements"""
+    record_time: float = 60.0
+    sleep_time: float = 0.0
+    tag_name: str = ''
+    display_name: Literal['QCMD Record Tag'] = 'QCMD Record Tag'
+    method_name: Literal['QCMDRecordTag'] = 'QCMDRecordTag'
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [self.sub_method(method_name=self.method_name,
+                                method_data=dict(tag_name=self.tag_name,
+                                                 record_time=self.record_time,
+                                                 sleep_time=self.sleep_time)
+                                ).to_dict()]
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
+        return self.sleep_time + self.record_time

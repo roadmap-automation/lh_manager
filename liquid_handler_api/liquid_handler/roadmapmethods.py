@@ -1,8 +1,9 @@
-from .bedlayout import LHBedLayout, Composition, WellLocation, Well
+from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_composition
 from .methods import BaseMethod, register, MethodContainer, MethodsType
 from .formulation import Formulation, SoluteFormulation
 from .injectionmethods import InjectLoop, LoadLoop, BaseInjectionSystemMethod
-from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse
+from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod
+from .qcmdmethods import QCMDRecord, QCMDRecordTag
 
 import numpy as np
 from copy import copy
@@ -10,6 +11,31 @@ from typing import List, Literal, Tuple
 from pydantic.v1.dataclasses import dataclass
 
 from dataclasses import field, asdict
+
+def find_well_and_volume(composition: Composition, volume: float, wells: List[Well]) -> Tuple[Well | None, str | None]:
+    """Finds the well with the target composition and the most available volume
+
+    Args:
+        composition (Composition): target composition
+        volume (float): volume required
+        wells (List[Well]): list of wells to search
+
+    Returns:
+        Tuple[Well | None, str | None]: selected well and error
+    """
+
+    # find all wells containing target composition
+    well_candidates = find_composition(composition, wells)
+    if not len(well_candidates):
+        return None, f'no target wells with composition {composition} found'
+    
+    # check for sufficient well volume
+    well_volumes = [well.volume for well in well_candidates]
+    if not any(wv >= volume for wv in well_volumes):
+        return None, f'no target wells with composition {composition} and required volume {volume} found'
+
+    return well_candidates[well_volumes.index(max(well_volumes))]
+    
 
 class TransferOrganicsWithRinse(TransferWithRinse):
     Flow_Rate: float = 2.0
@@ -19,6 +45,11 @@ class TransferOrganicsWithRinse(TransferWithRinse):
 class MixOrganicsWithRinse(MixWithRinse):
     Flow_Rate: float = 2.0
     Aspirate_Flow_Rate: float = 1.0
+    Use_Liquid_Level_Detection: bool = False
+
+class InjectOrganicsWithRinse(InjectWithRinse):
+    Aspirate_Flow_Rate: float = 1.0
+    Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
 @register
@@ -64,3 +95,53 @@ class MakeBilayer(MethodContainer):
 
         return methods
 
+@register
+@dataclass
+class LoopInjectandMeasure(MethodContainer):
+    """Make a bilayer with solvent exchange"""
+    Target_Composition: Composition | None = None
+    Volume: float = 0.0
+    Injection_Flow_Rate: float = 1.0
+    Is_Organic: bool = False
+    Equilibration_Time: float = 0.5
+    Measurement_Time: float = 1.0
+    display_name: Literal['Loop Inject and Measure'] = 'Loop Inject and Measure'
+    method_name: Literal['LoopInjectandMeasure'] = 'LoopInjectandMeasure'
+
+    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
+        """Overwrites base class method to dynamically create list of methods
+        """
+
+        methods = []
+        minimum_volume = 0.15
+        extra_volume = 0.1
+        required_volume = self.Volume + minimum_volume + extra_volume
+
+        # select well with sufficient volume
+        target_well, error = find_well_and_volume(self.Target_Composition, required_volume, layout.get_all_wells())
+        if error is not None:
+            print(f'Warning in {self.method_name}' + error + ', aborting')
+            return []
+
+        load_loop = LoadLoop(Source=WellLocation(target_well.rack_id, target_well.well_number),
+                             Volume=self.Volume,
+                             Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
+                             Flow_Rate=2.0,
+                             Extra_Volume=extra_volume,
+                             Use_Liquid_Level_Detection=(False if self.Is_Organic else True),
+                             pump_volume=self.Volume)
+        
+        methods += load_loop.get_methods(layout)
+
+        inject_loop = InjectLoop(Volume=self.Volume,
+                                 Flow_Rate=self.Injection_Flow_Rate)
+        
+        methods += inject_loop.get_methods(layout)
+
+        measure = QCMDRecordTag(record_time=self.Measurement_Time * 60,
+                                sleep_time=self.Equilibration_Time * 60,
+                                tag_name=repr(target_well.composition))
+        
+        methods += measure.get_methods(layout)
+
+        return methods

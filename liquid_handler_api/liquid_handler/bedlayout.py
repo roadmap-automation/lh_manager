@@ -108,7 +108,6 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 
     return new_components, new_concs, volume1 + volume2
 
-
 @dataclass
 class WellLocation:
     rack_id: Optional[str] = None
@@ -147,6 +146,21 @@ class Well:
 
         self.volume = new_volume
         self.composition = Composition.from_list(new_solvents, new_fractions, new_solutes, new_concentrations)
+
+
+def find_composition(composition: Composition, wells: List[Well]) -> List[Well]:
+    """Finds wells containing the desired composition
+
+    Args:
+        composition (Composition): target composition
+        wells (List[Well]): list of wells to search
+
+    Returns:
+        List[Well]: list of wells containing that composition
+    """
+
+    return [well for well in wells if well.composition == composition]
+
 
 @dataclass
 class Rack:
