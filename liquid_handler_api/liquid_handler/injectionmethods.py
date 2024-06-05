@@ -212,7 +212,7 @@ class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
     pump_volume: float = 0
     pump_flow_rate: float = 1
     display_name: Literal['Load Injection System Loop'] = 'Load Injection System Loop'
-    method_name: Literal['ROADMAP_LoadLoop'] = 'ROADMAP_LoadLoop'
+    method_name: Literal['ROADMAP_QCMD_LoadLoop'] = 'ROADMAP_QCMD_LoadLoop'
 
     @dataclass
     class lh_method(BaseLHMethod.lh_method):
@@ -250,7 +250,7 @@ class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
             self.sub_method(
                 method_name='LoadLoop',
                 method_data={'pump_volume': self.Volume,
-                             'pump_flow_rate': self.pump_flow_rate}
+                             'excess_volume': self.Extra_Volume}
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:

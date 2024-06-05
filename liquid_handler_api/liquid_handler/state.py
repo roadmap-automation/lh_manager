@@ -5,7 +5,7 @@ from pathlib import Path
 from dataclasses import asdict
 from .samplecontainer import SampleContainer
 from .samplelist import example_sample_list, StageName
-from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmethods
+from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmethods, roadmapmethods
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item

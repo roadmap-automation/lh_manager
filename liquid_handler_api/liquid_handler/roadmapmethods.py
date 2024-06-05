@@ -3,7 +3,7 @@ from .methods import BaseMethod, register, MethodContainer, MethodsType
 from .formulation import Formulation, SoluteFormulation
 from .injectionmethods import InjectLoop, LoadLoop, BaseInjectionSystemMethod
 from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod
-from .qcmdmethods import QCMDRecord, QCMDRecordTag
+from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
 
 import numpy as np
 from copy import copy
@@ -52,7 +52,6 @@ class InjectOrganicsWithRinse(InjectWithRinse):
     Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
-@register
 @dataclass
 class MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
@@ -97,6 +96,32 @@ class MakeBilayer(MethodContainer):
 
 @register
 @dataclass
+class InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
+    """Inject contents of injection system loop"""
+    display_name: Literal['ROADMAP Inject Injection System Loop'] = 'ROADMAP Inject Injection System Loop'
+    method_name: Literal['ROADMAP_InjectLooptoQCMD'] = 'ROADMAP_InjectLooptoQCMD'
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
+        
+        return [
+            InjectLoop.sub_method(
+                method_name='InjectLoop',
+                method_data={'pump_volume': self.Volume,
+                             'pump_flow_rate': self.Flow_Rate}
+            ).to_dict() |
+            QCMDAcceptTransfer.sub_method(method_name='QCMDAcceptTransfer',
+                method_data={'contents': self.contents}
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return self.Volume / self.Flow_Rate
+
+
+@register
+@dataclass
 class LoopInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Target_Composition: Composition | None = None
@@ -133,8 +158,9 @@ class LoopInjectandMeasure(MethodContainer):
         
         methods += load_loop.get_methods(layout)
 
-        inject_loop = InjectLoop(Volume=self.Volume,
-                                 Flow_Rate=self.Injection_Flow_Rate)
+        inject_loop = InjectLooptoQCMD(Volume=self.Volume,
+                                 Flow_Rate=self.Injection_Flow_Rate,
+                                 contents=repr(target_well.composition))
         
         methods += inject_loop.get_methods(layout)
 
