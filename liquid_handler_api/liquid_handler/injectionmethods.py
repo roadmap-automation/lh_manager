@@ -149,17 +149,17 @@ class InjectLoop(BaseInjectionSystemMethod):
     Volume: float = 0
     Flow_Rate: float = 1
     display_name: Literal['Inject Injection System Loop'] = 'Inject Injection System Loop'
-    method_name: Literal['ROADMAP_InjectLoop'] = 'ROADMAP_InjectLoop'
+    method_name: Literal['InjectLoop'] = 'InjectLoop'
 
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseInjectionSystemMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseInjectionSystemMethod.sub_method]:
         
         return [
             self.sub_method(
                 method_name='InjectLoop',
-                method_data={'pump_volume': self.Volume,
+                method_data={'pump_volume': self.Volume * 1000,
                              'pump_flow_rate': self.Flow_Rate}
             ).to_dict()]
 
