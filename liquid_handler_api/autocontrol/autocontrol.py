@@ -11,7 +11,7 @@ from uuid import uuid4
 from autocontrol.task_struct import Task, TaskData, TaskType
 from autocontrol.status import Status
 
-from ..gui_api.events import trigger_sample_status_update
+from ..gui_api.events import trigger_sample_status_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
@@ -199,6 +199,7 @@ def synchronize_status(poll_delay: int = 5):
         
         return 'uncaught error'
 
+    @trigger_layout_update
     @trigger_sample_status_update
     def mark_complete(id: str) -> None:
         parent_item = active_tasks.active.pop(id)

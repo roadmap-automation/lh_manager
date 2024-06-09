@@ -1,3 +1,4 @@
+from liquid_handler_api.liquid_handler.error import MethodError
 from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_composition
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, register, MethodContainer, MethodsType
@@ -182,6 +183,9 @@ class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Volume / self.Flow_Rate
 
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+        return InjectMethod.execute(self, layout)
+
 @register
 @dataclass
 class InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
@@ -272,6 +276,9 @@ class DirectInjecttoQCMD(BaseInjectionSystemMethod, InjectMethod, BaseQCMDMethod
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate
+
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+        return InjectMethod.execute(self, layout)
 
 @register
 @dataclass
