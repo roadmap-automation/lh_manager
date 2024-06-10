@@ -148,6 +148,22 @@ class MultiTransfer(MethodContainer):
         
         methods += second_transfer.get_methods(layout)
 
+        new_target_well = InferredWellLocation('Mix')
+
+        third_transfer = TransferWithRinse(Source=self.Source,
+                                           Target=new_target_well,
+                                           Volume=0.1)
+        
+        methods += third_transfer.get_methods(layout)
+        
+        fourth_transfer = TransferWithRinse(Source=target_well,
+                                           Target=new_target_well,
+                                           Volume=0.1)
+        
+        methods += fourth_transfer.get_methods(layout)
+
+        return methods
+
         return methods
 
 @register

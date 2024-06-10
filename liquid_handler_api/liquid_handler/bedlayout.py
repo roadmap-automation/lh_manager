@@ -202,7 +202,8 @@ class LHBedLayout:
         self.racks[rack_id].wells.append(well)
 
     def find_next_empty(self, rack_id: str | None = None) -> WellLocation | None:
-        """Finds the next empty well in a rack
+        """Finds the next empty well in a rack. Requires volume to be zero and an
+            ID not to have been assigned.
 
         Args:
             rack_id (str|None): Target rack if provided, otherwise use all wells
@@ -212,7 +213,7 @@ class LHBedLayout:
         """
 
         rack = self.racks[rack_id]
-        next_empty = next((w for w in rack.wells if w.volume == 0), None)
+        next_empty = next((w for w in rack.wells if (w.volume == 0) & (w.id is None)), None)
         if next_empty is not None:
             return WellLocation(rack_id, next_empty.well_number)
 
