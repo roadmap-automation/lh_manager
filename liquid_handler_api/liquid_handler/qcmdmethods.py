@@ -2,7 +2,7 @@ from .bedlayout import LHBedLayout
 from .error import MethodError
 from .methods import BaseMethod, MethodType, register
 from .devices import DeviceBase, register_device
-from .lhinterface import LHJob, DATE_FORMAT
+from .job import JobBase
 
 from pydantic.v1.dataclasses import dataclass
 
@@ -21,14 +21,8 @@ class QCMDMeasurementDevice(DeviceBase):
     address: str = 'http://localhost:5005'
 
     @dataclass
-    class Job(LHJob):
+    class Job(JobBase):
         pass
-
-    @staticmethod
-    def create_job_data(method_list: List[dict]) -> dict:
-        """Makes an LHJob from a list of methods"""
-
-        return {'method_list': method_list}
 
 @dataclass
 class BaseQCMDMethod(BaseMethod):

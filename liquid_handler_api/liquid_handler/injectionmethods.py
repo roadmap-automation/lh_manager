@@ -26,13 +26,6 @@ class InjectionSystemDevice(DeviceBase):
     class Job(JobBase):
         pass
 
-    @staticmethod
-    def create_job_data(method_list: List[dict]) -> dict:
-        """Makes an Job from a list of methods"""
-
-        # only allow one method per list for now
-        return {'method_list': method_list}
-
 @dataclass
 class BaseInjectionSystemMethod(BaseMethod):
     """Base class for LH methods"""

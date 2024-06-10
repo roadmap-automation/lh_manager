@@ -5,8 +5,8 @@ from dataclasses import asdict
 from flask import make_response, Response, request
 
 from ..liquid_handler.job import ResultStatus, ValidationStatus
-
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
+from ..liquid_handler.state import layout
 from ..sio import socketio
 from . import lh_blueprint
 
@@ -84,7 +84,7 @@ def SubmitJob() -> Response:
         return make_response({'error': 'job rejected, cannot be deserialized'}, 400)
 
     # activate the job
-    lh_interface.activate_job(job)
+    lh_interface.activate_job(job, layout)
 
     return make_response({'success': 'job accepted'}, 200)
 
@@ -159,8 +159,8 @@ def PutSampleData():
         return make_response({'error': 'no active jobs'}, 400)
     if sample_id != job.LH_id:
         return make_response({'error': f'PutSampleData job ID {sample_id} does not match active job ID {job.LH_id}'}, 400)
-    if job.method_data['columns'][method_number]['METHODNAME'] != method_name:
-        return make_response({'error': f"PutSampleData method name {method_name} does not match corresponding method name {job.method_data['columns']['METHODNAME']}"}, 400)
+    if job.LH_method_data['columns'][method_number]['METHODNAME'] != method_name:
+        return make_response({'error': f"PutSampleData method name {method_name} does not match corresponding method name {job.LH_method_data['columns']['METHODNAME']}"}, 400)
 
     job.results.append(data)
     lh_interface.update_job_result(job, method_number, method_name, job.get_result_status())

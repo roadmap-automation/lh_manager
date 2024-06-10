@@ -215,15 +215,19 @@ class LHBedLayout:
         if next_empty is not None:
             return WellLocation(rack_id, next_empty.well_number)
 
-    def infer_location(self, well: InferredWellLocation) -> InferredWellLocation | None:
-        """Finds the next empty and fills in the inferred well location by ID or by next empty
+    def infer_location(self, well: WellLocation) -> WellLocation | None:
+        """Finds the next empty and fills in the inferred well location by ID or by next empty.
+            If well.id is None, returns the original well
 
         Args:
-            well (InferredWellLocation): inferred well location
+            well (WellLocation): well location to use for inference
 
         Returns:
-            InferredWellLocation: updated inferred well location
+            WellLocation: updated inferred well location
         """
+
+        if well.id is None:
+            return well
 
         # check for well ID match
         next_match = next((w for w in self.get_all_wells() if w.id == well.id), None)

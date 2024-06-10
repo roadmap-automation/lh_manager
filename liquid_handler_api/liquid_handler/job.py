@@ -21,8 +21,8 @@ class ResultStatus(str, Enum):
 @dataclass
 class JobBase:
     """Container for a single job list"""
-    id: str
-    method_data: dict
+    id: str | None = None
+    method_data: dict = field(default_factory=dict)
     validation: dict = field(default_factory=dict)
     results: list = field(default_factory=list)
     parent: Item | None = None

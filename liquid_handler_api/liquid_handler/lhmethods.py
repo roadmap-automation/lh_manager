@@ -3,32 +3,17 @@ from .error import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, register_device
-from .lhinterface import LHJob, DATE_FORMAT
 
 from pydantic.v1.dataclasses import dataclass
 
 from dataclasses import field, asdict
 from typing import List, Literal
 from enum import Enum
-from datetime import datetime
 
 class LHMethodType(str, Enum):
     TRANSFER = 'transfer'
     MIX = 'mix'
     INJECT = 'inject'
-
-@dataclass
-class SampleList:
-    """Class representing a sample list in JSON
-        serializable format for Gilson Trilution LH Web Service """
-    name: str
-    id: str | None
-    createdBy: str
-    description: str
-    createDate: str
-    startDate: str
-    endDate: str
-    columns: List[dict] | None
 
 @register_device
 @dataclass
@@ -40,39 +25,6 @@ class LHDevice(DeviceBase):
     device_type: str = 'lh'
     multichannel: bool = False
     address: str = 'http://localhost:5001'
-
-
-    @dataclass
-    class Job(LHJob):
-        pass
-
-    @staticmethod
-    def create_job_data(method_list: List[dict]) -> dict:
-        """Makes an LHJob from a list of methods"""
-
-        createdDate = datetime.now().strftime(DATE_FORMAT)
-
-        # Get unique keys across all the methods
-        all_columns = set.union(*(set(m.keys()) for m in method_list))
-
-        # Ensure that all keys exist in all dictionaries
-        for m in method_list:
-            for column in all_columns:
-                if column not in m:
-                    m[column] = None
-
-        d = asdict(SampleList(
-            name=method_list[0]['SAMPLENAME'],
-            id=None,
-            createdBy='System',
-            description=method_list[0]['SAMPLEDESCRIPTION'],
-            createDate=str(createdDate),
-            startDate=str(createdDate),
-            endDate=str(createdDate),
-            columns=method_list
-        ))
-
-        return d
 
 @dataclass
 class BaseLHMethod(BaseMethod):
@@ -94,7 +46,7 @@ class BaseLHMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = {LHDevice.device_name: [asdict(self)]}
+            d2 = asdict(self)
 
             # Following lines prepend all non-fixed fields with hashes
             #d = asdict(self)
@@ -125,6 +77,16 @@ class BaseLHMethod(BaseMethod):
         pass
     
     def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        """Renders the class to a dictionary"""
+        
+        return [{LHDevice.device_name: [dict(sample_name=sample_name,
+                                             sample_description=sample_description,
+                                             method=asdict(self))]}]
+    
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -248,12 +210,14 @@ class TransferWithRinse(TransferMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
 
+        self.Source = layout.infer_location(self.Source)
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        self.Target = layout.infer_location(self.Target)
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
         return [self.lh_method(
             SAMPLENAME=sample_name,
@@ -307,11 +271,12 @@ class MixWithRinse(MixMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
 
+        self.Target = layout.infer_location(self.Target)
         target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
         return [self.lh_method(
             SAMPLENAME=sample_name,
@@ -372,11 +337,12 @@ class InjectWithRinse(InjectMethod):
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
 
+        self.Source = layout.infer_location(self.Source)
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         return [self.lh_method(
             SAMPLENAME=sample_name,
@@ -410,7 +376,7 @@ class Sleep(BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         Time: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -439,7 +405,7 @@ class Sleep2(BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         Time2: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -470,7 +436,7 @@ class Prime(BaseLHMethod):
         Volume: str
         Repeats: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -519,6 +485,7 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
+        self.Source = layout.infer_location(self.Source)
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
             
         return [self.lh_method(
@@ -569,11 +536,12 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
+        self.Source = layout.infer_location(self.Source)
         source_zone, source_well_number = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
                     
         return [self.lh_method(

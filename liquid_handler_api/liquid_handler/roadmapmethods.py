@@ -201,24 +201,12 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
     display_name: Literal['ROADMAP Direct Inject to QCMD'] = 'ROADMAP Direct Inject to QCMD'
     method_name: Literal['ROADMAP_DirectInjecttoQCMD'] = 'ROADMAP_DirectInjecttoQCMD'
 
-    @dataclass
-    class lh_method(BaseLHMethod.lh_method):
-        Source_Zone: Zone
-        Source_Well: str
-        Volume: str
-        Aspirate_Flow_Rate: str
-        Load_Flow_Rate: str
-        Injection_Flow_Rate: str
-        Outside_Rinse_Volume: str
-        Extra_Volume: str
-        Air_Gap: str
-        Use_Liquid_Level_Detection: str
-
     def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
+        self.Source = layout.infer_location(self.Source)
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
                     
         return [super().render_method(sample_name=sample_name,

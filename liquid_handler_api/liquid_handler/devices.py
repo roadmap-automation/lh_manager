@@ -40,7 +40,8 @@ class DeviceBase:
             dict: task data
         """
 
-        return {}
+        return {'method_list': method_list}
+
 
 ### =========== Methods manager ==============
 

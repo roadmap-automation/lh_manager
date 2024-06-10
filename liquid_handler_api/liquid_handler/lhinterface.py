@@ -11,6 +11,9 @@ from dataclasses import asdict
 from pydantic.v1.dataclasses import dataclass
 
 from .job import JobBase, ResultStatus, ValidationStatus
+from .methods import method_manager
+from .lhmethods import BaseLHMethod
+from .bedlayout import LHBedLayout
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
@@ -23,10 +26,24 @@ class InterfaceStatus(str, Enum):
     ERROR = 'error'
 
 @dataclass
+class SampleList:
+    """Class representing a sample list in JSON
+        serializable format for Gilson Trilution LH Web Service """
+    name: str
+    id: str | None
+    createdBy: str
+    description: str
+    createDate: str
+    startDate: str
+    endDate: str
+    columns: List[dict] | None
+
+@dataclass
 class LHJob(JobBase):
     """Container for a single liquid handler sample list"""
 
     LH_id: int | None = None
+    LH_method_data: dict | None = None
 
     def get_validation_status(self) -> Tuple[ValidationStatus, dict | None]:
         """Returns true if validation exists """
@@ -58,10 +75,10 @@ class LHJob(JobBase):
         return ResultStatus.SUCCESS
 
     def get_number_of_methods(self) -> int:
-        if self.method_data['columns'] is None:
+        if self.LH_method_data['columns'] is None:
             return 0
         else:
-            return len(self.method_data['columns'])
+            return len(self.LH_method_data['columns'])
 
     def get_results(self) -> List[ResultStatus]:
         results = [ResultStatus.SUCCESS if ('completed successfully' in notification) else ResultStatus.FAIL
@@ -72,22 +89,61 @@ class LHJob(JobBase):
 
         return results
 
-    def get_method_data(self, listonly=False) -> dict:
-        """Gets the sample list formatted for Gilson LH.
+    def generate_method_data(self, layout: LHBedLayout) -> None:
+        """Gets the sample list formatted for Gilson LH (populates self.LH_method_data)
 
         Args:
             listonly (bool, optional): Only return header information. Defaults to False.
+        """
+
+        # should be a 1-dimensional list of methods (already exploded)
+        sample_name = self.method_data['method_list'][0]['sample_name']
+        sample_description = self.method_data['method_list'][0]['sample_description']
+        print(self.method_data)
+        
+        createdDate = datetime.now().strftime(DATE_FORMAT)
+
+        all_methods: List[BaseLHMethod] = [method_manager.get_method_by_name(md['method']['method_name'])(**md['method']) for md in self.method_data['method_list']]
+
+        # reconstruct methods
+        method_list = [m2 
+                    for m in all_methods
+                    for m2 in m.render_lh_method(sample_name=sample_name,
+                                            sample_description=sample_description,
+                                            layout=layout)]
+
+        # Get unique keys across all the methods
+        all_columns = set.union(*(set(m.keys()) for m in method_list))
+
+        # Ensure that all keys exist in all dictionaries
+        for m in method_list:
+            for column in all_columns:
+                if column not in m:
+                    m[column] = None
+
+        self.LH_method_data = asdict(SampleList(
+            name=sample_name,
+            id=self.LH_id,
+            createdBy='System',
+            description=sample_description,
+            createDate=str(createdDate),
+            startDate=str(createdDate),
+            endDate=str(createdDate),
+            columns=method_list
+        ))
+
+    def get_method_data(self, listonly=False) -> dict:
+        """Gets the sample list formatted for Gilson LH.
 
         Returns:
             dict: sample list prepared for Gilson LH
         """
 
-        samplelist = copy.copy(self.method_data)
+        samplelist = copy.copy(self.LH_method_data)
         if listonly:
             samplelist['columns'] = None
 
         return samplelist
-
 
 class LHJobHistory:
     table_name = 'lh_job_record'
@@ -243,7 +299,7 @@ class LHInterface:
         for callback in self.validation_callbacks:
             callback(job, *args, **kwargs)
 
-    def activate_job(self, job: LHJob, *args, **kwargs):
+    def activate_job(self, job: LHJob, layout: LHBedLayout, *args, **kwargs):
         """Activates an LHJob"""
 
         # check that interface is idle
@@ -261,10 +317,7 @@ class LHInterface:
         
         # assign new ID
         job.LH_id = max_LH_id + 1
-        job.method_data['id'] = job.LH_id
-
-        # set created date
-        job.method_data['createDate'] = datetime.now().strftime(DATE_FORMAT)
+        job.generate_method_data(layout)
         
         # activate job
         self._active_job = job
