@@ -486,3 +486,111 @@ class Prime(BaseLHMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         flow_rate = 10.0 # mL/min
         return 2 * float(self.Repeats) * float(self.Volume) / flow_rate
+    
+@register
+@dataclass
+class ROADMAP_QCMD_LoadLoop(InjectMethod):
+    """Inject with rinse"""
+    #Source: WellLocation defined in InjectMethod
+    #Volume: float defined in InjectMethod
+    Aspirate_Flow_Rate: float = 2.5
+    Flow_Rate: float = 2.5
+    Outside_Rinse_Volume: float = 0.5
+    Extra_Volume: float = 0.1
+    Air_Gap: float = 0.1
+    Use_Liquid_Level_Detection: bool = True
+    display_name: Literal['Load Injection System Loop'] = 'Load Injection System Loop'
+    method_name: Literal['ROADMAP_QCMD_LoadLoop'] = 'ROADMAP_QCMD_LoadLoop'
+
+    @dataclass
+    class lh_method(BaseLHMethod.lh_method):
+        Source_Zone: Zone
+        Source_Well: str
+        Volume: str
+        Aspirate_Flow_Rate: str
+        Flow_Rate: str
+        Outside_Rinse_Volume: str
+        Extra_Volume: str
+        Air_Gap: str
+        Use_Liquid_Level_Detection: str
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
+        
+        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+            
+        return [self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME='ROADMAP_QCMD_LoadLoop',
+            Source_Zone=source_zone,
+            Source_Well=source_well,
+            Volume=f'{self.Volume}',
+            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
+            Flow_Rate=f'{self.Flow_Rate}',
+            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
+            Extra_Volume=f'{self.Extra_Volume}',
+            Air_Gap=f'{self.Air_Gap}',
+            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
+        ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
+    
+@register
+@dataclass
+class ROADMAP_QCMD_DirectInject(InjectMethod):
+    """Direct Inject with rinse"""
+    #Source: WellLocation defined in InjectMethod
+    #Volume: float defined in InjectMethod
+    Aspirate_Flow_Rate: float = 2.5
+    Load_Flow_Rate: float = 2.5
+    Injection_Flow_Rate: float = 1.0
+    Outside_Rinse_Volume: float = 0.5
+    Extra_Volume: float = 0.1
+    Air_Gap: float = 0.1
+    Use_Liquid_Level_Detection: bool = True
+    Use_Bubble_Sensors: bool = True
+    display_name: Literal['Direct Inject'] = 'Direct Inject'
+    method_name: Literal['ROADMAP_QCMD_DirectInject'] = 'ROADMAP_QCMD_DirectInject'
+
+    @dataclass
+    class lh_method(BaseLHMethod.lh_method):
+        Source_Zone: Zone
+        Source_Well: str
+        Volume: str
+        Aspirate_Flow_Rate: str
+        Load_Flow_Rate: str
+        Injection_Flow_Rate: str
+        Outside_Rinse_Volume: str
+        Extra_Volume: str
+        Air_Gap: str
+        Use_Liquid_Level_Detection: str
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        source_zone, source_well_number = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+                    
+        return [self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME='ROADMAP_QCMD_DirectInject_BubbleSensor' if self.Use_Bubble_Sensors else 'ROADMAP_QCMD_DirectInject',
+            Source_Zone=source_zone,
+            Source_Well=source_well_number,
+            Volume=f'{self.Volume}',
+            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
+            Load_Flow_Rate=f'{self.Load_Flow_Rate}',
+            Injection_Flow_Rate=f'{self.Injection_Flow_Rate}',
+            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
+            Extra_Volume=f'{self.Extra_Volume}',
+            Air_Gap=f'{self.Air_Gap}',
+            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
+        ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate

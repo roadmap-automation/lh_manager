@@ -4,7 +4,7 @@ from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, register, MethodContainer, MethodsType
 from .formulation import Formulation, SoluteFormulation
 from .injectionmethods import InjectLoop, BaseInjectionSystemMethod
-from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod
+from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod, ROADMAP_QCMD_LoadLoop, ROADMAP_QCMD_DirectInject
 from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
 
 import numpy as np
@@ -126,7 +126,7 @@ class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
 
 @register
 @dataclass
-class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
+class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
     #Volume: float defined in InjectMethod
@@ -137,42 +137,17 @@ class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
     Air_Gap: float = 0.1
     Use_Liquid_Level_Detection: bool = True
     Use_Bubble_Sensors: bool = True
-    display_name: Literal['Load Injection System Loop'] = 'Load Injection System Loop'
-    method_name: Literal['ROADMAP_QCMD_LoadLoop'] = 'ROADMAP_QCMD_LoadLoop'
-
-    @dataclass
-    class lh_method(BaseLHMethod.lh_method):
-        Source_Zone: Zone
-        Source_Well: str
-        Volume: str
-        Aspirate_Flow_Rate: str
-        Flow_Rate: str
-        Outside_Rinse_Volume: str
-        Extra_Volume: str
-        Air_Gap: str
-        Use_Liquid_Level_Detection: str
+    display_name: Literal['ROADMAP Load Injection System Loop'] = 'ROADMAP Load Injection System Loop'
+    method_name: Literal['ROADMAP_LoadLoop_Sync'] = 'ROADMAP_LoadLoop_Sync'
 
     def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
-        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
-            
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Source_Zone=source_zone,
-            Source_Well=source_well,
-            Volume=f'{self.Volume}',
-            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
-            Flow_Rate=f'{self.Flow_Rate}',
-            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
-            Extra_Volume=f'{self.Extra_Volume}',
-            Air_Gap=f'{self.Air_Gap}',
-            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-        ).to_dict() | 
+        return [super().render_lh_method(sample_name=sample_name,
+                                        sample_description=sample_description,
+                                        layout=layout)[0] | 
             self.sub_method(
                 method_name='LoadLoopBubbleSensor' if self.Use_Bubble_Sensors else 'LoadLoop',
                 method_data=dict(pump_volume=self.Volume * 1000,
@@ -183,12 +158,9 @@ class LoadLoop(BaseInjectionSystemMethod, InjectMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Volume / self.Flow_Rate
 
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-        return InjectMethod.execute(self, layout)
-
 @register
 @dataclass
-class InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
+class ROADMAP_InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
     """Inject contents of injection system loop"""
     Use_Bubble_Sensors: bool = True
     display_name: Literal['ROADMAP Inject Injection System Loop'] = 'ROADMAP Inject Injection System Loop'
@@ -214,7 +186,7 @@ class InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
 
 @register
 @dataclass
-class DirectInjecttoQCMD(BaseInjectionSystemMethod, InjectMethod, BaseQCMDMethod):
+class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemMethod, BaseQCMDMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
     #Volume: float defined in InjectMethod
@@ -226,8 +198,8 @@ class DirectInjecttoQCMD(BaseInjectionSystemMethod, InjectMethod, BaseQCMDMethod
     Air_Gap: float = 0.1
     Use_Liquid_Level_Detection: bool = True
     Use_Bubble_Sensors: bool = True
-    display_name: Literal['Direct Inject to QCMD'] = 'Direct Inject to QCMD'
-    method_name: Literal['ROADMAP_QCMD_DirectInject'] = 'ROADMAP_QCMD_DirectInject'
+    display_name: Literal['ROADMAP Direct Inject to QCMD'] = 'ROADMAP Direct Inject to QCMD'
+    method_name: Literal['ROADMAP_DirectInjecttoQCMD'] = 'ROADMAP_DirectInjecttoQCMD'
 
     @dataclass
     class lh_method(BaseLHMethod.lh_method):
@@ -247,24 +219,11 @@ class DirectInjecttoQCMD(BaseInjectionSystemMethod, InjectMethod, BaseQCMDMethod
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        source_zone, source_well_number = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
                     
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME='ROADMAP_QCMD_DirectInject_BubbleSensor' if self.Use_Bubble_Sensors else 'ROADMAP_QCMD_DirectInject',
-            Source_Zone=source_zone,
-            Source_Well=source_well_number,
-            Volume=f'{self.Volume}',
-            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
-            Load_Flow_Rate=f'{self.Load_Flow_Rate}',
-            Injection_Flow_Rate=f'{self.Injection_Flow_Rate}',
-            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
-            Extra_Volume=f'{self.Extra_Volume}',
-            Air_Gap=f'{self.Air_Gap}',
-            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-        ).to_dict() | 
+        return [super().render_lh_method(sample_name=sample_name,
+                                        sample_description=sample_description,
+                                        layout=layout)[0] | 
             BaseInjectionSystemMethod.sub_method(
                 method_name='DirectInjectBubbleSensor' if self.Use_Bubble_Sensors else 'DirectInject',
                 method_data={}
@@ -277,12 +236,9 @@ class DirectInjecttoQCMD(BaseInjectionSystemMethod, InjectMethod, BaseQCMDMethod
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate
 
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-        return InjectMethod.execute(self, layout)
-
 @register
 @dataclass
-class LoopInjectandMeasure(MethodContainer):
+class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Target_Composition: Composition | None = None
     Volume: float = 0.0
@@ -291,8 +247,8 @@ class LoopInjectandMeasure(MethodContainer):
     Use_Bubble_Sensors: bool = True
     Equilibration_Time: float = 0.5
     Measurement_Time: float = 1.0
-    display_name: Literal['Loop Inject and Measure'] = 'Loop Inject and Measure'
-    method_name: Literal['LoopInjectandMeasure'] = 'LoopInjectandMeasure'
+    display_name: Literal['ROADMAP QCMD Loop Inject and Measure'] = 'ROADMAP QCMD Loop Inject and Measure'
+    method_name: Literal['ROADMAP_QCMD_LoopInjectandMeasure'] = 'ROADMAP_QCMD_LoopInjectandMeasure'
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
@@ -312,7 +268,7 @@ class LoopInjectandMeasure(MethodContainer):
             print(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
        
 
-        load_loop = LoadLoop(Source=WellLocation(target_well.rack_id, target_well.well_number),
+        load_loop = ROADMAP_LoadLoop_Sync(Source=WellLocation(target_well.rack_id, target_well.well_number),
                              Volume=self.Volume,
                              Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
                              Flow_Rate=2.0,
@@ -324,7 +280,7 @@ class LoopInjectandMeasure(MethodContainer):
         
         methods += load_loop.get_methods(layout)
 
-        inject_loop = InjectLooptoQCMD(Volume=self.Volume,
+        inject_loop = ROADMAP_InjectLooptoQCMD(Volume=self.Volume,
                                  Flow_Rate=self.Injection_Flow_Rate,
                                  contents=repr(target_well.composition))
         
@@ -340,7 +296,7 @@ class LoopInjectandMeasure(MethodContainer):
 
 @register
 @dataclass
-class DirectInjectandMeasure(MethodContainer):
+class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Target_Composition: Composition | None = None
     Volume: float = 0.0
@@ -349,8 +305,8 @@ class DirectInjectandMeasure(MethodContainer):
     Use_Bubble_Sensors: bool = True
     Equilibration_Time: float = 0.5
     Measurement_Time: float = 1.0
-    display_name: Literal['Direct Inject and Measure'] = 'Direct Inject and Measure'
-    method_name: Literal['DirectInjectandMeasure'] = 'DirectInjectandMeasure'
+    display_name: Literal['ROADMAP QCMD Direct Inject and Measure'] = 'ROADMAP QCMD Direct Inject and Measure'
+    method_name: Literal['ROADMAP_QCMD_DirectInjectandMeasure'] = 'ROADMAP_QCMD_DirectInjectandMeasure'
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
@@ -369,7 +325,7 @@ class DirectInjectandMeasure(MethodContainer):
         else:
             print(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
 
-        direct_inject = DirectInjecttoQCMD(Source=WellLocation(target_well.rack_id, target_well.well_number),
+        direct_inject = ROADMAP_DirectInjecttoQCMD(Source=WellLocation(target_well.rack_id, target_well.well_number),
                              Volume=self.Volume,
                              Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
                              Load_Flow_Rate=2.0,
