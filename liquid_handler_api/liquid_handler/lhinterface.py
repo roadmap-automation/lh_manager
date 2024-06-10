@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Callable, Tuple
-from dataclasses import asdict
+from dataclasses import asdict, field
 from pydantic.v1.dataclasses import dataclass
 
 from .job import JobBase, ResultStatus, ValidationStatus
@@ -43,6 +43,7 @@ class LHJob(JobBase):
     """Container for a single liquid handler sample list"""
 
     LH_id: int | None = None
+    LH_methods: List[BaseLHMethod] | None = None
     LH_method_data: dict | None = None
 
     def get_validation_status(self) -> Tuple[ValidationStatus, dict | None]:
@@ -132,6 +133,8 @@ class LHJob(JobBase):
             columns=method_list
         ))
 
+        self.LH_methods = all_methods
+
     def get_method_data(self, listonly=False) -> dict:
         """Gets the sample list formatted for Gilson LH.
 
@@ -144,6 +147,16 @@ class LHJob(JobBase):
             samplelist['columns'] = None
 
         return samplelist
+    
+    def execute_methods(self, layout: LHBedLayout) -> None:
+        """Update layout with job methods
+
+        Args:
+            layout (LHBedLayout): layout to update
+        """
+
+        for m in self.LH_methods:
+            m.execute(layout)
 
 class LHJobHistory:
     table_name = 'lh_job_record'

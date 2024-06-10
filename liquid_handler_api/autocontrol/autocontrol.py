@@ -208,10 +208,11 @@ def synchronize_status(poll_delay: int = 5):
         sample.stages[parent_item.stage].status = SampleStatus.PARTIAL
         sample.stages[parent_item.stage].update_status()
 
+        # NOTE: this is now done at the LHInterface level. However, GUI is only updated here.
         # if sample stage is complete, execute all methods
-        if sample.stages[parent_item.stage].status == SampleStatus.COMPLETED:
-            for method in sample.stages[parent_item.stage].methods:
-                method.execute(layout)
+        #if sample.stages[parent_item.stage].status == SampleStatus.COMPLETED:
+        #    for method in sample.stages[parent_item.stage].methods:
+        #        method.execute(layout)
 
     while True:
 
