@@ -66,7 +66,7 @@ class BaseInjectionSystemMethod(BaseMethod):
     def explode(self, layout: LHBedLayout) -> None:
         pass
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -81,7 +81,7 @@ class RoadmapChannelInit(BaseInjectionSystemMethod):
     display_name: Literal['Init Injection System'] = 'Init Injection System'
     method_name: Literal['RoadmapChannelInit'] = 'RoadmapChannelInit'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -104,7 +104,7 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
     method_name: Literal['RoadmapChannelSleep'] = 'RoadmapChannelSleep'
     sleep_time: float = 1.0
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -127,7 +127,7 @@ class PrimeLoop(BaseInjectionSystemMethod):
     display_name: Literal['Prime Injection System Loop'] = 'Prime Injection System Loop'
     method_name: Literal['PrimeLoop'] = 'PrimeLoop'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -151,7 +151,7 @@ class InjectLoop(BaseInjectionSystemMethod):
     display_name: Literal['Inject Injection System Loop'] = 'Inject Injection System Loop'
     method_name: Literal['InjectLoop'] = 'InjectLoop'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseInjectionSystemMethod.sub_method]:

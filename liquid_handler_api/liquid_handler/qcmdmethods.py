@@ -63,7 +63,7 @@ class BaseQCMDMethod(BaseMethod):
     def explode(self, layout: LHBedLayout) -> None:
         pass
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -79,7 +79,7 @@ class QCMDInit(BaseQCMDMethod):
     display_name: Literal['QCMD Init'] = 'QCMD Init'
     method_name: Literal['QCMDInit'] = 'QCMDInit'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -99,7 +99,7 @@ class QCMDSleep(BaseQCMDMethod):
     display_name: Literal['QCMD Sleep'] = 'QCMD Sleep'
     method_name: Literal['QCMDSleep'] = 'QCMDSleep'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -120,7 +120,7 @@ class QCMDAcceptTransfer(BaseQCMDMethod):
     display_name: Literal['QCMD Accept Transfer'] = 'QCMD Accept Transfer'
     method_name: Literal['QCMDAcceptTransfer'] = 'QCMDAcceptTransfer'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -138,7 +138,7 @@ class QCMDRecord(BaseQCMDMethod):
     display_name: Literal['QCMD Record'] = 'QCMD Record'
     method_name: Literal['QCMDRecord'] = 'QCMDRecord'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -159,7 +159,7 @@ class QCMDRecordTag(QCMDRecord):
     display_name: Literal['QCMD Record Tag'] = 'QCMD Record Tag'
     method_name: Literal['QCMDRecordTag'] = 'QCMDRecordTag'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:

@@ -108,7 +108,7 @@ class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         Time: str
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -140,12 +140,12 @@ class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
     display_name: Literal['ROADMAP Load Injection System Loop'] = 'ROADMAP Load Injection System Loop'
     method_name: Literal['ROADMAP_LoadLoop_Sync'] = 'ROADMAP_LoadLoop_Sync'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
-        return [super().render_lh_method(sample_name=sample_name,
+        return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
             self.sub_method(
@@ -166,7 +166,7 @@ class ROADMAP_InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
     display_name: Literal['ROADMAP Inject Injection System Loop'] = 'ROADMAP Inject Injection System Loop'
     method_name: Literal['ROADMAP_InjectLooptoQCMD'] = 'ROADMAP_InjectLooptoQCMD'
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -214,14 +214,14 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
                     
-        return [super().render_lh_method(sample_name=sample_name,
+        return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
             BaseInjectionSystemMethod.sub_method(

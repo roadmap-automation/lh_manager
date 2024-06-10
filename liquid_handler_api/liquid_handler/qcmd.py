@@ -23,7 +23,7 @@ class QCMD_Record_Sync(BaseLHMethod):
         Record_Time: str
         Equilibration_Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -57,7 +57,7 @@ class QCMD_Setup(BaseLHMethod):
         QCMD_PORT: int
         GSIOC_ADDRESS: int
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -83,7 +83,7 @@ class QCMD_Stop(BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         pass
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -127,7 +127,7 @@ class InjectWithRinseSync(InjectMethod):
         Record_Time: str
         Equilibration_Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -196,7 +196,7 @@ class InjectDoubleSync(InjectMethod):
         Record_Time: str
         Equilibration_Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -242,7 +242,7 @@ class Sync_WaitUntilIdle(BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         pass
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:

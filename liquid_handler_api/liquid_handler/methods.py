@@ -44,7 +44,7 @@ class BaseMethod:
     def explode(self, layout: LHBedLayout) -> None:
         pass
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -81,14 +81,14 @@ class MethodContainer(BaseMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return sum(m.estimated_time() for m in self.get_methods(layout))
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
         rendered_methods = []
         for m in self.get_methods(layout):
-            rendered_methods += m.render_lh_method(sample_name=sample_name,
+            rendered_methods += m.render_method(sample_name=sample_name,
                                                    sample_description=sample_description,
                                                    layout=layout)
         return rendered_methods

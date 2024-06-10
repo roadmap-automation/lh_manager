@@ -102,7 +102,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
     # render all the methods
     rendered_methods: List[dict] = [m2
                                     for m in all_methods
-                                    for m2 in m.render_lh_method(sample_name=sample.name,
+                                    for m2 in m.render_method(sample_name=sample.name,
                                                     sample_description=sample.description,
                                                     layout=layout)]
 

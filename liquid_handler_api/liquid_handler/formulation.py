@@ -329,7 +329,7 @@ if __name__ == '__main__':
     print(f.formulate(layout))
     print(f.get_methods(layout))
     print(f.execute(deepcopy(layout)))
-    print(f.render_lh_method('test_name', 'test_description', layout))
+    print(f.render_method('test_name', 'test_description', layout))
     print(samples.getSamplebyName(example_sample_list[9].name).toSampleList('prep', layout, False))
     #print(samples.getSamplebyName(example_sample_list[9].name).stages['prep'].methods)
 

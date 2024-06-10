@@ -124,7 +124,7 @@ class BaseLHMethod(BaseMethod):
     def explode(self, layout: LHBedLayout) -> None:
         pass
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
@@ -248,7 +248,7 @@ class TransferWithRinse(TransferMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -307,7 +307,7 @@ class MixWithRinse(MixMethod):
         Target_Zone: Zone
         Target_Well: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -372,7 +372,7 @@ class InjectWithRinse(InjectMethod):
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -410,7 +410,7 @@ class Sleep(BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -439,7 +439,7 @@ class Sleep2(BaseLHMethod):
     class lh_method(BaseLHMethod.lh_method):
         Time2: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -470,7 +470,7 @@ class Prime(BaseLHMethod):
         Volume: str
         Repeats: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -514,7 +514,7 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
@@ -569,7 +569,7 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
