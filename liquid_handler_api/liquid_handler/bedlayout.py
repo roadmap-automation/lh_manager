@@ -1,4 +1,5 @@
 """Class definitions for bed layout, wells, and compositions"""
+from uuid import uuid4
 from dataclasses import field
 from pydantic.v1.dataclasses import dataclass
 from typing import Optional, Tuple, List
@@ -112,7 +113,12 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 class WellLocation:
     rack_id: Optional[str] = None
     well_number: Optional[int] = None
+    id: Optional[str] = None    
 
+class InferredWellLocation(WellLocation):
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid4())
 
 @dataclass
 class Well:
@@ -122,12 +128,14 @@ class Well:
         well_number (int): Well number in specified rack
         composition (Composition): composition of solution in well
         volume (float | None): total volume in the well in mL. None indicates unoccupied well
+        id (str | None): optional UUID of well. Used for matching InferredWellLocation to existing wells
         """
 
     rack_id: str
     well_number: int
     composition: Composition
     volume: float | None
+    id: str | None = None
 
     def mix_with(self, volume: float, composition: Composition) -> None:
         """Update volume and composition from mixing with new solution"""
@@ -192,6 +200,48 @@ class LHBedLayout:
         # add well to appropriate rack
         self.racks[rack_id].wells.append(well)
 
+    def find_next_empty(self, rack_id: str | None = None) -> WellLocation | None:
+        """Finds the next empty well in a rack
+
+        Args:
+            rack_id (str|None): Target rack if provided, otherwise use all wells
+
+        Returns:
+            WellLocation: location of returned 
+        """
+
+        rack = self.racks[rack_id]
+        next_empty = next((w for w in rack.wells if w.volume == 0), None)
+        if next_empty is not None:
+            return WellLocation(rack_id, next_empty.well_number)
+
+    def infer_location(self, well: InferredWellLocation) -> InferredWellLocation | None:
+        """Finds the next empty and fills in the inferred well location by ID or by next empty
+
+        Args:
+            well (InferredWellLocation): inferred well location
+
+        Returns:
+            InferredWellLocation: updated inferred well location
+        """
+
+        # check for well ID match
+        next_match = next((w for w in self.get_all_wells() if w.id == well.id), None)
+
+        # if match found
+        if next_match is not None:
+            well.rack_id, well.well_number = next_match.rack_id, next_match.well_number
+            return well
+        else:        
+            # otherwise find the next empty and associate the InferredWellLocation well ID with that well
+            next_empty = self.find_next_empty(well.rack_id)
+            if next_empty is not None:
+                target_well, _ = self.get_well_and_rack(next_empty.rack_id, next_empty.well_number)
+                target_well.id = well.id
+
+                well.rack_id, well.well_number = next_empty.rack_id, next_empty.well_number
+                return well
+        
     def get_well_and_rack(self, rack_id: str, well_number: int) -> Tuple[Well, Rack]:
         """Get well using the GUI (rack, well) specification"""
         rack = self.racks[rack_id]

@@ -14,6 +14,7 @@ export interface MethodDef {
 export interface WellLocation {
   rack_id: string,
   well_number: number,
+  id: string | null,
 }
 
 export type MethodType = {
@@ -73,6 +74,7 @@ export interface Well {
   rack_id: string,
   volume: number,
   well_number: number,
+  id: string | null,
 }
 
 interface WellWithZone extends Well {
