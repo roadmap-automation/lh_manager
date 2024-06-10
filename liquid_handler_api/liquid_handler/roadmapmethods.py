@@ -1,10 +1,10 @@
 from liquid_handler_api.liquid_handler.error import MethodError
-from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_composition
+from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_composition, InferredWellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, register, MethodContainer, MethodsType
 from .formulation import Formulation, SoluteFormulation
 from .injectionmethods import InjectLoop, BaseInjectionSystemMethod
-from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod, ROADMAP_QCMD_LoadLoop, ROADMAP_QCMD_DirectInject
+from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod, ROADMAP_QCMD_LoadLoop, ROADMAP_QCMD_DirectInject, TransferMethod
 from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
 
 import numpy as np
@@ -123,6 +123,32 @@ class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
                 method_name='RoadmapChannelSleep',
                 method_data={'sleep_time': self.Injection_System_Sleep_Time}
             ).to_dict()]    
+
+@register
+@dataclass
+class MultiTransfer(MethodContainer):
+    Source: WellLocation = field(default_factory=WellLocation)
+    display_name: Literal['TestWellInference'] = 'TestWellInference'
+    method_name: Literal['Test Well Inference'] = 'Test Well Inference'
+
+    def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:
+        
+        methods = []
+        target_well = InferredWellLocation('Mix')
+
+        first_transfer = TransferWithRinse(Source=self.Source,
+                                           Target=target_well,
+                                           Volume=0.1)
+        
+        methods += first_transfer.get_methods(layout)
+        
+        second_transfer = TransferWithRinse(Source=self.Source,
+                                           Target=target_well,
+                                           Volume=0.1)
+        
+        methods += second_transfer.get_methods(layout)
+
+        return methods
 
 @register
 @dataclass

@@ -115,6 +115,7 @@ class WellLocation:
     well_number: Optional[int] = None
     id: Optional[str] = None    
 
+@dataclass
 class InferredWellLocation(WellLocation):
     def __post_init__(self):
         if self.id is None:
