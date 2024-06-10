@@ -54,18 +54,17 @@ class InjectOrganicsWithRinse(InjectWithRinse):
     Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
+@register
 @dataclass
-class MakeBilayer(MethodContainer):
+class ROADMAP_QCMD_MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Bilayer_Composition: Composition | None = None
     Bilayer_Solvent: Composition | None = None
-    Lipid_Mixing_Well: WellLocation = field(default_factory=WellLocation)
     Lipid_Injection_Volume: float = 0.0
     Buffer_Composition: Composition | None = None
-    Buffer_Mixing_Well: WellLocation = field(default_factory=WellLocation)
     Buffer_Injection_Volume: float = 0.0
-    display_name: Literal['Make Bilayer'] = 'Make Bilayer'
-    method_name: Literal['MakeBilayer'] = 'MakeBilayer'
+    display_name: Literal['ROADMAP QCMD Make Bilayer'] = 'ROADMAP QCMD Make Bilayer'
+    method_name: Literal['ROADMAP_QCMD_MakeBilayer'] = 'ROADMAP_QCMD_MakeBilayer'
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
@@ -74,25 +73,80 @@ class MakeBilayer(MethodContainer):
         methods = []
         minimum_volume = 0.15
         extra_volume = 0.1
-        bilayer_formulation = SoluteFormulation(target_composition=self.Bilayer_Composition,
-                                          diluent=self.Bilayer_Solvent,
-                                          target_volume=self.Lipid_Injection_Volume + minimum_volume + extra_volume,
-                                          Target=self.Lipid_Mixing_Well,
-                                          transfer_template=TransferOrganicsWithRinse,
-                                          mix_template=MixOrganicsWithRinse)
-        methods += bilayer_formulation.get_methods(layout)
+        rinse_volume = 2.0
+        injection_flow_rate=2.0
+        exchange_flow_rate=0.1
+        equilibration_time = 1.0
+        measurement_time = 2.0
 
-        # DirectInject here (with bubble sensors?)
+        # ==== Solvent rinse ====
+        required_volume = minimum_volume + extra_volume + rinse_volume
+        lipid_prep_well, error = find_well_and_volume(self.Bilayer_Solvent, required_volume, layout.get_all_wells())
+        if lipid_prep_well is None:
+            print('Error: insufficient or nonexistent bilayer solvent. Aborting.')
+            return []
 
-        buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
-                                          target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
-                                          Target=self.Buffer_Mixing_Well,
-                                          exact_match=True,
-                                          transfer_template=TransferWithRinse,
-                                          mix_template=MixWithRinse)
-        methods += buffer_formulation.get_methods(layout)
+        inject_rinse = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=lipid_prep_well.composition,
+                                                         Volume=rinse_volume,
+                                                         Injection_Flow_Rate=injection_flow_rate,
+                                                         Is_Organic=True,
+                                                         Use_Bubble_Sensors=True,
+                                                         Equilibration_Time=equilibration_time,
+                                                         Measurement_Time=measurement_time)
 
-        # LoadLoop and InjectLoop
+        methods += inject_rinse.get_methods(layout)
+
+        # ==== Lipids in solvent ====
+        required_volume = minimum_volume + extra_volume + self.Lipid_Injection_Volume
+        lipid_mixing_well, error = find_well_and_volume(self.Bilayer_Composition, required_volume, layout.get_all_wells())
+        if lipid_mixing_well is None:
+            lipid_mixing_well = InferredWellLocation('Mix')
+
+            bilayer_formulation = SoluteFormulation(target_composition=self.Bilayer_Composition,
+                                            diluent=self.Bilayer_Solvent,
+                                            target_volume=self.Lipid_Injection_Volume + minimum_volume + extra_volume,
+                                            Target=lipid_mixing_well,
+                                            transfer_template=TransferOrganicsWithRinse,
+                                            mix_template=MixOrganicsWithRinse)
+            methods += bilayer_formulation.get_methods(layout)
+        else:
+            lipid_mixing_well = InferredWellLocation(lipid_mixing_well.rack_id, lipid_mixing_well.well_number)
+
+        inject_lipids = ROADMAP_QCMD_DirectInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
+                                                         Volume=self.Lipid_Injection_Volume,
+                                                         Injection_Flow_Rate=injection_flow_rate,
+                                                         Is_Organic=True,
+                                                         Use_Bubble_Sensors=True,
+                                                         Equilibration_Time=equilibration_time,
+                                                         Measurement_Time=measurement_time)
+        
+        methods += inject_lipids.get_methods(layout)
+
+        # ==== Buffer ====
+        required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
+        buffer_mixing_well, error = find_well_and_volume(self.Buffer_Composition, required_volume, layout.get_all_wells())
+        if buffer_mixing_well is None:
+            buffer_mixing_well = InferredWellLocation('Mix')
+
+            buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
+                                            target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
+                                            Target=buffer_mixing_well,
+                                            exact_match=True,
+                                            transfer_template=TransferWithRinse,
+                                            mix_template=MixWithRinse)
+            methods += buffer_formulation.get_methods(layout)
+        else:
+            buffer_mixing_well = InferredWellLocation(buffer_mixing_well.rack_id, buffer_mixing_well.well_number)
+
+        inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
+                                                         Volume=self.Buffer_Injection_Volume,
+                                                         Injection_Flow_Rate=exchange_flow_rate,
+                                                         Is_Organic=False,
+                                                         Use_Bubble_Sensors=True,
+                                                         Equilibration_Time=equilibration_time,
+                                                         Measurement_Time=measurement_time)
+        
+        methods += inject_buffer.get_methods(layout)        
 
         return methods
 
