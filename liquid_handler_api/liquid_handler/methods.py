@@ -40,11 +40,11 @@ class BaseMethod:
         """Estimated time for method in default time units"""
         return 0.0
 
-    def get_methods(self, layout: LHBedLayout):
+    def get_methods(self, layout: LHBedLayout) -> List:
         return [self]
     
-    def explode(self, layout: LHBedLayout) -> None:
-        pass
+    def explode(self, layout: LHBedLayout) -> List:
+        return self.get_methods(layout)
     
     def render_method(self,
                          sample_name: str,

@@ -49,24 +49,6 @@ class BaseInjectionSystemMethod(BaseMethod):
 
             return d2
 
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-        """Actions to be taken upon executing method. Default is nothing changes"""
-        return None
-
-    def get_methods(self, layout: LHBedLayout):
-        return [self]
-    
-    def explode(self, layout: LHBedLayout) -> None:
-        pass
-    
-    def render_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[dict]:
-        """Renders the lh_method class to a Gilson LH-compatible format"""
-        
-        return [{}]
-
 @register
 @dataclass
 class RoadmapChannelInit(BaseInjectionSystemMethod):

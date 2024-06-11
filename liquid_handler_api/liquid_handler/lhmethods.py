@@ -69,12 +69,6 @@ class BaseLHMethod(BaseMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         """Estimated time for method in default time units"""
         return 0.0
-
-    def get_methods(self, layout: LHBedLayout):
-        return [self]
-    
-    def explode(self, layout: LHBedLayout) -> None:
-        pass
     
     def render_method(self,
                          sample_name: str,
@@ -99,6 +93,13 @@ class LHMethodCluster(BaseLHMethod):
 
     method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
     methods: List[MethodsType] = field(default_factory=list)
+
+    def explode(self, layout: LHBedLayout):
+        methods = []
+        for m in self.methods:
+            methods += m.explode(layout)
+
+        return methods
 
     def render_method(self, sample_name: str, sample_description: str, layout: LHBedLayout) -> List[dict]:
         

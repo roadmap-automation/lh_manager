@@ -71,14 +71,23 @@ class MethodList:
 
     def explode(self, layout: LHBedLayout):
         """Permanently replaces the original methods with "exploded" methods, i.e. rendered methods
-            based on the provided layout. Cannot be undone.
+            based on the provided layout. Cannot be undone. Two layers of recursion to account for
+            LHMethodClusters.
 
         Args:
             layout (LHBedLayout): layout to use to generate exploded methods
         """
 
         #self.prepare_run_methods(layout)
-        new_methods = [im for m in self.methods for im in m.get_methods(layout)]
+        new_methods = []
+        for m in self.methods:
+            print('m', type(m))
+            print('m exploded', m.explode(layout))
+            for im in m.explode(layout):
+                print('im', type(im))
+                #print(im.explode(layout))
+                for iim in im.explode(layout):
+                    new_methods.append(iim)
         self.methods = new_methods
 
     def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
