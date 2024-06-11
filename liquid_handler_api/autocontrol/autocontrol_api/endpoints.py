@@ -8,6 +8,7 @@ from . import autocontrol_blueprint
 from autocontrol.status import Status
 from autocontrol.task_struct import TaskData
 from ...liquid_handler.lhinterface import InterfaceStatus, lh_interface
+from ...liquid_handler.state import samples
 
 @autocontrol_blueprint.route('/autocontrol/GetStatus', methods=['GET'])
 def GetStatus() -> Response:
@@ -17,8 +18,8 @@ def GetStatus() -> Response:
                  InterfaceStatus.DOWN: Status.DOWN,
                  InterfaceStatus.UP: Status.IDLE}
     
-    print(lh_interface.get_status())
+    status = status_map[lh_interface.get_status()]
 
-    return make_response(dict(status=status_map[lh_interface.get_status()],
-                              channel_status=[])
+    return make_response(dict(status=status,
+                              channel_status=[status] * samples.n_channels)
                               , 200)

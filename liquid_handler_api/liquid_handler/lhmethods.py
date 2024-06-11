@@ -23,7 +23,7 @@ class LHDevice(DeviceBase):
 
     device_name: str = 'Gilson 271 Liquid Handler'
     device_type: str = 'lh'
-    multichannel: bool = False
+    multichannel: bool = True
     address: str = 'http://localhost:5001'
 
 @dataclass

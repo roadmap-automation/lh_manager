@@ -15,7 +15,7 @@ from ..gui_api.events import trigger_sample_status_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
-from ..liquid_handler.methods import MethodsType
+from ..liquid_handler.methods import MethodsType, MethodType
 from ..liquid_handler.bedlayout import LHBedLayout
 from ..liquid_handler.samplelist import Sample, StageName
 from ..liquid_handler.state import samples, layout
@@ -100,43 +100,55 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
         all_methods += m.get_methods(layout)
 
     # render all the methods
-    rendered_methods: List[dict] = [m2
-                                    for m in all_methods
-                                    for m2 in m.render_method(sample_name=sample.name,
+    rendered_methods: List[List[dict]] = [m.render_method(sample_name=sample.name,
                                                     sample_description=sample.description,
-                                                    layout=layout)]
+                                                    layout=layout)
+                                            for m in all_methods]
+    
+    method_types: List[MethodType] = [m.method_type
+                                    for m in all_methods]
 
     # create tasks, one per method
     tasks: List[Task] = []
     sample.stages[stage].run_jobs = []
-    for method in rendered_methods:
-        new_task = Task(id=str(uuid4()),
-                        sample_id=sample.id,
-                        task_type=TaskType.NOCHANNEL,
-                        tasks=[TaskData(id=uuid4(),
-                                        device=device_name,
-                                        channel=(sample.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None),
-                                        method_data=device_manager.get_device_by_name(device_name).create_job_data(method[device_name]))
-                                for device_name in method.keys()])
+    for method_type, method_list in zip(method_types, rendered_methods):
         
-        # detect transfer tasks
-        if len(new_task.tasks) > 1:
-            new_task.task_type = TaskType.TRANSFER
+        # should typically only ever be one method in method_list
+        for method in method_list:
+            taskdata = []
+            max_subtasks = 0
+            for device_name, device_data in method.items():
+                channel = sample.channel if device_manager.get_device_by_name(device_name).is_multichannel() else None
+                max_subtasks = max(max_subtasks, len(device_data))
+                taskdata.append(TaskData(id=uuid4(),
+                                device=device_name,
+                                channel=channel,
+                                method_data=device_manager.get_device_by_name(device_name).create_job_data(device_data),
+                                non_channel_storage='vial' if channel is None else None)
+                                )
+            
+            # transfer if multiple devices are involved
+            if len(method.keys()) > 1:
+                tasktype = TaskType.TRANSFER
+            # prepare if multiple subtasks from a single device are involved
+            elif method_type == MethodType.PREPARE:
+                tasktype = TaskType.PREPARE
+            elif method_type == MethodType.MEASURE:
+                tasktype = TaskType.MEASURE
+            else:
+                tasktype = TaskType.NOCHANNEL
+                
+            new_task = Task(id=str(uuid4()),
+                            sample_id=sample.id,
+                            task_type=tasktype,
+                            tasks=taskdata)
 
-            # required for non-channel devices
-            for task in new_task.tasks:
-                if task.channel is None:
-                    task.non_channel_storage = 'vial'
+            # reserve active_tasks (and sample.stages[stage])
+            with active_tasks.lock:
+                sample.stages[stage].run_jobs += [str(new_task.id)]
+                active_tasks.pending.update({str(new_task.id): Item(sample.id, stage)})
 
-        elif new_task.tasks[0].channel is not None:
-            new_task.task_type = TaskType.MEASURE
-
-        # reserve active_tasks (and sample.stages[stage])
-        with active_tasks.lock:
-            sample.stages[stage].run_jobs += [str(new_task.id)]
-            active_tasks.pending.update({str(new_task.id): Item(sample.id, stage)})
-
-        tasks.append(new_task)
+            tasks.append(new_task)
     
     submit_tasks(tasks)
 
