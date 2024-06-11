@@ -157,7 +157,7 @@ function activateSelector({name, type}) {
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solvents')">add</button>
           </div>
           <div class="ps-3" v-for="(solvent, sindex) of (param?.value?.solvents ?? [])">
-            <select v-model="solvent.name">
+            <select v-model="solvent.name" @change="send_changes(param)">
               <option v-for="source_solvent of filter_components('solvents')" :value="source_solvent">
                 {{ source_solvent }}</option>
             </select>
