@@ -17,6 +17,8 @@ class MethodType(str, Enum):
     TRANSFER = 'transfer'
     MIX = 'mix'
     INJECT = 'inject'
+    PREPARE = 'prepare'
+    MEASURE = 'measure'
 
 @dataclass
 class BaseMethod:

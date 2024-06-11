@@ -129,6 +129,7 @@ class QCMDRecord(BaseQCMDMethod):
     """Record QCMD measurements"""
     record_time: float = 60.0
     sleep_time: float = 0.0
+    method_type: Literal[MethodType.MEASURE] = MethodType.MEASURE
     display_name: Literal['QCMD Record'] = 'QCMD Record'
     method_name: Literal['QCMDRecord'] = 'QCMDRecord'
 
@@ -150,6 +151,7 @@ class QCMDRecord(BaseQCMDMethod):
 class QCMDRecordTag(QCMDRecord):
     """Record QCMD measurements"""
     tag_name: str = ''
+    method_type: Literal[MethodType.MEASURE] = MethodType.MEASURE    
     display_name: Literal['QCMD Record Tag'] = 'QCMD Record Tag'
     method_name: Literal['QCMDRecordTag'] = 'QCMDRecordTag'
 

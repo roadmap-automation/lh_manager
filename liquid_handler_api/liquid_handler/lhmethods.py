@@ -1,7 +1,7 @@
 from .bedlayout import LHBedLayout, WellLocation
 from .error import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .methods import BaseMethod, MethodType, register, MethodsType
+from .methods import BaseMethod, MethodType, register, MethodContainer, MethodsType, method_manager
 from .devices import DeviceBase, register_device
 
 from pydantic.v1.dataclasses import dataclass
@@ -93,6 +93,19 @@ class BaseLHMethod(BaseMethod):
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
         return [{}]
+
+@dataclass
+class LHMethodCluster(BaseLHMethod):
+
+    method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
+    methods: List[MethodsType] = field(default_factory=list)
+
+    def render_method(self, sample_name: str, sample_description: str, layout: LHBedLayout) -> List[dict]:
+        
+        return [{LHDevice.device_name: [dict(sample_name=sample_name,
+                                             sample_description=sample_description,
+                                             method=asdict(m))
+                                        for m in self.methods]}]
 
 @dataclass
 class InjectMethod(BaseLHMethod):
@@ -480,7 +493,7 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
         Air_Gap: str
         Use_Liquid_Level_Detection: str
 
-    def render_method(self,
+    def render_lh_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
