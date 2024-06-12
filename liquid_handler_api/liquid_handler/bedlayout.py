@@ -113,7 +113,8 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 class WellLocation:
     rack_id: Optional[str] = None
     well_number: Optional[int] = None
-    id: Optional[str] = None    
+    id: Optional[str] = None
+    expected_composition: Composition | None = None    
 
 @dataclass
 class InferredWellLocation(WellLocation):
@@ -213,7 +214,10 @@ class LHBedLayout:
         """
 
         rack = self.racks[rack_id]
-        next_empty = next((w for w in rack.wells if (w.volume == 0) & (w.id is None)), None)
+        next_empty = next((w
+                            for w in sorted(rack.wells, key=lambda w: w.well_number)
+                            if (w.volume == 0) & (w.id is None)),
+                        None)
         if next_empty is not None:
             return WellLocation(rack_id, next_empty.well_number)
 

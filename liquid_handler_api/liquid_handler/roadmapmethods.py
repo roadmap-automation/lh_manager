@@ -84,6 +84,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         methods = []
         minimum_volume = 0.15
         
+        mix_extra_volume = 0.05
         extra_volume = self.Extra_Volume
         rinse_volume = self.Rinse_Volume
         injection_flow_rate=self.Flow_Rate
@@ -125,25 +126,38 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
 
             bilayer_formulation = SoluteFormulation(target_composition=self.Bilayer_Composition,
                                             diluent=self.Bilayer_Solvent,
-                                            target_volume=self.Lipid_Injection_Volume + minimum_volume + extra_volume,
+                                            target_volume=self.Lipid_Injection_Volume + minimum_volume + extra_volume + mix_extra_volume,
                                             Target=lipid_mixing_well,
                                             transfer_template=TransferOrganicsWithRinse(),
-                                            mix_template=MixOrganicsWithRinse())
+                                            mix_template=MixOrganicsWithRinse(Repeats=1,
+                                                                              Extra_Volume=mix_extra_volume))
+            
+            lipid_mixing_well.expected_composition = bilayer_formulation.get_expected_composition(layout)
+
             methods += [LHMethodCluster(method_type=MethodType.PREPARE,
                                         methods=bilayer_formulation.get_methods(layout))]
         else:
-            lipid_mixing_well = InferredWellLocation(lipid_mixing_well.rack_id, lipid_mixing_well.well_number)
+            lipid_mixing_well = InferredWellLocation(lipid_mixing_well.rack_id, lipid_mixing_well.well_number, expected_composition=lipid_mixing_well.composition)
 
-        inject_lipids = ROADMAP_QCMD_DirectInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
-                                                         Volume=self.Lipid_Injection_Volume,
-                                                         Injection_Flow_Rate=injection_flow_rate,
-                                                         Extra_Volume=self.Extra_Volume,
-                                                         Is_Organic=True,
-                                                         Use_Bubble_Sensors=True,
-                                                         Equilibration_Time=equilibration_time,
-                                                         Measurement_Time=measurement_time)
+        direct_inject = ROADMAP_DirectInjecttoQCMD(Source=lipid_mixing_well,
+                             Volume=self.Lipid_Injection_Volume,
+                             Aspirate_Flow_Rate=1.0,
+                             Load_Flow_Rate=2.0,
+                             Injection_Flow_Rate=injection_flow_rate,
+                             Outside_Rinse_Volume=0.5,
+                             Extra_Volume=self.Extra_Volume,
+                             Air_Gap=0.1,
+                             Use_Liquid_Level_Detection=False,
+                             Use_Bubble_Sensors=True
+                             )
         
-        methods += inject_lipids.get_methods_from_well(lipid_mixing_well, self.Bilayer_Composition, layout)
+        methods += direct_inject.get_methods(layout)
+
+        measure = QCMDRecordTag(record_time=self.Measurement_Time * 60,
+                                sleep_time=self.Equilibration_Time * 60,
+                                tag_name=repr(lipid_mixing_well.expected_composition))
+        
+        methods += measure.get_methods(layout)
 
         # ==== Buffer ====
         required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
@@ -157,10 +171,13 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                             exact_match=True,
                                             transfer_template=TransferWithRinse(),
                                             mix_template=MixWithRinse())
+            
+            buffer_mixing_well.expected_composition = buffer_formulation.get_expected_composition(layout)
+
             methods += [LHMethodCluster(method_type=MethodType.PREPARE,
                                         methods=buffer_formulation.get_methods(layout))]
         else:
-            buffer_mixing_well = InferredWellLocation(buffer_mixing_well.rack_id, buffer_mixing_well.well_number)
+            buffer_mixing_well = InferredWellLocation(buffer_mixing_well.rack_id, buffer_mixing_well.well_number, expected_composition=buffer_mixing_well.composition)
 
         inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
                                                          Volume=self.Buffer_Injection_Volume,
@@ -170,7 +187,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                                          Equilibration_Time=equilibration_time,
                                                          Measurement_Time=measurement_time)
         
-        methods += inject_buffer.get_methods_from_well(buffer_mixing_well, self.Buffer_Composition, layout)
+        methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
 
         return methods
 
@@ -329,7 +346,11 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
                          layout: LHBedLayout) -> List[dict]:
         
         self.Source = layout.infer_location(self.Source)
-        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        if self.Source.well_number is not None:
+            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+            composition = repr(source_well.composition)
+        else:
+            composition = self.Source.expected_composition
                     
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
@@ -340,7 +361,7 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
             ).to_dict() |
             QCMDAcceptTransfer.sub_method(
                 method_name='QCMDAcceptTransfer',
-                method_data=dict(contents=repr(source_well.composition))
+                method_data=dict(contents=composition)
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:

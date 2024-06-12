@@ -104,7 +104,27 @@ class Formulation(MethodContainer):
         source_wells = [well for well, vol in zip(source_wells, sol) if vol > ZERO_VOLUME_TOLERANCE]
 
         return (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
-    
+
+    def get_expected_composition(self, layout: LHBedLayout) -> Composition:
+        """Calculates the expected composition from the formulation
+
+        Returns:
+            Composition: expected composition
+        """
+
+        volumes, wells, success = self.formulate(layout)
+
+        if success:
+            mix_well = Well('', 0, Composition(), 0)
+            for volume, well in zip(volumes, wells):
+                mix_well.mix_with(volume, well.composition)
+
+            return mix_well.composition
+
+        else:
+            return Composition()
+
+
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
         """
