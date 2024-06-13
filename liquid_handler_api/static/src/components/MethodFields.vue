@@ -17,6 +17,18 @@ function send_changes(param) {
   update_at_pointer(props.sample_id, method_pointer, param.value);
 }
 
+function send_solute_changes(param) {
+  const unit_lookup = filter_components('solutes')
+  //console.log(unit_lookup)
+  for (let solute of (param?.value?.solutes ?? []).values()) {
+    //console.log(solute, unit_lookup.names.indexOf(solute.name))
+    solute.units = unit_lookup.units[unit_lookup.names.indexOf(solute.name)]
+    //console.log(solute.name, solute.units)
+  }
+  //console.log(param)
+  send_changes(param)
+}
+
 
 function get_parameters(method: MethodType) {
   const { method_name } = method;
@@ -67,12 +79,13 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
   const first_available = filter_components(component_type)[0];
   console.log(component_type, first_available);
   if (first_available !== undefined) {
-    const new_component: {name: string, fraction?: number, concentration?: number} = {name: first_available};
+    const new_component: {name: string, fraction?: number, concentration?: number, units?: string} = {name: first_available.name};
     if (component_type === 'solvents') {
       new_component.fraction = 0;
     }
     else {
       new_component.concentration = 0;
+      new_component.units = first_available.units
     }
     console.log({param});
     param.value[component_type].push(new_component);
@@ -85,10 +98,14 @@ function filter_components(component_key: 'solutes' | 'solvents') {
   const include_zones_param = parameters.value.find((p) => p.name === 'include_zones');
   const include_zones = include_zones_param?.value ?? null;
   const filtered_components = (include_zones === null) ? [...components] : components.filter((c) => (include_zones.includes(c[1])));
-  const unique_components = new Set(filtered_components.map((c) => c[0]));
+  const filtered_names = filtered_components.map((c) => c[0])
+  const filtered_units = filtered_components.map((c) => c[2])
+  const unique_components = new Set(filtered_names);
+  const unique_component_units = Array.from(unique_components).map((c) => filtered_units[Array.from(filtered_names).indexOf(c)])
+  //console.log(unique_component_units)
   // console.log(source_components.value, component_key);
   // console.log({components, filtered_components, include_zones, unique_components});
-  return [...unique_components];
+  return {'names': [...unique_components], 'units': [...unique_component_units]};
 }
 
 function activateSelector({name, type}) {
@@ -140,14 +157,14 @@ function activateSelector({name, type}) {
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solutes')">add</button>
           </div>
           <div class="ps-3" v-for="(solute, sindex) of (param?.value?.solutes ?? [])">
-            <select v-model="solute.name" @change="send_changes(param)">
-              <option v-for="source_solute of filter_components('solutes')" :value="source_solute">{{
+            <select v-model="solute.name" @change="send_solute_changes(param)">
+              <option v-for="source_solute of filter_components('solutes').names" :value="source_solute">{{
                 source_solute }}</option>
             </select>
-            <label>concentration ({{ solute.units }}):
-              <input class="number px-1 py-0" v-model="solute.concentration" @keydown.enter="send_changes(param)"
-                @blur="send_changes(param)" />
-            </label>
+            <label>concentration ({{ solute.units }}) </label>
+              <input class="number px-1 py-0" v-model="solute.concentration" @keydown.enter="send_solute_changes(param)"
+                @blur="send_solute_changes(param)" />
+
             <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
               @click="param.value.solutes.splice(sindex, 1); send_changes(param)"></button>
           </div>
@@ -158,7 +175,7 @@ function activateSelector({name, type}) {
           </div>
           <div class="ps-3" v-for="(solvent, sindex) of (param?.value?.solvents ?? [])">
             <select v-model="solvent.name" @change="send_changes(param)">
-              <option v-for="source_solvent of filter_components('solvents')" :value="source_solvent">
+              <option v-for="source_solvent of filter_components('solvents').names" :value="source_solvent">
                 {{ source_solvent }}</option>
             </select>
             <label>fraction:

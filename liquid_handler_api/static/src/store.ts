@@ -65,7 +65,7 @@ export interface SampleStatusMap {
   }
 }
 
-type Component = [name: string, zone: string];
+type Component = [name: string, zone: string, units: string];
 export type Solute = {name: string, concentration: number, units: string};
 export type Solvent = {name: string, fraction: number};
 
@@ -313,8 +313,8 @@ function dedupe<T>(arr: T[]): T[] {
 
 export async function refreshWells() {
   const new_wells = await (await fetch("/GUI/GetWells/")).json() as WellWithZone[];
-  const solvent_zones: Component[] = new_wells.map((well) => (well.composition.solvents.map((s) => ([s.name, well.zone] as Component)))).flat();
-  const solute_zones: Component[] = new_wells.map((well) => (well.composition.solutes.map((s) => ([s.name, well.zone] as Component)))).flat();
+  const solvent_zones: Component[] = new_wells.map((well) => (well.composition.solvents.map((s) => ([s.name, well.zone, ""] as Component)))).flat();
+  const solute_zones: Component[] = new_wells.map((well) => (well.composition.solutes.map((s) => ([s.name, well.zone, s.units] as Component)))).flat();
   const dedup_solvent_zones = dedupe(solvent_zones);
   const dedup_solute_zones = dedupe(solute_zones);
   source_components.value = {solvents: dedup_solvent_zones, solutes: dedup_solute_zones};

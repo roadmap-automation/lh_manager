@@ -95,6 +95,10 @@ function remove_definition() {
               <label>concentration ({{ solute.units }}):
                 <input class="number px-1 py-0" v-model="solute.concentration" />
               </label>
+              <select v-model="solute.units">
+                <option>M</option>
+                <option>mg/mL</option>
+              </select>
               <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
                 @click="current_well?.composition.solutes.splice(sindex, 1)"></button>
             </div>
