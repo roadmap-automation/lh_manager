@@ -41,15 +41,15 @@ def find_well_and_volume(composition: Composition, volume: float, wells: List[We
 @register    
 @dataclass
 class TransferOrganicsWithRinse(TransferWithRinse):
-    Flow_Rate: float = 2.0
-    Aspirate_Flow_Rate: float = 1.0
+    Flow_Rate: float = 1.0
+    Aspirate_Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
 @register
 @dataclass
 class MixOrganicsWithRinse(MixWithRinse):
-    Flow_Rate: float = 2.0
-    Aspirate_Flow_Rate: float = 1.0
+    Flow_Rate: float = 1.0
+    Aspirate_Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
 @register
@@ -357,7 +357,8 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
                                         layout=layout)[0] | 
             BaseInjectionSystemMethod.sub_method(
                 method_name='DirectInjectBubbleSensor' if self.Use_Bubble_Sensors else 'DirectInject',
-                method_data={}
+                method_data=dict(pump_volume=self.Volume * 1000,
+                                 pump_flow_rate=self.Injection_Flow_Rate)
             ).to_dict() |
             QCMDAcceptTransfer.sub_method(
                 method_name='QCMDAcceptTransfer',
