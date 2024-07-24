@@ -36,6 +36,6 @@ def test_emit():
 
 if __name__ == '__main__':
     launch_autocontrol_interface(poll_delay=5)
-    socketio.run(app, host='localhost', port=5001, debug=True)
+    socketio.run(app, host='localhost', port=5001, debug=False)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)
