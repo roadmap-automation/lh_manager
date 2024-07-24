@@ -296,8 +296,8 @@ class SoluteFormulation(Formulation):
         try:
             diluent_well = next(well
                                 for well in self.get_all_wells(layout)
-                                    if all(well.composition.has_component(cmp)
-                                        for cmp in (self.diluent.get_solute_names() + self.diluent.get_solvent_names())))
+                                    if all(well.composition.has_component(cmp) == self.diluent.has_component(cmp)
+                                        for cmp in (self.diluent.get_solute_names() + self.diluent.get_solvent_names() + well.composition.get_solvent_names() + well.composition.get_solute_names())))
         except StopIteration:
             print(f'Diluent ({self.diluent}) not available on bed')
             return [], [], False
@@ -313,7 +313,7 @@ class SoluteFormulation(Formulation):
             volumes += [diluent_volume]
             wells += [diluent_well]
 
-        return volumes, wells, success
+        return volumes, wells, True
 
 
 target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
