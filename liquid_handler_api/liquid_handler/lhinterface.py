@@ -156,7 +156,9 @@ class LHJob(JobBase):
         """
 
         for m in self.LH_methods:
-            m.execute(layout)
+            print('Executing: ', asdict(m))
+            result = m.execute(layout)
+            print('Result: ', asdict(m))
 
 class LHJobHistory:
     table_name = 'lh_job_record'
