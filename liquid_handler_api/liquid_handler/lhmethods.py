@@ -109,6 +109,21 @@ class LHMethodCluster(BaseLHMethod):
                                         for m in self.methods]}]
 
 @dataclass
+class SetWellID(BaseMethod):
+    """Sets an Inferred Well Location ID for future use
+    """
+
+    well: WellLocation = field(default_factory=WellLocation)
+    well_id: str | None = None
+    method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
+
+    def execute(self, layout: LHBedLayout) -> MethodError | None:
+
+        well, _ = layout.get_well_and_rack(self.well.rack_id, self.well.well_number)
+        well.id = self.well_id
+        
+
+@dataclass
 class InjectMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
