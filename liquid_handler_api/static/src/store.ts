@@ -83,6 +83,30 @@ interface SourceComponents {
   solvents: Component[]
 }
 
+// @dataclass
+// class Material:
+//     uuid: str
+//     name: str
+//     pubchem_cid: Optional[int] = None
+//     iupac_name: Optional[str] = None
+//     molecular_weight: Optional[float] = None
+//     metadata: Optional[dict] = None
+//     type: Optional[str] = None
+//     density: Optional[float] = None
+//     display_units: Optional[str] = None
+
+export interface Material {
+  uuid: string,
+  name: string,
+  pubchem_cid: number | null,
+  iupac_name: string | null,
+  molecular_weight: number | null,
+  metadata: object | null,
+  type: string | null,
+  density: number | null,
+  display_units: string | null,
+}
+
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
@@ -91,6 +115,7 @@ export const source_components = ref<SourceComponents>();
 export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
 export const well_to_edit = ref<WellLocation>();
+export const materials = ref<Material[]>([]);
 
 // export const layout_with_contents = computed(() => {
 //   const layout_copy = structuredClone(toRaw(layout.value));
@@ -367,6 +392,32 @@ export async function refreshComponents() {
   const new_source_components = await (await fetch("/GUI/GetComponents/")).json();
   source_components.value = new_source_components;
   console.log({new_source_components});
+}
+
+export async function refreshMaterials() {
+  const { materials: new_materials } = await (await fetch("/Materials/all/")).json();
+  materials.value = new_materials;
+  console.log({new_materials});
+}
+
+export async function add_material(material: Material) {
+  const update_result = await fetch("/Materials/update/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(material)
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function delete_material(material: Material) {
+  const update_result = await fetch("/Materials/delete/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(material)
+  });
+  const response_body = await update_result.json();
+  return response_body;
 }
 
 export const source_well = ref<WellLocation | null>(null);
