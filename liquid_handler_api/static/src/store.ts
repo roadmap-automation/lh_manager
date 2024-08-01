@@ -65,9 +65,9 @@ export interface SampleStatusMap {
   }
 }
 
-type Component = [name: string, zone: string];
-export type Solute = {name: string, concentration: number, units: string};
+export type Solute = {name: string, concentration: number, units: SoluteMassUnits | SoluteVolumeUnits};
 export type Solvent = {name: string, fraction: number};
+
 
 export interface Well {
   composition: {solvents: Solvent[], solutes: Solute[]},
@@ -82,9 +82,16 @@ interface WellWithZone extends Well {
 }
 
 interface SourceComponents {
-  solutes: Component[],
-  solvents: Component[]
+  solutes: { [name: string]: (Solute & { zone: string })[] },
+  solvents: { [name: string]: (Solvent & { zone: string })[] },
 }
+
+export const materialType = ["solvent", "solute", "lipid", "protein"] as const;
+export type MaterialType = typeof materialType[number];
+export const soluteMassUnits = ["mg/mL", "mg/L"] as const;
+export const soluteVolumeUnits = ["M", "mM", "nM"] as const;
+export type SoluteMassUnits = typeof soluteMassUnits[number];
+export type SoluteVolumeUnits = typeof soluteVolumeUnits[number];
 
 // @dataclass
 // class Material:
@@ -96,25 +103,24 @@ interface SourceComponents {
 //     metadata: Optional[dict] = None
 //     type: Optional[str] = None
 //     density: Optional[float] = None
-//     display_units: Optional[str] = None
+//     solute_concentration_units: Optional[str] = None
 
 export interface Material {
-  uuid: string,
   name: string,
   pubchem_cid: number | null,
   iupac_name: string | null,
   molecular_weight: number | null,
   metadata: object | null,
-  type: string | null,
+  type: MaterialType | null,
   density: number | null,
-  display_units: string | null,
+  solute_concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
 }
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
-export const source_components = ref<SourceComponents>();
+export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
 export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
 export const well_to_edit = ref<WellLocation>();
@@ -338,11 +344,24 @@ function dedupe<T>(arr: T[]): T[] {
 
 export async function refreshWells() {
   const new_wells = await (await fetch("/GUI/GetWells/")).json() as WellWithZone[];
-  const solvent_zones: Component[] = new_wells.map((well) => (well.composition.solvents.map((s) => ([s.name, well.zone] as Component)))).flat();
-  const solute_zones: Component[] = new_wells.map((well) => (well.composition.solutes.map((s) => ([s.name, well.zone] as Component)))).flat();
-  const dedup_solvent_zones = dedupe(solvent_zones);
-  const dedup_solute_zones = dedupe(solute_zones);
-  source_components.value = {solvents: dedup_solvent_zones, solutes: dedup_solute_zones};
+  const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
+  const solutes = {} as {[name: string]: (Solute & { zone: string })[]};
+  new_wells.forEach((well) => {
+    const { zone } = well;
+    well.composition.solvents.forEach((s) => {
+      if (!(s.name in solvents)) {
+        solvents[s.name] = [];
+      }
+      solvents[s.name].push({ ...s, zone });
+    });
+    well.composition.solutes.forEach((s) => {
+      if (!(s.name in solutes)) {
+        solutes[s.name] = [];
+      }
+      solutes[s.name].push({ ...s, zone });
+    });
+  });
+  source_components.value = { solvents, solutes };
   wells.value = new_wells;
   console.log({new_wells});
 }

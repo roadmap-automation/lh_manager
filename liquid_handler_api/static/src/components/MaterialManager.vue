@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import BedLayout from './BedLayout.vue';
 
-import { materials, add_material, delete_material } from '../store';
-import type { Material } from '../store';
+import { materials, materialType, soluteMassUnits, soluteVolumeUnits, add_material, delete_material, wells } from '../store';
+import type { Material, MaterialType } from '../store';
 
 type sortOrder = "name" | "iupac_name" | "molecular_weight" | "type";
 const sortby = ref<sortOrder>("name");
 const step = ref(1);
-const new_material = ref<Partial<Material>>({name: "", iupac_name: "", molecular_weight: null, type: "", display_units: ""});
+const chosenMaterial = ref<string | null>(null);
+const soluteUnits = [...soluteMassUnits, ...soluteVolumeUnits];
+
+const generate_new_material = () => ({ name: "", iupac_name: "", molecular_weight: null, type: null });
+const new_material = ref<Partial<Material>>(generate_new_material());
 
 const UP_ARROW = "▲";
 const DOWN_ARROW = "▼";
@@ -48,11 +53,6 @@ function MaterialSorter(a: Material, b: Material) {
   }
 }
 
-function doSorting() {
-  filtered_materials.value = materials.value.filter(NameSearch).sort(MaterialSorter);
-}
-
-
 const filtered_materials = computed(() => {
   return materials.value.filter(NameSearch).sort(MaterialSorter);
 });
@@ -68,7 +68,6 @@ function toggleSorting(column: sortOrder) {
   }
 }
 
-
 function calculateIcon(column: sortOrder) {
   if (sortby.value === column) {
     return (step.value > 0) ? UP_ARROW : DOWN_ARROW;
@@ -78,54 +77,119 @@ function calculateIcon(column: sortOrder) {
   }
 }
 
+async function pubchem_search() {
+  const pubchem_cid = new_material.value.pubchem_cid;
+  const response = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${pubchem_cid}/property/MolecularWeight,IUPACName/JSON`)
+  // const response = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${pubchem_cid}/json`);
+  const data = await response.json();
+  console.log(data);
+  new_material.value.iupac_name = data.PropertyTable.Properties[0].IUPACName;
+  new_material.value.molecular_weight = data.PropertyTable.Properties[0].MolecularWeight;
+  if (new_material.value.name === "") {
+    const name_response = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${pubchem_cid}/synonyms/TXT`);
+    const name_data = await name_response.text();
+    new_material.value.name = name_data.split("\n")[0];
+  }
+}
+
+async function submit_add() {
+  await add_material(new_material.value);
+  new_material.value = generate_new_material();
+}
+
+function clear() {
+  new_material.value = generate_new_material();
+}
+
+function check_delete(material: Material) {
+  if (confirm(`Are you sure you want to delete ${material.name}?`)) {
+    delete_material(material);
+  }
+}
+
+function edit_material(material: Material) {
+  new_material.value = {...material};
+}
 
 </script>
 
 <template>
-  <div class="container">
-    <h5>Materials:</h5>
-    <div class="input-group mb-3">
-      <input type="text" class="form-control" placeholder="Material name" v-model="new_material.name">
-      <input type="text" class="form-control" placeholder="PubChem CID" v-model="new_material.pubchem_cid">
-      <input type="text" class="form-control" placeholder="IUPAC name" v-model="new_material.iupac_name">
-      <input type="number" class="form-control" placeholder="Molecular Weight" v-model="new_material.molecular_weight">
-      <input type="text" class="form-control" placeholder="Type" v-model="new_material.type">
-      <input type="text" class="form-control" placeholder="Display Units" v-model="new_material.display_units">
-      <button class="btn btn-outline-secondary" type="button" @click="add_material(new_material)">Add</button>
-    </div>
-    <div class="input-group mb-3">
-      <input type="text" class="form-control" placeholder="Search for material" v-model="active_search_pattern"
-        @input="active_search_regexp = new RegExp(active_search_pattern, 'i')">
-      <button class="btn btn-outline-secondary" type="button" @click="doSorting">Search</button>
-    </div>
-    <table class="table table-sm">
-      <thead>
-        <tr class="sticky-top text-body bg-white">
-          <th scope="col" @click="toggleSorting('name')">Name{{ calculateIcon('name') }}</th>
-          <th scope="col">PubChem CID</th>
-          <th scope="col" @click="toggleSorting('iupac_name')">IUPAC name{{ calculateIcon('iupac_name') }}</th>
-          <th scope="col" @click="toggleSorting('molecular_weight')">Molecular Weight{{ calculateIcon('molecular_weight') }}</th>
-          <th scope="col" @click="toggleSorting('type')">Type{{ calculateIcon('type') }}</th>
-          <th scope="col" title="concentration display units">conc. default units</th>
-          <th scope="col" title="delete"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="material in filtered_materials"
-          :key="material.name"
-          :class="{'table-warning': material.name == chosenMaterial}"
-          @click="chosenMaterial=material.name"
-          @dblclick="chosenMaterial=material.name;chooseMaterial()"
-          >
-          <td>{{ material.name }}</td>
-          <td>{{ material.pubchem_cid }}</td>
-          <td>{{ material.iupac_name }}</td>
-          <td>{{ material.molecular_weight }}</td>
-          <td>{{ material.type }}</td>
-          <td>{{ material.display_units }}</td>
-          <td><button class="btn btn-outline-danger" @click="delete_material(material)">Delete</button></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>  
+  <div class="row flex-grow-1">
+      <div class="col">
+        <h5>Materials:</h5>
+        <div class="input-group mb-3">
+          <div class="form-floating">
+            <input type="text" class="form-control" v-model="new_material.name" id="floatingInputName">
+            <label for="floatingInputName">Material name</label>
+          </div>
+          <div class="form-floating">
+            <input type="text" class="form-control" @keydown.enter="pubchem_search" @blur="pubchem_search" v-model="new_material.pubchem_cid" id="floatingInputCID">
+            <label for="floatingInputCID">PubChem CID</label>
+          </div>
+          <div class="form-floating">
+            <input type="text" class="form-control" v-model="new_material.iupac_name" id="floatingInputIUPAC">
+            <label for="floatingInputIUPAC">IUPAC name</label>
+          </div>
+          <div class="form-floating">
+            <input type="number" class="form-control" v-model="new_material.molecular_weight" id="floatingInputMW">
+            <label for="floatingInputMW">Molec. Weight</label>
+          </div>
+          <div class="form-floating">
+            <select class="form-select" v-model="new_material.type" title="choose type">
+              <option value="null"></option>
+              <option v-for="type in materialType" :key="type" :value="type">{{ type }}</option>
+            </select>
+            <label for="floatingInputType">Type</label>
+          </div>
+          <button class="btn btn-outline-secondary" type="button" @click="submit_add">{{ materials.some((m) => m.name === new_material.name) ? 'Save' : 'Add' }}</button>
+          <button class="btn btn-outline-secondary" type="button" @click="clear">Clear</button>
+        </div>
+        <div class="input-group mb-3">
+          <input type="text" class="form-control" placeholder="Search for material" v-model="active_search_pattern"
+            @input="active_search_regexp = new RegExp(active_search_pattern ?? '.', 'i')">
+        </div>
+        <table class="table table-sm">
+          <thead>
+            <tr class="sticky-top text-body bg-white">
+              <th scope="col" @click="toggleSorting('name')">Name{{ calculateIcon('name') }}</th>
+              <th scope="col">PubChem CID</th>
+              <th scope="col" @click="toggleSorting('iupac_name')">IUPAC name{{ calculateIcon('iupac_name') }}</th>
+              <th scope="col" @click="toggleSorting('molecular_weight')">Molecular Weight{{ calculateIcon('molecular_weight') }}</th>
+              <th scope="col" @click="toggleSorting('type')">Type{{ calculateIcon('type') }}</th>
+              <th scope="col" title="delete"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="material in filtered_materials"
+              :key="material.name"
+              :class="{'table-warning': material.name == chosenMaterial}"
+              @click="chosenMaterial=material.name"
+              @dblclick="edit_material(material)"
+              >
+              <td>{{ material.name }}</td>
+              <td>{{ material.pubchem_cid }}</td>
+              <td>{{ material.iupac_name }}</td>
+              <td>{{ material.molecular_weight }}</td>
+              <td>{{ material.type }}</td>
+              <td><button class="btn btn-outline-danger" @click="check_delete(material)">Delete</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col">
+        <BedLayout :wells="wells" />
+      </div>
+  </div>
 </template>
+
+<style scoped>
+  select:has(option[value="null"]:checked) {
+    color: gray;
+  }
+  option[value="null"] {
+    color: gray;
+  }
+  .form-floating>label {
+    padding-left: 0.1rem;
+  }
+</style>

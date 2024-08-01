@@ -84,7 +84,7 @@ function openMixture() {
         <BedLayout :wells="wells" />
       </div>
     </div>
-    <div class="tab-pane" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
+    <div class="tab-pane d-flex flex-grow-1" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>
 
