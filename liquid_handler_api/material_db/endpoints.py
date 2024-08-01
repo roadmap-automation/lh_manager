@@ -46,8 +46,10 @@ def get_all() -> Response:
     return make_response({'materials': [asdict(material) for material in materials]}, 200)
 
 @blueprint.route('/Materials/delete/', methods=['GET', 'POST'])
-def delete(material: db.Material) -> Response:
+def delete() -> Response:
     """Delete material from the database"""
+    data = request.get_json(force=True)
+    material = db.Material(**data)
     with db.MaterialDB() as database:
         database.delete_material(material)
     socketio.emit('update_materials', {'msg': 'update_materials'}, include_self=True)

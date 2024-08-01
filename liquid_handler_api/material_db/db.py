@@ -16,7 +16,7 @@ class Material:
     metadata: Optional[dict] = None
     type: Optional[str] = None
     density: Optional[float] = None
-    display_units: Optional[str] = None
+    concentration_units: Optional[str] = None
 
 MATERIAL_DB = Path(__file__).parent.parent.parent / 'persistent_state' / 'materials.sqlite'
 
@@ -31,7 +31,7 @@ class MaterialDB:
             metadata JSON,
             type TEXT,
             density REAL,
-            display_units TEXT
+            concentration_units TEXT
         );"""
     columns = [f.name for f in fields(Material)]
 
@@ -71,13 +71,29 @@ class MaterialDB:
 
     def populate_from_pubchem(self, name: str) -> Material:
         import pubchempy as pcp
-        material = self.get_material_by_uuid(uuid)
+        material = self.get_material_by_name(name)
         pubchem_cid = material.pubchem_cid
         compound = pcp.Compound.from_cid(pubchem_cid)
         material.molecular_weight = compound.molecular_weight
         material.iupac_name = compound.iupac_name
         self.smart_insert(material)
         return material
+    
+    def query_pubchem(self, pubchem_cid: int) -> Material:
+        import pubchempy as pcp
+        compound = pcp.Compound.from_cid(pubchem_cid)
+        material = Material(
+            name=compound.synonyms[0],
+            pubchem_cid=compound.cid,
+            iupac_name=compound.iupac_name,
+            molecular_weight=compound.molecular_weight,
+            metadata={},
+            type='compound',
+            density=None,
+            concentration_units=None
+        )
+        return material
+
 
     def search_name(self, name: str, case_sensitive: bool = False) -> List[Material]:
         res = self.db.execute(f"SELECT * FROM {self.table_name} WHERE name {'LIKE' if case_sensitive else 'ILIKE'} ?", (f'%{name}%',))
@@ -105,6 +121,6 @@ class MaterialDB:
         return [Material(*m) for m in materials]
     
     def delete_material(self, material: Material) -> None:
-        self.db.execute(f"DELETE FROM {self.table_name} WHERE uuid=?", (material.uuid,))
+        self.db.execute(f"DELETE FROM {self.table_name} WHERE name=?", (material.name,))
         self.db.commit()
 
