@@ -137,7 +137,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
             methods += [LHMethodCluster(method_type=MethodType.PREPARE,
                                         methods=bilayer_formulation.get_methods(layout))]
         else:
-            lipid_mixing_well = InferredWellLocation(lipid_mixing_well.rack_id, lipid_mixing_well.well_number, expected_composition=lipid_mixing_well.composition)
+            lipid_mixing_well = WellLocation(lipid_mixing_well.rack_id, lipid_mixing_well.well_number, expected_composition=lipid_mixing_well.composition)
 
         direct_inject = ROADMAP_DirectInjecttoQCMD(Source=lipid_mixing_well,
                              Volume=self.Lipid_Injection_Volume,
