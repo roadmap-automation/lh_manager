@@ -143,7 +143,11 @@ class MethodManager:
             MethodsType: method class
         """
 
-        return next(m for m in self.method_list if m.method_name == method_name)
+        try:
+            return next(m for m in self.method_list if m.method_name == method_name)
+        except StopIteration:
+            print(f'{method_name} not found')
+            return BaseMethod()
 
 method_manager = MethodManager()
 
