@@ -149,3 +149,24 @@ class QCMDRecordTag(QCMDRecord):
     def estimated_time(self, layout: LHBedLayout) -> float:
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time + self.record_time
+
+# TODO: Replace other QCMD Stop method with this one
+#@register
+@dataclass
+class QCMDStop2(BaseQCMDMethod):
+    """Stops QCMD recording"""
+
+    display_name: Literal['QCMD Stop 2'] = 'QCMD Stop 2'
+    method_name: Literal['QCMDStop'] = 'QCMDStop'
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [self.sub_method(method_name=self.method_name,
+                                method_data=dict()
+                                ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return 0.0
