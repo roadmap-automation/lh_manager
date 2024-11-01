@@ -180,7 +180,8 @@ def init_devices():
                        tasks=[TaskData(device=device.device_name,
                                        device_type=device.device_type,
                                        device_address=device.address,
-                                       number_of_channels=(samples.n_channels if device.is_multichannel() else None))])
+                                       number_of_channels=(samples.n_channels if device.is_multichannel() else None),
+                                       sample_mixing=device.allow_sample_mixing)])
                   for device in device_manager.device_list]
 
     submit_tasks(init_tasks)

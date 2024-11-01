@@ -13,6 +13,7 @@ class DeviceBase:
     device_name: str = 'none'
     device_type: str = 'none'
     multichannel: bool = False
+    allow_sample_mixing: bool = False
     address: str = 'http://0.0.0.0:0000'
 
     @classmethod

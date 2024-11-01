@@ -20,6 +20,7 @@ class InjectionSystemDevice(DeviceBase):
     device_name: str = 'Multichannel Injection System'
     device_type: str = 'injection'
     multichannel: bool = True
+    allow_sample_mixing: bool = True
     address: str = 'http://localhost:5003'
 
     @dataclass
