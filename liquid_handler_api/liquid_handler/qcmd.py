@@ -71,7 +71,7 @@ class QCMD_Setup(BaseLHMethod):
             GSIOC_ADDRESS=f'{self.GSIOC_Address}'
         )]
 
-@register
+#@register
 @dataclass
 class QCMD_Stop(BaseLHMethod):
     """Stops QCMD recording"""

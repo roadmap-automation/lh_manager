@@ -18,6 +18,7 @@ class QCMDMeasurementDevice(DeviceBase):
     device_name: str = 'QCMD Measurement Device'
     device_type: str = 'qcmd'
     multichannel: bool = True
+    allow_sample_mixing: bool = False
     address: str = 'http://localhost:5005'
 
     @dataclass
@@ -150,13 +151,12 @@ class QCMDRecordTag(QCMDRecord):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time + self.record_time
 
-# TODO: Replace other QCMD Stop method with this one
-#@register
+@register
 @dataclass
-class QCMDStop2(BaseQCMDMethod):
+class QCMDStop(BaseQCMDMethod):
     """Stops QCMD recording"""
 
-    display_name: Literal['QCMD Stop 2'] = 'QCMD Stop 2'
+    display_name: Literal['QCMD Stop'] = 'QCMD Stop'
     method_name: Literal['QCMDStop'] = 'QCMDStop'
 
     def render_method(self,
