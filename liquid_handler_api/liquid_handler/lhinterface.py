@@ -246,6 +246,7 @@ class LHInterface:
     def __init__(self) -> None:
         self._active_job: LHJob | None = None
         self.running: bool = True
+        self.has_error: bool = False
         self.activation_callbacks: List[Callable] = []
         self.validation_callbacks: List[Callable] = []
         self.results_callbacks: List[Callable] = []
@@ -263,6 +264,9 @@ class LHInterface:
 
         if not self.running:
             return InterfaceStatus.DOWN
+
+        if self.has_error:
+            return InterfaceStatus.ERROR
 
         if self._active_job is not None:
             return InterfaceStatus.BUSY

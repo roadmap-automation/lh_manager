@@ -16,6 +16,7 @@ def GetStatus() -> Response:
 
     status_map = {InterfaceStatus.BUSY: Status.BUSY,
                  InterfaceStatus.DOWN: Status.DOWN,
+                 InterfaceStatus.ERROR: Status.ERROR,
                  InterfaceStatus.UP: Status.IDLE}
     
     status = status_map[lh_interface.get_status()]

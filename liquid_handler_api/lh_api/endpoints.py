@@ -139,7 +139,10 @@ def PutSampleListValidation(sample_list_id):
     error = None
     if job.get_validation_status()[0] != ValidationStatus.SUCCESS:
         error = f'Error in validation. Full message: ' + data['validation']['message']
+        lh_interface.has_error = True
         lh_interface.deactivate()
+
+    lh_interface.has_error = False
 
     return make_response({sample_list_id: job.get_validation_status(), 'error': error}, 200)
 
@@ -169,8 +172,31 @@ def PutSampleData():
     error = None
     if job.get_result_status() == ResultStatus.FAIL:
         error = f'Error in results. Full message: ' + repr(data)
+        print(error)
+        lh_interface.has_error = True
         lh_interface.deactivate()
     elif job.get_result_status() == ResultStatus.SUCCESS:
         job.execute_methods(layout)
 
     return make_response({'data': data}, 200)
+
+@lh_blueprint.route('/LH/ReportError/', methods=['POST'])
+def ReportError():
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+
+    error = f'Error in results. Full message: ' + repr(data)
+    print(error)
+
+    lh_interface.has_error = True
+
+    return make_response({'data': data}, 200)
+
+@lh_blueprint.route('/LH/ResetErrorState/', methods=['POST'])
+def ResetErrorState() -> Response:
+    """Clears error state of LH interface
+    """
+
+    lh_interface.has_error = False
+
+    return make_response({'success': 'error state reset'}, 200)
