@@ -50,6 +50,17 @@ function MaterialSorter(a: Material, b: Material) {
   else if (bv === null) {
     return -s;
   }
+  else if ((typeof av === 'string') && (typeof bv === 'string')) {
+    if (av.toLowerCase() > bv.toLowerCase()) {
+      return s;
+    }
+    else if (av.toLowerCase() < bv.toLowerCase()) {
+      return -s;
+    }
+    else {
+      return 0;
+    }
+  }  
   else if (av > bv) {
     return s;
   }
