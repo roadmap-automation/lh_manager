@@ -5,13 +5,13 @@ import BedLayout from './BedLayout.vue';
 import { materials, materialType, soluteMassUnits, soluteVolumeUnits, add_material, delete_material, wells } from '../store';
 import type { Material, MaterialType } from '../store';
 
-type sortOrder = "name" | "iupac_name" | "molecular_weight" | "type";
+type sortOrder = "name" | "full_name" | "iupac_name" | "molecular_weight" | "type";
 const sortby = ref<sortOrder>("name");
 const step = ref(1);
 const chosenMaterial = ref<string | null>(null);
 const soluteUnits = [...soluteMassUnits, ...soluteVolumeUnits];
 
-const generate_new_material = () => ({ name: "", iupac_name: "", molecular_weight: null, type: null });
+const generate_new_material = () => ({ name: "", full_name: "", iupac_name: "", molecular_weight: null, type: null });
 const new_material = ref<Partial<Material>>(generate_new_material());
 
 const UP_ARROW = "▲";
@@ -89,6 +89,7 @@ async function pubchem_search() {
     const name_response = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${pubchem_cid}/synonyms/TXT`);
     const name_data = await name_response.text();
     new_material.value.name = name_data.split("\n")[0];
+    new_material.value.full_name = name_data.split("\n")[0];
   }
 }
 
@@ -127,6 +128,10 @@ function edit_material(material: Material) {
             <label for="floatingInputCID">PubChem CID</label>
           </div>
           <div class="form-floating">
+            <input type="text" class="form-control" v-model="new_material.full_name" id="floatingInputFullName">
+            <label for="floatingInputFullName">Full name</label>
+          </div>          
+          <div class="form-floating">
             <input type="text" class="form-control" v-model="new_material.iupac_name" id="floatingInputIUPAC">
             <label for="floatingInputIUPAC">IUPAC name</label>
           </div>
@@ -153,6 +158,7 @@ function edit_material(material: Material) {
             <tr class="sticky-top text-body bg-white">
               <th scope="col" @click="toggleSorting('name')">Name{{ calculateIcon('name') }}</th>
               <th scope="col">PubChem CID</th>
+              <th scope="col" @click="toggleSorting('full_name')">Full name{{ calculateIcon('full_name') }}</th>
               <th scope="col" @click="toggleSorting('iupac_name')">IUPAC name{{ calculateIcon('iupac_name') }}</th>
               <th scope="col" @click="toggleSorting('molecular_weight')">Molecular Weight{{ calculateIcon('molecular_weight') }}</th>
               <th scope="col" @click="toggleSorting('type')">Type{{ calculateIcon('type') }}</th>
@@ -168,6 +174,7 @@ function edit_material(material: Material) {
               >
               <td>{{ material.name }}</td>
               <td>{{ material.pubchem_cid }}</td>
+              <td>{{ material.full_name }}</td>
               <td>{{ material.iupac_name }}</td>
               <td>{{ material.molecular_weight }}</td>
               <td>{{ material.type }}</td>

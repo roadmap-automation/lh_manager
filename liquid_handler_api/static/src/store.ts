@@ -108,6 +108,7 @@ export type SoluteVolumeUnits = typeof soluteVolumeUnits[number];
 export interface Material {
   name: string,
   pubchem_cid: number | null,
+  full_name: string | null,
   iupac_name: string | null,
   molecular_weight: number | null,
   metadata: object | null,

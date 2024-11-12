@@ -1,16 +1,15 @@
 import os
-import json
 import sqlite3
-import time
 
 from pathlib import Path
 from typing import List, Optional
-from dataclasses import asdict, dataclass, fields
+from dataclasses import dataclass, fields
 
 @dataclass
 class Material:
     name: str
     pubchem_cid: Optional[int] = None
+    full_name: Optional[str] = None    
     iupac_name: Optional[str] = None
     molecular_weight: Optional[float] = None
     metadata: Optional[dict] = None
@@ -26,6 +25,7 @@ class MaterialDB:
         CREATE TABLE IF NOT EXISTS {table_name}(
             name TEXT PRIMARY KEY,
             pubchem_cid INTEGER,
+            full_name TEXT,
             iupac_name TEXT,
             molecular_weight REAL,
             metadata JSON,
@@ -85,6 +85,7 @@ class MaterialDB:
         material = Material(
             name=compound.synonyms[0],
             pubchem_cid=compound.cid,
+            full_name=compound.synonyms[0],
             iupac_name=compound.iupac_name,
             molecular_weight=compound.molecular_weight,
             metadata={},
