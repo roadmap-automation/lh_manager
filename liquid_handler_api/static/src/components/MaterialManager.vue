@@ -21,12 +21,20 @@ const active_search_pattern = ref<string | null>(null);
 const active_search_regexp = ref<RegExp | null>(null);
 
 function NameSearch(m: Material) {
-  if (active_search_regexp.value === null) {
-    return true;
+  let result = false
+  if (!!active_search_regexp.value) {
+    result = result || active_search_regexp.value.test(m.name)
+    if (!!m.full_name) {
+      result = result || active_search_regexp.value.test(m.full_name)
+    }
+    if (!!m.iupac_name) {
+      result = result || active_search_regexp.value.test(m.iupac_name)
+    }
   }
   else {
-    return active_search_regexp.value.test(m.name);
+    result = true
   }
+  return result
 }
 
 function MaterialSorter(a: Material, b: Material) {
