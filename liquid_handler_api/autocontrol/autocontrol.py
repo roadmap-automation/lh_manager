@@ -93,7 +93,7 @@ class AutocontrolTaskTracker(TaskTracker):
     task: Task | None = None
     status: SampleStatus | None = None
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
 
         if self.id is None:
             self.id = self.task.id
@@ -148,8 +148,7 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
                 else:
                     tasktype = TaskType.NOCHANNEL
                     
-                new_task = Task(id=str(uuid4()),
-                                sample_id=sample.id,
+                new_task = Task(sample_id=sample.id,
                                 task_type=tasktype,
                                 tasks=taskdata)
 
@@ -188,8 +187,7 @@ def submit_tasks(tasks: List[Task]):
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
-                       tasks=[TaskData(id=str(uuid4()),
-                                       device=device.device_name,
+                       tasks=[TaskData(device=device.device_name,
                                        device_type=device.device_type,
                                        device_address=device.address,
                                        number_of_channels=(samples.n_channels if device.multichannel else None),
@@ -229,9 +227,13 @@ def synchronize_status(poll_delay: int = 5):
     def mark_complete(id: str) -> None:
         parent_item = active_tasks.active.pop(id)
         _, sample = samples.getSampleById(parent_item.id)
-        sample.stages[parent_item.stage].run_jobs.pop(sample.stages[parent_item.stage].run_jobs.index(id))
-        sample.stages[parent_item.stage].status = SampleStatus.PARTIAL
-        sample.stages[parent_item.stage].update_status()
+        stage = sample.stages[parent_item.stage]
+        for m in stage.methods:
+            for t in m.tasks:
+                if t.id == id:
+                    t.status = SampleStatus.COMPLETED
+
+            #sample.stages[parent_item.stage].update_status()
 
         # NOTE: this is now done at the LHInterface level. However, GUI is only updated here.
         # if sample stage is complete, execute all methods

@@ -1,6 +1,5 @@
 """HTTP Endpoints for GUI API"""
 import warnings
-from dataclasses import replace
 from copy import deepcopy
 from flask import make_response, request, Response
 from typing import List, Tuple, Optional
@@ -45,8 +44,6 @@ def UpdateSample() -> Response:
         return make_response({'error': "no id in sample, can't update or add"}, 200)
 
     sample_index, sample = samples.getSampleById(id)
-    print(data)
-    print(sample)
     if sample is None or sample_index is None:
         """ adding a new sample """
         new_sample = Sample(**data)
@@ -54,8 +51,7 @@ def UpdateSample() -> Response:
         return make_response({'sample added': id}, 200)
     else:
         """ replacing sample """
-        new_sample = Sample(**sample.model_copy(update=data, deep=True).model_dump())
-        print('new sample: ', new_sample)
+        new_sample = Sample(**sample.model_copy(update=data).model_dump())
         samples.samples[sample_index] = new_sample
         return make_response({'sample updated': id}, 200)
 

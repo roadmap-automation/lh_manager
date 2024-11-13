@@ -65,8 +65,10 @@ class ActiveTasks:
 #        })
         for sample in samples.samples:
             for stagename, stage in sample.stages.items():
-                if stage.run_jobs is not None:
-                    self.active.update({id: Item(sample.id, stagename) for id in stage.run_jobs})
+                for m in stage.methods:
+                    for t in m.tasks:
+                        if t.status != SampleStatus.COMPLETED:
+                            self.active.update({t.id: Item(id=sample.id, stage=stagename)})
 
 
 class JobQueue(BaseModel):
