@@ -1,7 +1,6 @@
 from typing import List, Tuple, Literal
 from copy import copy
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
 
 import numpy as np
 
@@ -11,7 +10,6 @@ from .bedlayout import LHBedLayout, WellLocation
 from .methods import MethodContainer, MethodsType, register, method_manager
 
 @register
-@dataclass
 class SerialDilution(MethodContainer):
 
     # Defined from BaseMethod
@@ -136,7 +134,6 @@ class SerialDilution(MethodContainer):
 
 
 @register
-@dataclass
 class SerialDilutionInject(SerialDilution):
 
     method_name: Literal['SerialDilutionInject'] = 'SerialDilutionInject'
@@ -173,7 +170,6 @@ class SerialDilutionInject(SerialDilution):
         return methods
 
 @register
-@dataclass
 class StandardDilution(MethodContainer):
 
     # Defined from BaseMethod
@@ -282,7 +278,6 @@ class StandardDilution(MethodContainer):
         return methods
 
 @register
-@dataclass
 class StandardDilutionInject(StandardDilution):
 
     # Defined from BaseMethod
@@ -321,8 +316,9 @@ class StandardDilutionInject(StandardDilution):
 
 if __name__ == '__main__':
 
-    @dataclass
-    class TestDilution:
+    from pydantic import BaseModel
+
+    class TestDilution(BaseModel):
         initial_dilution_factor = 10.0
         dilution_factor = 2
         number_of_dilutions = 10

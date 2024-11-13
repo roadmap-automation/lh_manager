@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Callable
 from uuid import uuid4
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from threading import Lock
 
 from ..gui_api.events import trigger_sample_status_update, trigger_layout_update
@@ -95,8 +95,7 @@ def mark_complete(job: LHJob):
         for method in sample.stages[parent_item.stage].methods:
             method.execute(layout)
 
-@dataclass
-class JobQueue:
+class JobQueue(BaseModel):
     """Hub for interfacing (upstream) samples object to (downstream) running of jobs.
         Use submit_callbacks to link submission to downstream activities. Also provides
         an interface for the upstream objects based on validation and run results"""

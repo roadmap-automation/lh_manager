@@ -3,7 +3,6 @@ from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
 
 from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
 
@@ -15,7 +14,6 @@ from .methods import MethodContainer, MethodsType, register, method_manager
 ZERO_VOLUME_TOLERANCE = 1e-8
 
 @register
-@dataclass
 class Formulation(MethodContainer):
 
     # Defined from BaseMethod
@@ -268,7 +266,6 @@ class Formulation(MethodContainer):
 # TODO: NEEDS TESTING
 
 @register
-@dataclass
 class SoluteFormulation(Formulation):
     """Subclass of Formulation. In target_composition, specify only the solutes
         of interest; any missing volume will be filled in with the diluent. Diluent
@@ -316,15 +313,15 @@ class SoluteFormulation(Formulation):
         return volumes, wells, True
 
 
-target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
+#target_composition = Composition(solvents=[Solvent('D2O', 1.0)], solutes=[Solute('peptide', 1e-6)])
 
-transfer = TransferWithRinse(Flow_Rate=2.0)
-mix = MixWithRinse(Repeats=2)
+#transfer = TransferWithRinse(Flow_Rate=2.0)
+#mix = MixWithRinse(Repeats=2)
 
-example_formulation = Formulation(target_composition=target_composition,
-                target_volume=7.0,
-                Target=WellLocation('Mix', 10),
-                mix_template=mix)
+#example_formulation = Formulation(target_composition=target_composition,
+#                target_volume=7.0,
+#                Target=WellLocation('Mix', 10),
+#                mix_template=mix)
 
 #example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
 

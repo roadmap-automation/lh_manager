@@ -1,6 +1,6 @@
 from typing import List, Tuple, Dict
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from .history import History
 from .samplelist import Sample, StageName, SampleStatus
 from .bedlayout import LHBedLayout
@@ -8,8 +8,7 @@ from .dryrun import DryRunQueue
 from .items import Item
 from .error import MethodError
 
-@dataclass
-class SampleContainer:
+class SampleContainer(BaseModel):
     """Specialized sample dictionary allowing convenient referencing by sample ID or sample name"""
 
     samples: list[Sample] = field(default_factory=list)

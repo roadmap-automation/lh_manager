@@ -1,7 +1,6 @@
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class MethodError:
+class MethodError(BaseModel):
     
     name: str
     error: str

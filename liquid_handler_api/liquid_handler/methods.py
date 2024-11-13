@@ -1,8 +1,7 @@
-from dataclasses import fields, asdict
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel, fields
 from enum import Enum
 from copy import copy
-from typing import Dict, List, Literal, Union, Set
+from typing import Dict, List, Literal, Union, Set, ClassVar
 
 from .bedlayout import LHBedLayout
 from .error import MethodError
@@ -20,10 +19,11 @@ class MethodType(str, Enum):
     PREPARE = 'prepare'
     MEASURE = 'measure'
 
-@dataclass
-class BaseMethod:
+class BaseMethod(BaseModel):
     """Base class for LH methods"""
 
+    method_name: Literal['BaseMethod'] = 'BaseMethod'
+    display_name: Literal['BaseMethod'] = 'BaseMethod'
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
@@ -54,12 +54,12 @@ class BaseMethod:
         
         return [{}]
 
-@dataclass
 class MethodContainer(BaseMethod):
     """Special method that generates a list of basic methods when rendered"""
 
     method_type: Literal[MethodType.CONTAINER] = MethodType.CONTAINER
-    display_name: str = 'MethodContainer'
+    method_name: Literal['MethodContainer'] = 'MethodContainer'
+    display_name: Literal['MethodContainer'] = 'MethodContainer'
 
     def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:
         """Generates list of methods. Intended to be superceded for specific applications
@@ -126,10 +126,10 @@ class MethodManager:
         lh_method_fields: Dict[str, Dict] = {}
         for method in self.method_list:
             fieldlist = []
-            for fi in fields(method):
-                if not fi.name in EXCLUDE_FIELDS:
-                    fieldlist.append(fi.name)
-            lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name, 'schema': method.__pydantic_model__.schema()}
+            for name, fi in method.model_fields.items():
+                if not name in EXCLUDE_FIELDS:
+                    fieldlist.append(name)
+            lh_method_fields[method.model_fields['method_name'].default] = {'fields': fieldlist, 'display_name': method.model_fields['display_name'].default, 'schema': method.model_json_schema()}
 
         return lh_method_fields
     
@@ -144,10 +144,10 @@ class MethodManager:
         """
 
         try:
-            return next(m for m in self.method_list if m.method_name == method_name)
+            return next(m for m in self.method_list if m.model_fields['method_name'].default == method_name)
         except StopIteration:
             print(f'{method_name} not found')
-            return BaseMethod()
+            return BaseMethod
 
 method_manager = MethodManager()
 
@@ -161,7 +161,6 @@ def register(cls):
 # methods must be registered in methods manager
 
 @register
-@dataclass
 class Release(BaseMethod):
     """Special method that does nothing except "release" the liquid handler, i.e. signal to
         the software that other higher priority methods can be inserted at this position and run in the interim.

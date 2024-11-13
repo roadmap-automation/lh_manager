@@ -1,10 +1,9 @@
 from typing import List
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from .items import Item
 
-@dataclass
-class DryRunQueue:
+class DryRunQueue(BaseModel):
     """Container for dry run objects. Unrelated to queue.Queue"""
 
     # Ordered list of tuples (uuid, stage name) to dry run

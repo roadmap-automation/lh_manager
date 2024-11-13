@@ -1,7 +1,7 @@
 from enum import Enum
 from .items import Item
 
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
 from dataclasses import field
 from typing import List, Tuple
@@ -18,8 +18,7 @@ class ResultStatus(str, Enum):
     SUCCESS = 'success',
     FAIL = 'failed'
 
-@dataclass
-class JobBase:
+class JobBase(BaseModel):
     """Container for a single job list"""
     id: str | None = None
     method_data: dict = field(default_factory=dict)

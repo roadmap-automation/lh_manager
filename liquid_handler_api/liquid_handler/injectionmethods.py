@@ -1,41 +1,38 @@
 from .bedlayout import LHBedLayout
 from .error import MethodError
 from .methods import BaseMethod, MethodType, register
-from .devices import DeviceBase, register_device
+from .devices import DeviceBase, device_manager
 from .job import JobBase
 
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
-from dataclasses import field, asdict
-from typing import List, Literal
+from dataclasses import field
+from typing import List, Literal, ClassVar
 from enum import Enum
 from datetime import datetime
 
-@register_device
-@dataclass
 class InjectionSystemDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: str = 'Multichannel Injection System'
+    device_name: ClassVar[str] = 'Multichannel Injection System'
     device_type: str = 'injection'
     multichannel: bool = True
     allow_sample_mixing: bool = True
     address: str = 'http://localhost:5003'
 
-    @dataclass
     class Job(JobBase):
         pass
 
-@dataclass
+device_manager.register(InjectionSystemDevice())
+
 class BaseInjectionSystemMethod(BaseMethod):
     """Base class for LH methods"""
 
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
-    @dataclass
-    class sub_method:
+    class sub_method(BaseModel):
         """Base class for representation in sample lists"""
         method_name: str
         method_data: dict = field(default_factory=dict)
@@ -46,12 +43,11 @@ class BaseInjectionSystemMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = {InjectionSystemDevice.device_name: [asdict(self)]}
+            d2 = {InjectionSystemDevice.device_name: [self.model_dump()]}
 
             return d2
 
 @register
-@dataclass
 class RoadmapChannelInit(BaseInjectionSystemMethod):
     """Initialize QCMD instrument"""
     display_name: Literal['Init Injection System'] = 'Init Injection System'
@@ -73,7 +69,6 @@ class RoadmapChannelInit(BaseInjectionSystemMethod):
 
 
 @register
-@dataclass
 class RoadmapChannelSleep(BaseInjectionSystemMethod):
     """Initialize QCMD instrument"""
     display_name: Literal['Sleep Injection System'] = 'Sleep Injection System'
@@ -96,7 +91,6 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
         return self.sleep_time
 
 @register
-@dataclass
 class PrimeLoop(BaseInjectionSystemMethod):
     """Prime a loop"""
     number_of_primes: int = 3
@@ -119,7 +113,6 @@ class PrimeLoop(BaseInjectionSystemMethod):
         return 0.0
     
 @register
-@dataclass
 class InjectLoop(BaseInjectionSystemMethod):
     """Inject contents of injection system loop"""
     Volume: float = 0

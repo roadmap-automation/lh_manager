@@ -1,32 +1,20 @@
 from dataclasses import fields
-from pydantic.v1.dataclasses import dataclass
-from typing import Dict, List, Literal, Union, Set
+from pydantic import BaseModel
+from typing import Dict, List, Literal, Union, Set, ClassVar
 from .job import JobBase
 
 EXCLUDE_FIELDS = set([])
 
-@dataclass
-class DeviceBase:
+class DeviceBase(BaseModel):
     """Base class for device definitions
     """
 
-    device_name: str = 'none'
+    device_name: ClassVar[str] = 'none'
     device_type: str = 'none'
     multichannel: bool = False
     allow_sample_mixing: bool = False
     address: str = 'http://0.0.0.0:0000'
 
-    @classmethod
-    def is_multichannel(cls) -> bool:
-        """Determines if device is a multichannel device
-
-        Returns:
-            bool: True if multichannel, False if not
-        """
-
-        return cls.multichannel
-
-    @dataclass
     class Job(JobBase):
         pass
 
@@ -53,7 +41,11 @@ class DeviceManager:
 
     def __init__(self) -> None:
 
-        self.device_list: Set[DevicesType] = set()
+        self.devices: Dict[str, DevicesType] = {}
+
+    @property
+    def device_list(self) -> List[DevicesType]:
+        return self.devices.values()
 
     def register(self, device: DeviceBase) -> None:
         """Registers a device in the manager
@@ -62,7 +54,7 @@ class DeviceManager:
             device (DeviceBase): method to register
         """
 
-        self.device_list.add(device)
+        self.devices.update({device.device_name: device})
 
     def get_all_schema(self) -> Dict[str, Dict]:
         """Gets the schema of all the devides in the manager
@@ -73,12 +65,12 @@ class DeviceManager:
         """
 
         lh_method_fields: Dict[str, Dict] = {}
-        for device in self.device_list:
+        for device in self.devices.values():
             fieldlist = []
             for fi in fields(device):
                 if not fi.name in EXCLUDE_FIELDS:
                     fieldlist.append(fi.name)
-            lh_method_fields[device.device_name] = {'fields': fieldlist, 'device_name': device.device_name, 'schema': device.__pydantic_model__.schema()}
+            lh_method_fields[device.device_name] = {'fields': fieldlist, 'device_name': device.device_name, 'schema': device.model_json_schema()}
 
         return lh_method_fields
     
@@ -92,7 +84,7 @@ class DeviceManager:
             DevicesType: device class
         """
 
-        return next(m for m in self.device_list if m.device_name == device_name)
+        return self.devices[device_name]
 
 device_manager = DeviceManager()
 

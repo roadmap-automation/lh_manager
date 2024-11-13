@@ -1,6 +1,6 @@
 """HTTP Endpoints for GUI API"""
 import warnings
-from dataclasses import asdict, replace
+from dataclasses import replace
 from copy import deepcopy
 from flask import make_response, request, Response
 from typing import List, Tuple, Optional
@@ -30,7 +30,7 @@ def AddSample() -> Response:
     for method in new_sample.stages[StageName.PREP].methods:
         method.execute(test_layout)
 
-    return make_response({'new sample': new_sample.toSampleList(StageName.PREP, test_layout), 'layout': asdict(test_layout)}, 200)
+    return make_response({'new sample': new_sample.toSampleList(StageName.PREP, test_layout), 'layout': test_layout.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/UpdateSample/', methods=['POST'])
 @trigger_samples_update
@@ -45,7 +45,8 @@ def UpdateSample() -> Response:
         return make_response({'error': "no id in sample, can't update or add"}, 200)
 
     sample_index, sample = samples.getSampleById(id)
-    print(data, sample)
+    print(data)
+    print(sample)
     if sample is None or sample_index is None:
         """ adding a new sample """
         new_sample = Sample(**data)
@@ -53,7 +54,8 @@ def UpdateSample() -> Response:
         return make_response({'sample added': id}, 200)
     else:
         """ replacing sample """
-        new_sample = replace(sample, **data)
+        new_sample = Sample(**sample.model_copy(update=data, deep=True).model_dump())
+        print('new sample: ', new_sample)
         samples.samples[sample_index] = new_sample
         return make_response({'sample updated': id}, 200)
 
@@ -223,13 +225,13 @@ def UpdateRunQueue() -> Response:
 def GetRunQueue() -> Response:
     """Gets run queue as dict"""
 
-    return make_response({'run_queue': asdict(LHqueue)}, 200)
+    return make_response({'run_queue': LHqueue.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:
     """Gets sample list as dict"""
 
-    return make_response({'samples': asdict(samples)}, 200)
+    return make_response({'samples': samples.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/GetSampleStatus/', methods=['GET'])
 def GetSamplesStatus() -> Response:
@@ -258,7 +260,7 @@ def GetAllMethodSchema() -> Response:
 def GetLayout() -> Response:
     """Gets list of sample names, IDs, and status"""
 
-    return make_response(asdict(layout), 200)
+    return make_response(layout.model_dump(), 200)
 
 def _get_component_zones(wells: List[Well]) -> Tuple[List[Tuple[str, Zone]], List[Tuple[str, Zone]]]:
     """Gets lists of all solvents and solutes in the specified wells
@@ -303,7 +305,7 @@ def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
         for loc in well_locations:
             well, rack = layout.get_well_and_rack(loc.rack_id, loc.well_number)
             wells.append(well)
-    wells_dict = [asdict(well) for well in wells]
+    wells_dict = [well.model_dump() for well in wells]
     for wd in wells_dict:
         zone, _ = LayoutWell2ZoneWell(wd['rack_id'], wd['well_number'])
         wd['zone'] = zone
@@ -319,7 +321,7 @@ def UpdateWell() -> Response:
     assert isinstance(data, dict)
     well = Well(**data)
     layout.update_well(well)
-    return make_response(asdict(well), 200)
+    return make_response(well.model_dump(), 200)
 
 @gui_blueprint.route('/GUI/RemoveWellDefinition/', methods=['POST'])
 @trigger_layout_update

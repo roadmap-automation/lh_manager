@@ -2,7 +2,6 @@
 import json
 import os
 from pathlib import Path
-from dataclasses import asdict
 from .samplecontainer import SampleContainer
 from .samplelist import example_sample_list, StageName
 from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmethods, roadmapmethods
@@ -33,11 +32,13 @@ def make_persistent_dir():
     
 def save_layout():
     make_persistent_dir()
-    json.dump(asdict(layout), open(LAYOUT_LOG, 'w'))
+    with open(LAYOUT_LOG, 'w') as f:
+        f.write(layout.model_dump_json(indent=4))
 
 def save_samples():
     make_persistent_dir()
-    json.dump(asdict(samples), open(SAMPLES_LOG, 'w'))
+    with open(SAMPLES_LOG, 'w') as f:
+        f.write(samples.model_dump_json(indent=4))
 
 if not parser.parse_args().noload:
     print('loading state!')

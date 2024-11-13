@@ -1,12 +1,10 @@
 """Gilson Trilution LH 4.0 Endpoints
 
     Designed to operate as an independent web interface; does not depend on sample list state"""
-from dataclasses import asdict
 from flask import make_response, Response, request
 
 from . import autocontrol_blueprint
 from autocontrol.status import Status
-from autocontrol.task_struct import TaskData
 from ...liquid_handler.lhinterface import InterfaceStatus, lh_interface
 from ...liquid_handler.state import samples
 

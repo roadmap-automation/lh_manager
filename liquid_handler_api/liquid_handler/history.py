@@ -5,7 +5,6 @@ import time
 
 from pathlib import Path
 from typing import List
-from dataclasses import asdict
 
 from .samplelist import Sample
 
@@ -54,7 +53,7 @@ class History:
             ON CONFLICT(uuid) DO UPDATE SET 
               NICE_uuid=excluded.NICE_uuid,
               sample=excluded.sample;
-        """, (sample.id, sample.NICE_uuid, json.dumps(asdict(sample))))
+        """, (sample.id, sample.NICE_uuid, sample.model_dump_json()))
         
         self.db.commit()
 

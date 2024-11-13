@@ -1,5 +1,4 @@
 """NICE API Endpoints"""
-from dataclasses import asdict
 from flask import make_response, Response, request
 
 from ..liquid_handler.lhqueue import validate_format, submit_handler
@@ -133,7 +132,7 @@ def GetMetaData(uuid) -> Response:
         
         if len(samples_uuid):
             samples_uuid.sort(key=lambda sample: sample.get_earliest_date())
-            return make_response({'metadata': [asdict(sample) for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
+            return make_response({'metadata': [sample.model_dump() for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
 
     return make_response({}, 200)
 

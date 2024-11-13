@@ -1,4 +1,3 @@
-from pydantic.v1.dataclasses import dataclass
 from typing import List, Literal
 
 from .lhmethods import InjectMethod, BaseLHMethod
@@ -7,7 +6,6 @@ from .bedlayout import LHBedLayout
 from .layoutmap import LayoutWell2ZoneWell, Zone
 
 @register
-@dataclass
 class QCMD_Record_Sync(BaseLHMethod):
     """Records QCMD Data"""
 
@@ -17,7 +15,6 @@ class QCMD_Record_Sync(BaseLHMethod):
     display_name: Literal['QCMD Record'] = 'QCMD Record'
     method_name: Literal['NCNR_QCMD_Record_Sync'] = 'NCNR_QCMD_Record_Sync'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Tag_Name: str
         Record_Time: str
@@ -38,7 +35,6 @@ class QCMD_Record_Sync(BaseLHMethod):
         )]
 
 @register
-@dataclass
 class QCMD_Setup(BaseLHMethod):
     """NCNR_QCMD_Setup
     
@@ -51,7 +47,6 @@ class QCMD_Setup(BaseLHMethod):
     display_name: Literal['QCMD Setup'] = 'QCMD Setup'
     method_name: Literal['NCNR_QCMD_Setup'] = 'NCNR_QCMD_Setup'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         QCMD_ADDRESS: str
         QCMD_PORT: int
@@ -72,14 +67,12 @@ class QCMD_Setup(BaseLHMethod):
         )]
 
 #@register
-@dataclass
 class QCMD_Stop(BaseLHMethod):
     """Stops QCMD recording"""
 
     display_name: Literal['QCMD Stop'] = 'QCMD Stop'
     method_name: Literal['NCNR_QCMD_Stop'] = 'NCNR_QCMD_Stop'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         pass
 
@@ -95,7 +88,6 @@ class QCMD_Stop(BaseLHMethod):
         )]
 
 @register
-@dataclass
 class InjectWithRinseSync(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -112,7 +104,6 @@ class InjectWithRinseSync(InjectMethod):
     display_name: Literal['Inject With Synchronization'] = 'Inject With Synchronization'
     method_name: Literal['NCNR_InjectWithRinse_Sync'] = 'NCNR_InjectWithRinse_Sync'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
@@ -160,7 +151,6 @@ class InjectWithRinseSync(InjectMethod):
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
 
 @register
-@dataclass
 class InjectDoubleSync(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -179,7 +169,6 @@ class InjectDoubleSync(InjectMethod):
     display_name: Literal['Inject Double with Synchronization'] = 'Inject Double with Synchronization'
     method_name: Literal['NCNR_InjectDouble_Sync'] = 'NCNR_InjectDouble_Sync'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
@@ -231,14 +220,12 @@ class InjectDoubleSync(InjectMethod):
         return (self.Volume + self.Second_Volume) / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Second_Volume / self.Second_Flow_Rate
 
 @register
-@dataclass
 class Sync_WaitUntilIdle(BaseLHMethod):
     """Waits until idle signal is received"""
 
     display_name: Literal['Wait Until Idle'] = 'Wait Until Idle'
     method_name: Literal['NCNR_Sync_WaitUntilIdle'] = 'NCNR_Sync_WaitUntilIdle'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         pass
 

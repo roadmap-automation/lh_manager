@@ -1,39 +1,35 @@
 from .bedlayout import LHBedLayout
 from .error import MethodError
 from .methods import BaseMethod, MethodType, register
-from .devices import DeviceBase, register_device
+from .devices import DeviceBase, device_manager
 from .job import JobBase
 
-from pydantic.v1.dataclasses import dataclass
+from dataclasses import field
+from pydantic import BaseModel
+from typing import List, Literal, ClassVar
 
-from dataclasses import field, asdict
-from typing import List, Literal
-
-@register_device
-@dataclass
 class QCMDMeasurementDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: str = 'QCMD Measurement Device'
+    device_name: ClassVar[str] = 'QCMD Measurement Device'
     device_type: str = 'qcmd'
     multichannel: bool = True
     allow_sample_mixing: bool = False
     address: str = 'http://localhost:5005'
 
-    @dataclass
     class Job(JobBase):
         pass
 
-@dataclass
+device_manager.register(QCMDMeasurementDevice())
+
 class BaseQCMDMethod(BaseMethod):
     """Base class for LH methods"""
 
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
-    @dataclass
-    class sub_method:
+    class sub_method(BaseModel):
         """Base class for representation in sample lists"""
         method_name: str
         method_data: dict = field(default_factory=dict)
@@ -44,12 +40,11 @@ class BaseQCMDMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = {QCMDMeasurementDevice.device_name: [asdict(self)]}
+            d2 = {QCMDMeasurementDevice.device_name: [self.model_dump()]}
 
             return d2
 
 @register
-@dataclass
 class QCMDInit(BaseQCMDMethod):
     """Initialize QCMD instrument"""
     display_name: Literal['QCMD Init'] = 'QCMD Init'
@@ -68,7 +63,6 @@ class QCMDInit(BaseQCMDMethod):
         return 0.0
 
 @register
-@dataclass
 class QCMDSleep(BaseQCMDMethod):
     """Sleep the QCMD instrument"""
     sleep_time: float = 10.0
@@ -89,7 +83,6 @@ class QCMDSleep(BaseQCMDMethod):
         return self.sleep_time
 
 @register
-@dataclass
 class QCMDAcceptTransfer(BaseQCMDMethod):
     """Register a solution in the QCMD instrument"""
     contents: str = ''
@@ -106,7 +99,6 @@ class QCMDAcceptTransfer(BaseQCMDMethod):
                                 ).to_dict()]
 
 @register
-@dataclass
 class QCMDRecord(BaseQCMDMethod):
     """Record QCMD measurements"""
     record_time: float = 60.0
@@ -129,7 +121,6 @@ class QCMDRecord(BaseQCMDMethod):
         return self.sleep_time + self.record_time
 
 @register
-@dataclass
 class QCMDRecordTag(QCMDRecord):
     """Record QCMD measurements"""
     tag_name: str = ''
@@ -152,7 +143,6 @@ class QCMDRecordTag(QCMDRecord):
         return self.sleep_time + self.record_time
 
 @register
-@dataclass
 class QCMDStop(BaseQCMDMethod):
     """Stops QCMD recording"""
 

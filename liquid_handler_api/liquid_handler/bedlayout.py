@@ -1,22 +1,19 @@
 """Class definitions for bed layout, wells, and compositions"""
 from uuid import uuid4
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from typing import Optional, Tuple, List
 
-@dataclass
-class Solvent:
-    name: str
-    fraction: float
+class Solvent(BaseModel):
+    name: str = ''
+    fraction: float = 0.0
 
-@dataclass
-class Solute:
-    name: str
-    concentration: float
+class Solute(BaseModel):
+    name: str = ''
+    concentration: float = 0.0
     units: str = 'M' # not currently used
 
-@dataclass
-class Composition:
+class Composition(BaseModel):
     """Class representing a solution composition"""
     solvents: list[Solvent] = field(default_factory=list)
     solutes: list[Solute] = field(default_factory=list)
@@ -42,8 +39,8 @@ class Composition:
     @classmethod
     def from_list(cls, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
 
-        return cls([Solvent(name, fraction) for name, fraction in zip(solvent_names, solvent_fractions)],
-                   [Solute(name, conc) for name, conc in zip(solute_names, solute_concentrations)])
+        return cls(solvents=[Solvent(name=name, fraction=fraction) for name, fraction in zip(solvent_names, solvent_fractions)],
+                   solutes=[Solute(name=name, concentration=conc) for name, conc in zip(solute_names, solute_concentrations)])
 
     def get_solvent_names(self) -> Tuple[list[str]]:
         """Returns list of solvent names"""
@@ -109,21 +106,18 @@ def combine_components(components1: list[str], concs1: list[float], volume1: flo
 
     return new_components, new_concs, volume1 + volume2
 
-@dataclass
-class WellLocation:
+class WellLocation(BaseModel):
     rack_id: Optional[str] = None
     well_number: Optional[int] = None
     id: Optional[str] = None
     expected_composition: Composition | None = None    
 
-@dataclass
 class InferredWellLocation(WellLocation):
     def __post_init__(self):
         if self.id is None:
             self.id = str(uuid4())
 
-@dataclass
-class Well:
+class Well(BaseModel):
     """Class representing the contents of a single well
     
         rack_id (str): String description of rack where well is located
@@ -172,8 +166,7 @@ def find_composition(composition: Composition, wells: List[Well]) -> List[Well]:
     return [well for well in wells if well.composition == composition]
 
 
-@dataclass
-class Rack:
+class Rack(BaseModel):
     """Class representing a rack"""
     columns: int
     rows: int
@@ -181,8 +174,7 @@ class Rack:
     wells: list[Well]
     style: str = 'grid' # grid | staggered
 
-@dataclass
-class LHBedLayout:
+class LHBedLayout(BaseModel):
     """Class representing a general LH bed layout"""
     racks: dict[str, Rack] = field(default_factory=dict)
 
@@ -285,32 +277,32 @@ class LHBedLayout:
                 wells.pop(i)
         return wells
 
-d2o = Solvent('D2O', 1.0)
-kcl0 = Solute('KCl', 0.1)
-kcl1 = Solute('KCl', 1.0)
-h2o = Solvent('H2O', 1.0)
-peptide = Solute('peptide', 1e-3)
+d2o = Solvent(name='D2O', fraction=1.0)
+kcl0 = Solute(name='KCl', fraction=0.1)
+kcl1 = Solute(name='KCl', fraction=1.0)
+h2o = Solvent(name='H2O', fraction=1.0)
+peptide = Solute(name='peptide', fraction=1e-3)
 
-dbuffer = Composition([d2o], [kcl0])
-hbuffer = Composition([h2o], [kcl1])
-water = Composition([h2o], [])
-dwater = Composition([d2o], [])
-peptide_solution = Composition([h2o], [peptide])
-dpeptide_solution = Composition([d2o], [peptide])
+dbuffer = Composition(solvents=[d2o], solutes=[kcl0])
+hbuffer = Composition(solvents=[h2o], solutes=[kcl1])
+water = Composition(solvents=[h2o])
+dwater = Composition(solvents=[d2o])
+peptide_solution = Composition(solvents=[h2o], solutes=[peptide])
+dpeptide_solution = Composition(solvents=[d2o], solutes=[peptide])
 
-mix_well = Well('Mix', 2, dbuffer, 4.0)
+mix_well = Well(rack_id='Mix', well_number=2, composition=dbuffer, volume=4.0)
 mix_well.mix_with(2, hbuffer)
 
-empty = Composition([], [])
-example_wells: List[Well] = [Well('Stock', 1, dwater, 2.0),
-                 Well('Stock', 3, dwater, 8.0),
-                 Well('Stock', 2, hbuffer, 8.0),
-                 Well('Mix', 1, empty, 0.0),
-                 Well('Mix', 10, water, 6.0),
+empty = Composition()
+example_wells: List[Well] = [Well(rack_id='Stock', well_number=1, composition=dwater, volume=2.0),
+                 Well(rack_id='Stock', well_number=3, composition=dwater, volume=8.0),
+                 Well(rack_id='Stock', well_number=2, composition=hbuffer, volume=8.0),
+                 Well(rack_id='Mix', well_number=1, composition=empty, volume=0.0),
+#                 Well('Mix', 10, water, 6.0),
                  mix_well,
-                 Well('Solvent', 1, water, 200),
-                 Well('Samples', 1, peptide_solution, 2),
-                 Well('Samples', 2, dpeptide_solution, 2),
-                 Well('Solvent', 2, dbuffer, 200)]
+#                 Well('Solvent', 1, water, 200),
+#                 Well('Samples', 1, peptide_solution, 2),
+#                 Well('Samples', 2, dpeptide_solution, 2),
+                 Well(rack_id='Solvent', well_number=2, composition=dbuffer, volume=200)]
 
 

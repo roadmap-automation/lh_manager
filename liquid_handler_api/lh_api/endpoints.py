@@ -1,7 +1,6 @@
 """Gilson Trilution LH 4.0 Endpoints
 
     Designed to operate as an independent web interface; does not depend on sample list state"""
-from dataclasses import asdict
 from flask import make_response, Response, request
 
 from ..liquid_handler.job import ResultStatus, ValidationStatus
@@ -62,7 +61,7 @@ def GetJob(job_id: str) -> Response:
         job = history.get_job_by_uuid(job_id)
 
     if job is not None:
-        return make_response({'success': asdict(job)}, 200)
+        return make_response({'success': job.model_dump()}, 200)
     else:
         return make_response({'error': f'job {job_id} does not exist'}, 400)
 

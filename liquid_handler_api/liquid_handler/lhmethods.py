@@ -2,12 +2,12 @@ from .bedlayout import LHBedLayout, WellLocation
 from .error import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodContainer, MethodsType, method_manager
-from .devices import DeviceBase, register_device
+from .devices import DeviceBase, device_manager
 
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
-from dataclasses import field, asdict
-from typing import List, Literal
+from dataclasses import field
+from typing import List, Literal, ClassVar
 from enum import Enum
 
 class LHMethodType(str, Enum):
@@ -15,27 +15,27 @@ class LHMethodType(str, Enum):
     MIX = 'mix'
     INJECT = 'inject'
 
-@register_device
-@dataclass
 class LHDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: str = 'Gilson 271 Liquid Handler'
+    device_name: ClassVar[str] = 'Gilson 271 Liquid Handler'
     device_type: str = 'lh'
     multichannel: bool = True
     allow_sample_mixing: bool = True
     address: str = 'http://localhost:5001'
 
-@dataclass
+device_manager.register(LHDevice())
+
 class BaseLHMethod(BaseMethod):
     """Base class for LH methods"""
 
+    method_name: Literal['BaseLHMethod'] = 'BaseLHMethod'
+    display_name: Literal['BaseLHMethod'] = 'BaseLHMethod'
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
-    @dataclass
-    class lh_method:
+    class lh_method(BaseModel):
         """Base class for representation in Trilution LH sample lists"""
         SAMPLENAME: str
         SAMPLEDESCRIPTION: str
@@ -47,10 +47,10 @@ class BaseLHMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = asdict(self)
+            d2 = self.model_dump()
 
             # Following lines prepend all non-fixed fields with hashes
-            #d = asdict(self)
+            #d = self.model_dump()
             #d2 = copy(d)
             #for key in d.keys():
             #    if key not in ('SAMPLENAME', 'SAMPLEDESCRIPTION', 'METHODNAME'):
@@ -79,7 +79,7 @@ class BaseLHMethod(BaseMethod):
         
         return [{LHDevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
-                                             method=asdict(self))]}]
+                                             method=self.model_dump())]}]
     
     def render_lh_method(self,
                          sample_name: str,
@@ -89,7 +89,6 @@ class BaseLHMethod(BaseMethod):
         
         return [{}]
 
-@dataclass
 class LHMethodCluster(BaseLHMethod):
 
     method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
@@ -106,10 +105,9 @@ class LHMethodCluster(BaseLHMethod):
         
         return [{LHDevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
-                                             method=asdict(m))
+                                             method=m.model_dump())
                                         for m in self.methods]}]
 
-@dataclass
 class SetWellID(BaseMethod):
     """Sets an Inferred Well Location ID for future use
     """
@@ -124,7 +122,6 @@ class SetWellID(BaseMethod):
         well.id = self.well_id
         
 
-@dataclass
 class InjectMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
@@ -150,7 +147,6 @@ class InjectMethod(BaseLHMethod):
         source_well.volume -= self.Volume
 
 
-@dataclass
 class MixMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
@@ -173,7 +169,6 @@ class MixMethod(BaseLHMethod):
                                       )
 
 
-@dataclass
 class TransferMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
@@ -210,7 +205,6 @@ class TransferMethod(BaseLHMethod):
 
 
 @register
-@dataclass
 class TransferWithRinse(TransferMethod):
     """Transfer with rinse"""
 
@@ -225,7 +219,6 @@ class TransferWithRinse(TransferMethod):
     display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
     method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
@@ -272,7 +265,6 @@ class TransferWithRinse(TransferMethod):
 
 
 @register
-@dataclass
 class MixWithRinse(MixMethod):
     """Inject with rinse"""
     # Target and Volume defined in MixMethod
@@ -287,7 +279,6 @@ class MixWithRinse(MixMethod):
     display_name: Literal['Mix With Rinse'] = 'Mix With Rinse'
     method_name: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Volume: str
         Flow_Rate: str
@@ -341,7 +332,6 @@ class MixWithRinse(MixMethod):
 
 
 @register
-@dataclass
 class InjectWithRinse(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -355,7 +345,6 @@ class InjectWithRinse(InjectMethod):
     display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'
     method_name: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
@@ -394,7 +383,6 @@ class InjectWithRinse(InjectMethod):
 
 
 @register
-@dataclass
 class Sleep(BaseLHMethod):
     """Sleep"""
 
@@ -402,7 +390,6 @@ class Sleep(BaseLHMethod):
     display_name: Literal['Sleep'] = 'Sleep'
     method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Time: str
 
@@ -423,7 +410,6 @@ class Sleep(BaseLHMethod):
 
 
 @register
-@dataclass
 class Sleep2(BaseLHMethod):
     """Sleep"""
 
@@ -431,7 +417,6 @@ class Sleep2(BaseLHMethod):
     display_name: Literal['Sleep2'] = 'Sleep2'
     method_name: Literal['NCNR_Sleep2'] = 'NCNR_Sleep2'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Time2: str
 
@@ -452,7 +437,6 @@ class Sleep2(BaseLHMethod):
 
 
 @register
-@dataclass
 class Prime(BaseLHMethod):
     """Prime"""
 
@@ -461,7 +445,6 @@ class Prime(BaseLHMethod):
     display_name: Literal['Prime'] = 'Prime'
     method_name: Literal['NCNR_Prime'] = 'NCNR_Prime'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Volume: str
         Repeats: str
@@ -484,7 +467,6 @@ class Prime(BaseLHMethod):
         return 2 * float(self.Repeats) * float(self.Volume) / flow_rate
     
 @register
-@dataclass
 class ROADMAP_QCMD_LoadLoop(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -498,7 +480,6 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
     display_name: Literal['Load Injection System Loop'] = 'Load Injection System Loop'
     method_name: Literal['ROADMAP_QCMD_LoadLoop'] = 'ROADMAP_QCMD_LoadLoop'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
@@ -537,7 +518,6 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
     
 @register
-@dataclass
 class ROADMAP_QCMD_DirectInject(InjectMethod):
     """Direct Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -553,7 +533,6 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
     display_name: Literal['Direct Inject'] = 'Direct Inject'
     method_name: Literal['ROADMAP_QCMD_DirectInject'] = 'ROADMAP_QCMD_DirectInject'
 
-    @dataclass
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str

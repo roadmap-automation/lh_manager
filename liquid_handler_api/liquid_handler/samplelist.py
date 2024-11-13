@@ -1,5 +1,5 @@
-from dataclasses import asdict, field
-from pydantic.v1.dataclasses import dataclass
+from dataclasses import field
+from pydantic import BaseModel, validator
 from enum import Enum
 from uuid import uuid4
 from typing import Dict, List, Union
@@ -24,31 +24,56 @@ class SampleStatus(str, Enum):
     FAILED = 'failed'
     COMPLETED = 'completed'
 
-@dataclass
-class JobContainer:
+class JobContainer(BaseModel):
     """Container for jobs and the associated (unserialized) methods. Assists with keeping
         track of job completion"""
     job: JobBase
     methods: List[MethodsType]
 
-@dataclass
-class MethodList:
+class TaskTracker(BaseModel):
+    id: str | None = None
+    task: dict = field(default_factory={})
+    status: SampleStatus | None = None
+
+class MethodTracker(BaseModel):
+    id: str | None = None
+    method: dict | BaseMethod | None = None
+    tasks: List[TaskTracker] = field(default_factory=list)
+
+    @validator('method')
+    def validate_method(cls, v):
+
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+
+        if not (isinstance(v, BaseMethod)):
+            raise ValueError(f"{v} must be derived from BaseMethod")
+
+        return v
+
+    def model_post_init(self, __context):
+
+        if self.id is None:
+            self.id = str(uuid4())
+
+        if isinstance(self.method, dict):
+            self.method = method_manager.get_method_by_name(self.method['method_name'])(**self.method)
+
+class MethodList(BaseModel):
     """Class representing a list of methods representing one LH job. Can be nested
         in a single stage"""
     createdDate: str | None = None
-    methods: List[MethodsType] = field(default_factory=list)
-    run_jobs: List[str] | None = None
+    methods: List[MethodTracker] = field(default_factory=list)
     status: SampleStatus = SampleStatus.INACTIVE
 
-    def __post_init__(self):
+    @property
+    def run_jobs(self) -> List[str]:
 
-        for i, method in enumerate(self.methods):
-            if isinstance(method, dict):
-                self.methods[i] = method_manager.get_method_by_name(method['method_name'])(**method)
+        return [task.id for m in self.methods for task in m.tasks]
 
     def addMethod(self, method: MethodsType) -> None:
         """Adds new method"""
-        self.methods.append(method)
+        self.methods.append(MethodTracker(method=method))
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         """Generates estimated time of all methods in list. Does not track method completion
@@ -59,15 +84,7 @@ class MethodList:
 
         # NOTE: Does not currently update estimated time based on completion
 
-        return sum(m.estimated_time(layout) for m in self.methods)
-
-    def update_status(self) -> None:
-        """Updates status based on run_methods
-        """
-
-        if self.run_jobs is not None:
-            if len(self.run_jobs) == 0:
-                self.status = SampleStatus.COMPLETED
+        return sum(m.method.estimated_time(layout) for m in self.methods)
 
     def explode(self, layout: LHBedLayout):
         """Permanently replaces the original methods with "exploded" methods, i.e. rendered methods
@@ -82,12 +99,12 @@ class MethodList:
         new_methods = []
         for m in self.methods:
             print('m', type(m))
-            print('m exploded', m.explode(layout))
-            for im in m.explode(layout):
+            print('m exploded', m.method.explode(layout))
+            for im in m.method.explode(layout):
                 print('im', type(im))
                 #print(im.explode(layout))
                 for iim in im.explode(layout):
-                    new_methods.append(iim)
+                    new_methods.append(MethodTracker(method=iim))
         self.methods = new_methods
 
     def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
@@ -97,14 +114,9 @@ class MethodList:
         errors = []
         for m in self.methods:
             print(f'Executing {m}')
-            errors += [m.execute(layout)]
+            errors += [m.method.execute(layout)]
 
         return errors
-
-    def undo_prepare(self):
-        """Undoes the prepare steps"""
-
-        self.run_jobs = None
     
     def get_method_completion(self) -> bool:
         """Method completion is not currently being tracked. Returns False
@@ -115,8 +127,7 @@ class MethodList:
 
         return False
 
-@dataclass
-class Sample:
+class Sample(BaseModel):
     """Class representing a sample to be created by Gilson LH"""
     name: str
     description: str
@@ -186,7 +197,7 @@ class Sample:
             return None
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')
-Sample.__pydantic_model__.update_forward_refs()  # type: ignore
+Sample.model_rebuild()  # type: ignore
 example_sample_list: List[Sample] = []
 
 if False:

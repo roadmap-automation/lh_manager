@@ -3,7 +3,7 @@
 from enum import Enum
 from .items import Item
 
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
 from dataclasses import field
 from typing import List, Tuple
@@ -15,14 +15,12 @@ class TaskType(str, Enum):
     TRANSFER = 'transfer'
     MEASURE = 'measure'
 
-@dataclass
-class TaskData:
+class TaskData(BaseModel):
     device: str = ''
     channel: int | None = None
     method_data: dict = field(default_factory=dict)
 
-@dataclass
-class Task:
+class Task(BaseModel):
     id: str | None = None
     tasks: List[TaskData] = field(default_factory=list)
     task_type: TaskType = TaskType.NONE

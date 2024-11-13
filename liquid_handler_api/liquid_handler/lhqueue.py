@@ -3,7 +3,7 @@ from flask import make_response, Response
 from typing import Dict, Callable, List
 from threading import Lock
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from datetime import datetime
 
 from .job import ResultStatus, ValidationStatus
@@ -69,8 +69,7 @@ class ActiveTasks:
                     self.active.update({id: Item(sample.id, stagename) for id in stage.run_jobs})
 
 
-@dataclass
-class JobQueue:
+class JobQueue(BaseModel):
     """Hub for interfacing (upstream) samples object to (downstream) running of jobs.
         Use submit_callbacks to link submission to downstream activities. Also provides
         an interface for the upstream objects based on validation and run results"""

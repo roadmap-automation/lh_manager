@@ -7,8 +7,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Callable, Tuple
-from dataclasses import asdict, field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
 from .job import JobBase, ResultStatus, ValidationStatus
 from .methods import method_manager
@@ -25,8 +24,7 @@ class InterfaceStatus(str, Enum):
     DOWN = 'down'
     ERROR = 'error'
 
-@dataclass
-class SampleList:
+class SampleList(BaseModel):
     """Class representing a sample list in JSON
         serializable format for Gilson Trilution LH Web Service """
     name: str
@@ -38,7 +36,6 @@ class SampleList:
     endDate: str
     columns: List[dict] | None
 
-@dataclass
 class LHJob(JobBase):
     """Container for a single liquid handler sample list"""
 
@@ -122,7 +119,7 @@ class LHJob(JobBase):
                 if column not in m:
                     m[column] = None
 
-        self.LH_method_data = asdict(SampleList(
+        self.LH_method_data = SampleList(
             name=sample_name,
             id=self.LH_id,
             createdBy='System',
@@ -130,8 +127,7 @@ class LHJob(JobBase):
             createDate=str(createdDate),
             startDate=str(createdDate),
             endDate=str(createdDate),
-            columns=method_list
-        ))
+            columns=method_list).model_dump()
 
         self.LH_methods = all_methods
 
@@ -156,9 +152,9 @@ class LHJob(JobBase):
         """
 
         for m in self.LH_methods:
-            print('Executing: ', asdict(m))
+            print('Executing: ', m.model_dump())
             result = m.execute(layout)
-            print('Result: ', asdict(m))
+            print('Result: ', m.model_dump())
 
 class LHJobHistory:
     table_name = 'lh_job_record'
@@ -201,7 +197,7 @@ class LHJobHistory:
             ON CONFLICT(uuid) DO UPDATE SET 
               LH_id=excluded.LH_id,
               job=excluded.job;
-        """, (job.id, job.LH_id, json.dumps(asdict(job))))
+        """, (job.id, job.LH_id, job.model_dump_json()))
         
         self.db.commit()
 

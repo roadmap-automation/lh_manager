@@ -25,12 +25,56 @@ export type MethodType = {
   [fieldname: string]: string | number | WellLocation | null | undefined,
 }
 
+export type TaskDataType = {
+  id: string,
+  device: string,
+  channel?: number,
+  method_data?: object,
+  md: object,
+
+  device_type?: string,
+  device_address?: string,
+  channel_mode?: number,
+  number_of_channels?: number,
+  simulated: boolean,
+  sample_mixing: boolean,
+
+  acquisition_time?: number
+  non_channel_storage?: string,
+  wait_for_queue_to_empty: boolean,
+}
+
+export type TaskType = {
+  id: string,
+  md: object,
+  priority?: number | null,
+  sample_id?: string,
+  sample_number?: number,
+  tasks: TaskDataType[],
+  task_history: string[],
+  task_type: string
+  dependency_id?: string,
+  dependency_sample_number?: number
+}
+
+export type TaskTrackerType = {
+  id: string,
+  task: TaskType,
+  status: StatusType
+}
+
+export type MethodTrackerType = {
+  id: string | null,
+  method: MethodType,
+  tasks: TaskTrackerType[]
+}
+
 // Class representing a list of methods representing one LH job. Allows dividing
 // prep and inject operations for a single sample.
 export interface MethodList {
     LH_id: number | null,
     createdDate: string | null,
-    methods: MethodType[],
+    methods: MethodTrackerType[],
     methods_complete: boolean[], 
     status: StatusType,
 }
@@ -171,11 +215,16 @@ export function add_method(sample_id: string, stage_name: StageName, event: Even
   // event comes from a select element:
   const event_target = event.target as HTMLOptionElement;
   const method_name = event_target.value;
+  console.log(method_name)
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
     const { stages } = s;
     const stage = stages[stage_name];
-    const num_methods = stage.methods.push({method_name});
+    const new_method: MethodTrackerType = {'id': null,
+      'method': {method_name},
+      'tasks': []
+    }
+    const num_methods = stage.methods.push(new_method);
     update_sample(s);
     active_stage.value = stage_name;
     active_method_index.value = num_methods - 1;
