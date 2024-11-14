@@ -6,6 +6,7 @@ import BedLayout from './BedLayout.vue';
 import SampleChannels from './SampleChannels.vue';
 import { samples, sample_status, wells } from '../store';
 import EditWellContents from './EditWellContents.vue';
+import MaterialManager from './MaterialManager.vue';
 
 const props = defineProps({
   msg: String,
@@ -52,6 +53,10 @@ function openMixture() {
       <button class="nav-link active" id="layout-tab" data-bs-toggle="tab" data-bs-target="#Layout" type="button"
         role="tab" aria-controls="Layout" aria-selected="true">Layout</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#Materials" type="button" role="tab"
+        aria-controls="Materials" aria-selected="false">Materials</button>
+    </li>
   </ul>
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
     <div class="tab-pane" id="NICE" role="tabpanel" aria-labelledby="home-tab">NICE things</div>
@@ -78,6 +83,9 @@ function openMixture() {
       <div class="flex-grow-1">
         <BedLayout :wells="wells" />
       </div>
+    </div>
+    <div class="tab-pane d-flex flex-grow-1" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
+      <MaterialManager />
     </div>
 
   </div>

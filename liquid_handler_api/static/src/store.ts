@@ -65,9 +65,9 @@ export interface SampleStatusMap {
   }
 }
 
-type Component = [name: string, zone: string];
-export type Solute = {name: string, concentration: number, units: string};
+export type Solute = {name: string, concentration: number, units: SoluteMassUnits | SoluteVolumeUnits};
 export type Solvent = {name: string, fraction: number};
+
 
 export interface Well {
   composition: {solvents: Solvent[], solutes: Solute[]},
@@ -82,19 +82,51 @@ interface WellWithZone extends Well {
 }
 
 interface SourceComponents {
-  solutes: Component[],
-  solvents: Component[]
+  solutes: { [name: string]: (Solute & { zone: string })[] },
+  solvents: { [name: string]: (Solvent & { zone: string })[] },
+}
+
+export const materialType = ["solvent", "solute", "lipid", "protein"] as const;
+export type MaterialType = typeof materialType[number];
+export const soluteMassUnits = ["mg/mL", "mg/L"] as const;
+export const soluteVolumeUnits = ["M", "mM", "nM"] as const;
+export type SoluteMassUnits = typeof soluteMassUnits[number];
+export type SoluteVolumeUnits = typeof soluteVolumeUnits[number];
+
+// @dataclass
+// class Material:
+//     uuid: str
+//     name: str
+//     pubchem_cid: Optional[int] = None
+//     iupac_name: Optional[str] = None
+//     molecular_weight: Optional[float] = None
+//     metadata: Optional[dict] = None
+//     type: Optional[str] = None
+//     density: Optional[float] = None
+//     solute_concentration_units: Optional[str] = None
+
+export interface Material {
+  name: string,
+  pubchem_cid: number | null,
+  full_name: string | null,
+  iupac_name: string | null,
+  molecular_weight: number | null,
+  metadata: object | null,
+  type: MaterialType | null,
+  density: number | null,
+  solute_concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
 }
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
-export const source_components = ref<SourceComponents>();
+export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
 export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
 export const well_to_edit = ref<WellLocation>();
 export const num_channels = ref<number>(1);
+export const materials = ref<Material[]>([]);
 
 // export const layout_with_contents = computed(() => {
 //   const layout_copy = structuredClone(toRaw(layout.value));
@@ -313,11 +345,24 @@ function dedupe<T>(arr: T[]): T[] {
 
 export async function refreshWells() {
   const new_wells = await (await fetch("/GUI/GetWells/")).json() as WellWithZone[];
-  const solvent_zones: Component[] = new_wells.map((well) => (well.composition.solvents.map((s) => ([s.name, well.zone] as Component)))).flat();
-  const solute_zones: Component[] = new_wells.map((well) => (well.composition.solutes.map((s) => ([s.name, well.zone] as Component)))).flat();
-  const dedup_solvent_zones = dedupe(solvent_zones);
-  const dedup_solute_zones = dedupe(solute_zones);
-  source_components.value = {solvents: dedup_solvent_zones, solutes: dedup_solute_zones};
+  const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
+  const solutes = {} as {[name: string]: (Solute & { zone: string })[]};
+  new_wells.forEach((well) => {
+    const { zone } = well;
+    well.composition.solvents.forEach((s) => {
+      if (!(s.name in solvents)) {
+        solvents[s.name] = [];
+      }
+      solvents[s.name].push({ ...s, zone });
+    });
+    well.composition.solutes.forEach((s) => {
+      if (!(s.name in solutes)) {
+        solutes[s.name] = [];
+      }
+      solutes[s.name].push({ ...s, zone });
+    });
+  });
+  source_components.value = { solvents, solutes };
   wells.value = new_wells;
   console.log({new_wells});
 }
@@ -373,6 +418,32 @@ export async function refreshComponents() {
   const new_source_components = await (await fetch("/GUI/GetComponents/")).json();
   source_components.value = new_source_components;
   console.log({new_source_components});
+}
+
+export async function refreshMaterials() {
+  const { materials: new_materials } = await (await fetch("/Materials/all/")).json();
+  materials.value = new_materials;
+  console.log({new_materials});
+}
+
+export async function add_material(material: Material) {
+  const update_result = await fetch("/Materials/update/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(material)
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function delete_material(material: Material) {
+  const update_result = await fetch("/Materials/delete/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(material)
+  });
+  const response_body = await update_result.json();
+  return response_body;
 }
 
 export const source_well = ref<WellLocation | null>(null);
