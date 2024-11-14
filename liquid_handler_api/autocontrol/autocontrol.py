@@ -91,7 +91,7 @@ def submission_callback(data: dict):
 
     return 'sample not found'
 
-class AutocontrolTaskTracker(TaskContainer):
+class AutocontrolTaskContainer(TaskContainer):
     id: str | None = None
     task: Task | None = None
     status: SampleStatus | None = None
@@ -164,7 +164,7 @@ def prepare_and_submit_method(sample: Sample, stage: StageName, method_index: in
 
             # reserve active_tasks (and sample.stages[stage])
             with active_tasks.lock:
-                m.tasks.append(AutocontrolTaskTracker(task=new_task,
+                m.tasks.append(AutocontrolTaskContainer(task=new_task,
                                                         status=SampleStatus.PENDING))
                 active_tasks.pending.update({str(new_task.id): AutocontrolItem(id=sample.id, stage=stage, method_id=m.id)})
 

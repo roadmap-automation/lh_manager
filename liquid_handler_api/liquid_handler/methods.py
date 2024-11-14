@@ -23,7 +23,6 @@ class MethodType(str, Enum):
 class TaskContainer(BaseModel):
     id: str | None = None
     task: Any = Field(default_factory=dict)
-    subtasks: list = Field(default_factory=list)
     status: SampleStatus | None = None
 
 class BaseMethod(BaseModel):
@@ -185,13 +184,3 @@ class Release(BaseMethod):
     
     display_name: Literal['---release---'] = '---release---'
     method_name: Literal[''] = ''
-
-
-# =============== Sample list handling =================
-
-class TaskContainer(BaseModel):
-    id: str | None = None
-    task: Any = Field(default_factory=dict)
-    subtasks: list = Field(default_factory=list)
-    status: SampleStatus | None = None
-

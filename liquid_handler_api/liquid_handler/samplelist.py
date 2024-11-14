@@ -8,7 +8,7 @@ from .bedlayout import LHBedLayout
 from .lhinterface import DATE_FORMAT
 from .items import StageName
 from .status import MethodError, SampleStatus
-from .methods import MethodsType, BaseMethod, method_manager, TaskContainer
+from .methods import MethodsType, BaseMethod, method_manager
 from datetime import datetime
 
 class MethodList(BaseModel):

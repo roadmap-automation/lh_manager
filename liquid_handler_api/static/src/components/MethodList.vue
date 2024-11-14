@@ -3,6 +3,7 @@ import { ref, computed, defineProps } from 'vue';
 import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method } from '../store';
 import type { MethodType, StageName } from '../store';
 import MethodFields from './MethodFields.vue';
+import MethodTasks from './MethodTasks.vue';
 
 const props = defineProps<{
   sample_id: string,
@@ -95,8 +96,8 @@ const status = computed(() => {
             v-if="props.editable"
             type="button"
             class="btn-close btn-sm align-middle start"
-            aria-label="Duplicate method"
-            title="Duplicate method"
+            aria-label="Run method"
+            title="Run method"
             @click.stop="run_method(sample_id, stage_name, index)">
           </button>
           <button
@@ -136,12 +137,20 @@ const status = computed(() => {
           <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
             <MethodFields
               :sample_id="sample_id"
-              :pointer="`/stages/${stage_name}/methods/${index}`"
+              :pointer="`/stages/${stage_name}/${props.editable ? 'methods' : 'active'}/${index}`"
               :editable="props.editable"
               :method="method"
               :hide_fields="[]"
             />
-
+          </table>            
+          <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index && method.tasks.length">
+            <MethodTasks
+              :sample_id="sample_id"
+              :pointer="`/stages/${stage_name}/${props.editable ? 'methods' : 'active'}/${index}`"
+              :editable="props.editable"
+              :method="method"
+              :hide_fields="[]"
+            />
           </table>
           <div v-if="props.editable" class="d-flex justify-content-end">
             <button class="btn-close btn-sm btn-secondary arrow-up-square" :class=" { disabled: index < 1} " aria-label="Move up" title="Move up" @click="move_method(sample_id, stage_name, index, index - 1)"></button>

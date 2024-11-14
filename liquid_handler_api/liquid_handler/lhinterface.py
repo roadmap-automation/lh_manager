@@ -121,7 +121,7 @@ class LHJob(JobBase):
 
         self.LH_method_data = SampleList(
             name=sample_name,
-            id=self.LH_id,
+            id=str(self.LH_id),
             createdBy='System',
             description=sample_description,
             createDate=str(createdDate),

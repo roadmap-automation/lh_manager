@@ -21,7 +21,7 @@ export type TaskDataType = {
   id: string,
   device: string,
   channel?: number,
-  method_data?: object,
+  method_data?: {'method_list': object[]},
   md: object,
 
   device_type?: string,
@@ -49,9 +49,10 @@ export type TaskType = {
   dependency_sample_number?: number
 }
 
-export type TaskTrackerType = {
+export type TaskContainerType = {
   id: string,
   task: TaskType,
+  subtasks: TaskDataType[],
   status: StatusType
 }
 
@@ -62,7 +63,7 @@ export type MethodType = {
   Source?: WellLocation,
   Target?: WellLocation,
   [fieldname: string]: string | number | WellLocation | null | undefined,
-  tasks: TaskTrackerType[],
+  tasks: TaskContainerType[],
   status: StatusType
 }
 
@@ -300,7 +301,7 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
       new_method.id = null
       new_method.tasks = []
       new_method.status = 'inactive'
-      const num_methods = stage.methods.push(method);
+      const num_methods = stage.methods.push(new_method);
       update_sample(s);
       active_stage.value = stage_name;
       active_method_index.value = num_methods - 1;
