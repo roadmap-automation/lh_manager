@@ -21,25 +21,25 @@ const active_search_pattern = ref<string | null>(null);
 const active_search_regexp = ref<RegExp | null>(null);
 
 function NameSearch(m: Material) {
-  let result = false
-  if (!!active_search_regexp.value) {
-    result = result || active_search_regexp.value.test(m.name)
-    if (!!m.full_name) {
-      result = result || active_search_regexp.value.test(m.full_name)
-    }
-    if (!!m.iupac_name) {
-      result = result || active_search_regexp.value.test(m.iupac_name)
+  const re = active_search_regexp.value;
+  if (re) {
+    for (const name of [m.name, m.full_name, m.iupac_name]) {
+      if (name && re.test(name)) {
+        return true;
+      }
     }
   }
   else {
-    result = true
+    return true
   }
-  return result
+  return false;
 }
 
 function MaterialSorter(a: Material, b: Material) {
-  const av = a[sortby.value];
-  const bv = b[sortby.value];
+  let av = a[sortby.value];
+  let bv = b[sortby.value];  
+  if (typeof av === 'string') av = av.toLowerCase();
+  if (typeof bv === 'string') bv = bv.toLowerCase();
   const s = step.value;
   if (av === null && bv === null) {
     return 0;
@@ -50,17 +50,6 @@ function MaterialSorter(a: Material, b: Material) {
   else if (bv === null) {
     return -s;
   }
-  else if ((typeof av === 'string') && (typeof bv === 'string')) {
-    if (av.toLowerCase() > bv.toLowerCase()) {
-      return s;
-    }
-    else if (av.toLowerCase() < bv.toLowerCase()) {
-      return -s;
-    }
-    else {
-      return 0;
-    }
-  }  
   else if (av > bv) {
     return s;
   }
