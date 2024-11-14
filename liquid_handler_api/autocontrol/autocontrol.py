@@ -76,13 +76,16 @@ def submission_callback(data: dict):
 
     # check that sample name exists
     if sample is not None:
-        # check that requested stages are inactive
-        for stage in data['stage']:
-            #if sample.stages[stage].status != SampleStatus.INACTIVE:
-            #    return f'stage {stage} of sample {data["name"]} is not inactive'
-            
-            sample.stages[stage].status = SampleStatus.PENDING
-            prepare_and_submit(sample, stage, layout)
+        # check if running a single method or an entire stage
+        if 'method_id' in data.keys():
+            prepare_and_submit_method(sample=sample,
+                                      stage=data['stage'],
+                                      method_index=[m.id for m in sample.stages[data['stage']].methods].index(data['method_id']),
+                                      layout=layout)
+
+        else:
+            for stage in data['stage']:
+                prepare_and_submit_stage(sample, stage, layout)
 
         return
 
@@ -101,25 +104,16 @@ class AutocontrolTaskTracker(TaskContainer):
 class AutocontrolItem(Item):
     method_id: str | None = None
 
-def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
-    """Prepares a method list for running by populating run_methods and run_methods_complete.
-        List can then be used for dry or wet runs
+def prepare_and_submit_stage(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
+    """Runs all draft methods in an entire stage
     """
    
     # Generate real-time tasks based on layout
-    all_tasks: List[Task] = []
-    for i in range(len(sample.stages[stage].methods)):
-        all_tasks += prepare_method(sample, stage, i, layout)
+    for _ in range(len(sample.stages[stage].methods)):
+        prepare_and_submit_method(sample, stage, 0, layout)
 
-    # activate the tasks
-    for i in range(len(sample.stages[stage].methods)):
-        sample.stages[stage].activate(0)
-
-    submit_tasks(all_tasks)
-
-def prepare_method(sample: Sample, stage: StageName, method_index: int, layout: LHBedLayout) -> List[Task]:
-    """Prepares a method list for running by populating run_methods and run_methods_complete.
-        List can then be used for dry or wet runs
+def prepare_and_submit_method(sample: Sample, stage: StageName, method_index: int, layout: LHBedLayout) -> List[Task]:
+    """Runs a specific method by index
     """
    
     # Generate real-time tasks based on layout
@@ -176,7 +170,8 @@ def prepare_method(sample: Sample, stage: StageName, method_index: int, layout: 
 
             tasks.append(new_task)
 
-    return tasks
+    sample.stages[stage].activate(method_index)
+    submit_tasks(tasks)
 
 def to_thread(**thread_kwargs):
     def decorator_to_thread(f):

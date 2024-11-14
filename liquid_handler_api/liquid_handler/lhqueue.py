@@ -13,10 +13,10 @@ from .state import samples, layout
 from .samplelist import SampleStatus
 from .lhinterface import LHJob, lh_interface
 
-def validate_format(data: dict) -> bool:
+def validate_format(data: dict, fields: list[str]) -> bool:
     """Checks format of data input"""
     print('data in: ', list(data.keys()))
-    return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
+    return all(val in data.keys() for val in fields)
 
 class JobRunner:
     """Routes jobs to submission callbacks. Serves to enable plugins for various interfaces.

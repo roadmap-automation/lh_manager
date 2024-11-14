@@ -63,7 +63,7 @@ def RunSamplewithUUID() -> Response:
     data = request.get_json(force=True)
     #print(data)
     # check for proper format
-    if validate_format(data):
+    if validate_format(data, ('name', 'uuid', 'slotID', 'stage')):
 
         # catch null UUID
         if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
@@ -141,7 +141,7 @@ def DryRunSamplewithUUID() -> Response:
     """Dry runs a sample by name. UUID is ignored. Returns time estimate; otherwise error if sample not found."""
     data = request.get_json(force=True)
 
-    if validate_format(data):
+    if validate_format(data, ('name', 'uuid', 'slotID', 'stage')):
 
         sample = samples.getSamplebyName(data['name'])
         if sample is not None:

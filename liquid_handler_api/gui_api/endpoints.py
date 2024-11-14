@@ -162,10 +162,34 @@ def ArchiveandRemoveSample() -> Response:
 @trigger_samples_update
 def RunSample() -> Response:
     """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
-    data = request.get_json(force=True)
+    data: dict = request.get_json(force=True)
     #print(data)
     # check for proper format
-    if validate_format(data):
+    if validate_format(data, ['name', 'uuid', 'slotID', 'stage']):
+
+        # catch null UUID
+        if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
+            data['uuid'] = None
+
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
+
+@gui_blueprint.route('/GUI/RunMethod/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def RunMethod() -> Response:
+    """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['name', 'uuid', 'slotID', 'stage', 'method_id']):
 
         # catch null UUID
         if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):

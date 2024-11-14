@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method } from '../store';
 import type { MethodType, StageName } from '../store';
 import MethodFields from './MethodFields.vue';
 
@@ -92,15 +92,45 @@ const status = computed(() => {
             {{ method_string(method) }}
           </span>
           <button
+            v-if="props.editable"
+            type="button"
+            class="btn-close btn-sm align-middle start"
+            aria-label="Duplicate method"
+            title="Duplicate method"
+            @click.stop="run_method(sample_id, stage_name, index)">
+          </button>
+          <button
+            v-if="props.editable"
+            type="button"
+            class="btn-close btn-sm align-middle copy"
+            aria-label="Duplicate method"
+            title="Duplicate method"
+            @click.stop="copy_method(sample_id, stage_name, index)">
+          </button>
+          <button
             v-if="!props.editable"
             type="button"
             class="btn-close btn-sm align-middle arrow-90deg-up"
-            aria-label="Reuse sample"
-            title="Reuse sample"
+            aria-label="Reuse method"
+            title="Reuse method"
             @click.stop="reuse_method(sample_id, stage_name, index)">
+          </button>      
+          <button
+            v-if="!props.editable && !(method.status === 'completed')"
+            type="button"
+            class="btn-close btn-sm align-middle arrow-repeat"
+            aria-label="Resubmit tasks"
+            title="Resubmit tasks"
+            @click.stop="reuse_method(sample_id, stage_name, index)">
+          </button>                  
+          <button
+            v-if="props.editable"
+            class="btn-close btn-sm btn-danger trash"
+            aria-label="Remove method"
+            title="Remove method"
+            @click="remove_method(sample_id, stage_name, index)"></button>
           </button>
-        </button>
-      </h2>
+        </h2>
       <div class="accordion-collapse collapse" :class="{ show: stage_name === active_stage && index === active_method_index }">
         <div class="accordion-body p-2 border bg-light">
           <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
@@ -116,7 +146,6 @@ const status = computed(() => {
           <div v-if="props.editable" class="d-flex justify-content-end">
             <button class="btn-close btn-sm btn-secondary arrow-up-square" :class=" { disabled: index < 1} " aria-label="Move up" title="Move up" @click="move_method(sample_id, stage_name, index, index - 1)"></button>
             <button class="btn-close btn-sm btn-secondary arrow-down-square" :class=" { disabled: index == get_number_of_methods(sample_id, stage_name) - 1} " aria-label="Move down" title="Move down" @click="move_method(sample_id, stage_name, index, index + 1)"></button>
-            <button class="btn-close btn-sm btn-danger trash" aria-label="Remove method" title="Remove method" @click="remove_method(sample_id, stage_name, index)"></button>
           </div>
         </div>
       </div>

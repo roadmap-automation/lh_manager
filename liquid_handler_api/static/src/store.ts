@@ -273,6 +273,22 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
     }
   }
 
+  export function copy_method(sample_id: string, stage_name: StageName, method_index: number) {
+    const sample = get_sample_by_id(sample_id);
+    if (sample !== undefined) {
+      const s: Sample = structuredClone(toRaw(sample));
+      const { stages } = s;
+      const stage = stages[stage_name];
+      const method = stage.methods[method_index];
+      const new_method = structuredClone(toRaw(method))
+      new_method.id = null
+      stage.methods.splice(method_index + 1, 0, method);
+      update_sample(s);
+      active_stage.value = stage_name;
+      active_method_index.value = method_index + 1;
+    }
+  }
+
   export function reuse_method(sample_id: string, stage_name: StageName, method_index: number) {
     const sample = get_sample_by_id(sample_id);
     if (sample !== undefined) {
@@ -361,7 +377,7 @@ export async function remove_well_definition(well: Well) {
   return response_body;
 }
 
-export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject'] ): Promise<object> {
+export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject']): Promise<object> {
   const { name, id, NICE_uuid, NICE_slotID } = sample_obj;
   const uuid = NICE_uuid ?? null;
   const slotID = NICE_slotID ?? null; // don't send undefined.
@@ -374,6 +390,27 @@ export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep
   });
   const response_body = await update_result.json();
   return response_body;
+}
+
+export async function run_method(sample_id: string, stage: StageName, method_index: number ): Promise<object> {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    const { name, id, NICE_uuid, NICE_slotID, stages } = s;
+    const method = stages[stage].methods[method_index];
+    const method_id = method.id;
+    const uuid = NICE_uuid ?? null;
+    const slotID = NICE_slotID ?? null; // don't send undefined.
+    const data = { name, id, uuid, slotID, stage, method_id };
+    console.log({data});
+    const update_result = await fetch("/GUI/RunMethod/", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const response_body = await update_result.json();
+    return response_body;
+  }
 }
 
 export async function explode_stage(sample_obj: Sample, stage: StageName): Promise<object> {
