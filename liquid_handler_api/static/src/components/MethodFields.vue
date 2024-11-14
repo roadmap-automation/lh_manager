@@ -36,7 +36,6 @@ function get_parameters(method: MethodType) {
 }
 
 const parameters = computed(() => {
-  console.log(parameters)
   return get_parameters(props.method);
 });
 

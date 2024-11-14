@@ -10,7 +10,7 @@ from uuid import uuid4
 from autocontrol.task_struct import Task, TaskData, TaskType
 from autocontrol.status import Status
 
-from ..gui_api.events import trigger_sample_status_update, trigger_layout_update
+from ..gui_api.events import trigger_samples_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
@@ -78,8 +78,8 @@ def submission_callback(data: dict):
     if sample is not None:
         # check that requested stages are inactive
         for stage in data['stage']:
-            if sample.stages[stage].status != SampleStatus.INACTIVE:
-                return f'stage {stage} of sample {data["name"]} is not inactive'
+            #if sample.stages[stage].status != SampleStatus.INACTIVE:
+            #    return f'stage {stage} of sample {data["name"]} is not inactive'
             
             sample.stages[stage].status = SampleStatus.PENDING
             prepare_and_submit(sample, stage, layout)
@@ -107,60 +107,76 @@ def prepare_and_submit(sample: Sample, stage: StageName, layout: LHBedLayout) ->
     """
    
     # Generate real-time tasks based on layout
-    for m in sample.stages[stage].methods:
-        all_methods: List[MethodsType] = m.method.get_methods(layout)
+    all_tasks: List[Task] = []
+    for i in range(len(sample.stages[stage].methods)):
+        all_tasks += prepare_method(sample, stage, i, layout)
 
-        # render all the methods. Can be multiple rendered submethod per main method
-        rendered_methods: List[List[dict]] = [m.render_method(sample_name=sample.name,
-                                                        sample_description=sample.description,
-                                                        layout=layout)
-                                                for m in all_methods]
-        
-        method_types: List[MethodType] = [m.method_type
-                                        for m in all_methods]
+    # activate the tasks
+    for i in range(len(sample.stages[stage].methods)):
+        sample.stages[stage].activate(0)
 
-        # create tasks, one per method
-        tasks: List[Task] = []
-        for method_type, method_list in zip(method_types, rendered_methods):
-            
-            # should typically only ever be one method in method_list
-            for method in method_list:
-                taskdata: List[TaskData] = []
-                max_subtasks = 0
-                for device_name, device_data in method.items():
-                    channel = sample.channel if device_manager.get_device_by_name(device_name).multichannel else None
-                    max_subtasks = max(max_subtasks, len(device_data))
-                    newtaskdata = TaskData(id=str(uuid4()),
-                                    device=device_name,
-                                    channel=channel,
-                                    method_data=device_manager.get_device_by_name(device_name).create_job_data(device_data),
-                                    non_channel_storage='vial' if channel is None else None)
-                    taskdata.append(newtaskdata)
-                
-                # transfer if multiple devices are involved
-                if len(method.keys()) > 1:
-                    tasktype = TaskType.TRANSFER
-                # prepare if multiple subtasks from a single device are involved
-                elif method_type == MethodType.PREPARE:
-                    tasktype = TaskType.PREPARE
-                elif method_type == MethodType.MEASURE:
-                    tasktype = TaskType.MEASURE
-                else:
-                    tasktype = TaskType.NOCHANNEL
-                    
-                new_task = Task(sample_id=sample.id,
-                                task_type=tasktype,
-                                tasks=taskdata)
+    submit_tasks(all_tasks)
 
-                # reserve active_tasks (and sample.stages[stage])
-                with active_tasks.lock:
-                    m.tasks.append(AutocontrolTaskTracker(task=new_task,
-                                                          status=SampleStatus.PENDING))
-                    active_tasks.pending.update({str(new_task.id): AutocontrolItem(id=sample.id, stage=stage, method_id=m.id)})
+def prepare_method(sample: Sample, stage: StageName, method_index: int, layout: LHBedLayout) -> List[Task]:
+    """Prepares a method list for running by populating run_methods and run_methods_complete.
+        List can then be used for dry or wet runs
+    """
+   
+    # Generate real-time tasks based on layout
+    m = sample.stages[stage].methods[method_index]
+    all_methods: List[MethodsType] = m.method.get_methods(layout)
 
-                tasks.append(new_task)
+    # render all the methods. Can be multiple rendered submethod per main method
+    rendered_methods: List[List[dict]] = [m.render_method(sample_name=sample.name,
+                                                    sample_description=sample.description,
+                                                    layout=layout)
+                                            for m in all_methods]
     
-        submit_tasks(tasks)
+    method_types: List[MethodType] = [m.method_type
+                                    for m in all_methods]
+
+    # create tasks, one per method
+    tasks: List[Task] = []
+    for method_type, method_list in zip(method_types, rendered_methods):
+        
+        # should typically only ever be one method in method_list
+        for method in method_list:
+            taskdata: List[TaskData] = []
+            max_subtasks = 0
+            for device_name, device_data in method.items():
+                channel = sample.channel if device_manager.get_device_by_name(device_name).multichannel else None
+                max_subtasks = max(max_subtasks, len(device_data))
+                newtaskdata = TaskData(id=str(uuid4()),
+                                device=device_name,
+                                channel=channel,
+                                method_data=device_manager.get_device_by_name(device_name).create_job_data(device_data),
+                                non_channel_storage='vial' if channel is None else None)
+                taskdata.append(newtaskdata)
+            
+            # transfer if multiple devices are involved
+            if len(method.keys()) > 1:
+                tasktype = TaskType.TRANSFER
+            # prepare if multiple subtasks from a single device are involved
+            elif method_type == MethodType.PREPARE:
+                tasktype = TaskType.PREPARE
+            elif method_type == MethodType.MEASURE:
+                tasktype = TaskType.MEASURE
+            else:
+                tasktype = TaskType.NOCHANNEL
+                
+            new_task = Task(sample_id=sample.id,
+                            task_type=tasktype,
+                            tasks=taskdata)
+
+            # reserve active_tasks (and sample.stages[stage])
+            with active_tasks.lock:
+                m.tasks.append(AutocontrolTaskTracker(task=new_task,
+                                                        status=SampleStatus.PENDING))
+                active_tasks.pending.update({str(new_task.id): AutocontrolItem(id=sample.id, stage=stage, method_id=m.id)})
+
+            tasks.append(new_task)
+
+    return tasks
 
 def to_thread(**thread_kwargs):
     def decorator_to_thread(f):
@@ -223,15 +239,20 @@ def synchronize_status(poll_delay: int = 5):
         return 'uncaught error'
 
     @trigger_layout_update
-    @trigger_sample_status_update
+    @trigger_samples_update
     def mark_complete(id: str) -> None:
         parent_item = active_tasks.active.pop(id)
         _, sample = samples.getSampleById(parent_item.id)
         stage = sample.stages[parent_item.stage]
-        for m in stage.methods:
-            for t in m.tasks:
-                if t.id == id:
-                    t.status = SampleStatus.COMPLETED
+        for m in stage.active:
+            if m.status != SampleStatus.COMPLETED:
+                for t in m.tasks:
+                    # coerce to str because t.id can be UUID
+                    if str(t.id) == id:
+                        t.status = SampleStatus.COMPLETED
+            
+                if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
+                    m.status = SampleStatus.COMPLETED
 
             #sample.stages[parent_item.stage].update_status()
 

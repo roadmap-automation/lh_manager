@@ -147,7 +147,6 @@ const status_class_map: {[status in StatusType]: string} = {
           <div v-for="(stage, stage_name) of sample.stages">
             <h6 :class="status_class_map[sample_status?.[sample.id]?.[stage_name]?.status ?? 'inactive']">{{ stage_name }}:
               <button
-                v-if="sample_status?.[sample.id]?.stages?.[stage_name]?.status === 'inactive'"
                 type="button"
                 class="btn-close btn-sm align-middle expand-up-down"
                 aria-label="explode"
@@ -155,7 +154,6 @@ const status_class_map: {[status in StatusType]: string} = {
                 @click.stop="explode_stage(sample, stage_name)">
               </button>
               <button 
-                v-if="sample_status?.[sample.id]?.stages?.[stage_name]?.status === 'inactive'"
                 type="button"
                 class="btn-close btn-sm align-middle start"
                 aria-label="Run stage"
@@ -163,11 +161,24 @@ const status_class_map: {[status in StatusType]: string} = {
                 @click.stop="run_stage(sample, [stage_name])">
               </button>
             </h6>
+            <div v-if="!!stage.methods.length">
+              <h7>Draft</h7>
+            </div>
             <MethodList
               :sample_id="sample.id"
               :stage_name="stage_name"
               :methods="stage.methods"
+              :editable="true"
               @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />
+            <div v-if="!!stage.active.length">
+              <h7>Submitted</h7>
+            </div>
+            <MethodList
+              :sample_id="sample.id"
+              :stage_name="stage_name"
+              :methods="stage.active"
+              :editable="false"
+              @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />              
           </div>
         </div>
       </div>

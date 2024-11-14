@@ -67,16 +67,15 @@ export type MethodTrackerType = {
   id: string | null,
   method: MethodType,
   tasks: TaskTrackerType[]
+  status: StatusType,
 }
 
 // Class representing a list of methods representing one LH job. Allows dividing
 // prep and inject operations for a single sample.
 export interface MethodList {
-    LH_id: number | null,
     createdDate: string | null,
     methods: MethodTrackerType[],
-    methods_complete: boolean[], 
-    status: StatusType,
+    active: MethodTrackerType[],
 }
 
 export type StageName = 'prep' | 'inject';
@@ -279,6 +278,24 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
         update_sample(s);
         active_method_index.value = new_index
       }
+    }
+  }
+
+  export function reuse_method(sample_id: string, stage_name: StageName, method_index: number) {
+    const sample = get_sample_by_id(sample_id);
+    if (sample !== undefined) {
+      const s: Sample = structuredClone(toRaw(sample));
+      const { stages } = s;
+      const stage = stages[stage_name];
+      const method = stage.active[method_index];
+      const new_method: MethodTrackerType = {'id': null,
+        'method': method.method,
+        'tasks': []
+      }
+      const num_methods = stage.methods.push(new_method);
+      update_sample(s);
+      active_stage.value = stage_name;
+      active_method_index.value = num_methods - 1;
     }
   }
 

@@ -159,7 +159,7 @@ def ArchiveandRemoveSample() -> Response:
 
 @gui_blueprint.route('/GUI/RunSample/', methods=['POST'])
 @trigger_run_queue_update
-@trigger_sample_status_update
+@trigger_samples_update
 def RunSample() -> Response:
     """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
     data = request.get_json(force=True)

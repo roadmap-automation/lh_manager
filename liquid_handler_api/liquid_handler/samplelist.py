@@ -2,16 +2,14 @@ from dataclasses import field
 from pydantic import BaseModel, validator
 from enum import Enum
 from uuid import uuid4
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any
 
-from .job import ResultStatus, JobBase
-from .devices import device_manager
 from .lhmethods import Sleep
 from .bedlayout import LHBedLayout
 from .lhinterface import DATE_FORMAT
 from .items import StageName
 from .error import MethodError
-from .methods import MethodsType, BaseMethod, method_manager, Release
+from .methods import MethodsType, BaseMethod, method_manager
 from datetime import datetime
 
 # =============== Sample list handling =================
@@ -24,12 +22,6 @@ class SampleStatus(str, Enum):
     FAILED = 'failed'
     COMPLETED = 'completed'
 
-class JobContainer(BaseModel):
-    """Container for jobs and the associated (unserialized) methods. Assists with keeping
-        track of job completion"""
-    job: JobBase
-    methods: List[MethodsType]
-
 class TaskTracker(BaseModel):
     id: str | None = None
     task: dict = field(default_factory={})
@@ -37,8 +29,9 @@ class TaskTracker(BaseModel):
 
 class MethodTracker(BaseModel):
     id: str | None = None
-    method: dict | BaseMethod | None = None
+    method: Any = None
     tasks: List[TaskTracker] = field(default_factory=list)
+    status: SampleStatus | None = None
 
     @validator('method')
     def validate_method(cls, v):
@@ -64,16 +57,26 @@ class MethodList(BaseModel):
         in a single stage"""
     createdDate: str | None = None
     methods: List[MethodTracker] = field(default_factory=list)
+    active: List[MethodTracker] = field(default_factory=list)
     status: SampleStatus = SampleStatus.INACTIVE
 
     @property
     def run_jobs(self) -> List[str]:
 
-        return [task.id for m in self.methods for task in m.tasks]
+        return [task.id for m in self.active for task in m.tasks]
 
-    def addMethod(self, method: MethodsType) -> None:
+    def add(self, method: MethodsType) -> None:
         """Adds new method"""
         self.methods.append(MethodTracker(method=method))
+
+    def activate(self, index: int) -> None:
+        """Moves method to active category
+
+        Args:
+            index (int): index of method to move
+        """
+
+        self.active.append(self.methods.pop(index))
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         """Generates estimated time of all methods in list. Does not track method completion
