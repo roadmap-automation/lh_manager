@@ -1,4 +1,3 @@
-from liquid_handler_api.liquid_handler.error import MethodError
 from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_composition, InferredWellLocation
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, register, MethodContainer, MethodsType, MethodType

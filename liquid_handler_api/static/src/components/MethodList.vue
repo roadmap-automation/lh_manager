@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
 import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method } from '../store';
-import type { MethodTrackerType, MethodType, StageName } from '../store';
+import type { MethodType, StageName } from '../store';
 import MethodFields from './MethodFields.vue';
 
 const props = defineProps<{
   sample_id: string,
   stage_name: StageName,
-  methods: MethodTrackerType[],
+  methods: MethodType[],
   editable: boolean
 }>();
 
@@ -25,7 +25,7 @@ function toggleItem(method_index) {
   else {
     active_stage.value = props.stage_name;
     active_method_index.value = method_index;
-    const method = props.methods[method_index].method;
+    const method = props.methods[method_index];
     source_well.value = method['Source'] ?? null; // can be undefined
     target_well.value = method['Target'] ?? null; // can be undefined
 
@@ -87,9 +87,9 @@ const status = computed(() => {
       <h2 class="accordion-header">
         <button class="accordion-button p-1" :class="{ collapsed: stage_name === active_stage || index !== active_method_index }" type="button"
           @click="toggleItem(index)" :aria-expanded="index === active_method_index">
-          <span class="d-inline align-middle text-light bg-dark" > {{ method.method.display_name }}:</span>
+          <span class="d-inline align-middle text-light bg-dark" > {{ method.display_name }}:</span>
           <span class="d-inline align-middle px-2 method-string" :class="{ 'text-danger': method.status === 'completed' }">
-            {{ method_string(method.method) }}
+            {{ method_string(method) }}
           </span>
           <button
             v-if="!props.editable"
@@ -106,9 +106,9 @@ const status = computed(() => {
           <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
             <MethodFields
               :sample_id="sample_id"
-              :pointer="`/stages/${stage_name}/methods/${index}/method`"
+              :pointer="`/stages/${stage_name}/methods/${index}`"
               :editable="props.editable"
-              :method="method.method"
+              :method="method"
               :hide_fields="[]"
             />
 

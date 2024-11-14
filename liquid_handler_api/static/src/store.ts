@@ -17,14 +17,6 @@ export interface WellLocation {
   id: string | null,
 }
 
-export type MethodType = {
-  display_name: string,
-  method_name: string,
-  Source?: WellLocation,
-  Target?: WellLocation,
-  [fieldname: string]: string | number | WellLocation | null | undefined,
-}
-
 export type TaskDataType = {
   id: string,
   device: string,
@@ -63,19 +55,23 @@ export type TaskTrackerType = {
   status: StatusType
 }
 
-export type MethodTrackerType = {
+export type MethodType = {
   id: string | null,
-  method: MethodType,
-  tasks: TaskTrackerType[]
-  status: StatusType,
+  display_name: string,
+  method_name: string,
+  Source?: WellLocation,
+  Target?: WellLocation,
+  [fieldname: string]: string | number | WellLocation | null | undefined,
+  tasks: TaskTrackerType[],
+  status: StatusType
 }
 
 // Class representing a list of methods representing one LH job. Allows dividing
 // prep and inject operations for a single sample.
 export interface MethodList {
     createdDate: string | null,
-    methods: MethodTrackerType[],
-    active: MethodTrackerType[],
+    methods: MethodType[],
+    active: MethodType[],
 }
 
 export type StageName = 'prep' | 'inject';
@@ -219,11 +215,7 @@ export function add_method(sample_id: string, stage_name: StageName, event: Even
     const s: Sample = structuredClone(toRaw(sample));
     const { stages } = s;
     const stage = stages[stage_name];
-    const new_method: MethodTrackerType = {'id': null,
-      'method': {method_name},
-      'tasks': []
-    }
-    const num_methods = stage.methods.push(new_method);
+    const num_methods = stage.methods.push({ method_name });
     update_sample(s);
     active_stage.value = stage_name;
     active_method_index.value = num_methods - 1;
@@ -288,11 +280,11 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
       const { stages } = s;
       const stage = stages[stage_name];
       const method = stage.active[method_index];
-      const new_method: MethodTrackerType = {'id': null,
-        'method': method.method,
-        'tasks': []
-      }
-      const num_methods = stage.methods.push(new_method);
+      const new_method = structuredClone(toRaw(method))
+      new_method.id = null
+      new_method.tasks = []
+      new_method.status = 'inactive'
+      const num_methods = stage.methods.push(method);
       update_sample(s);
       active_stage.value = stage_name;
       active_method_index.value = num_methods - 1;

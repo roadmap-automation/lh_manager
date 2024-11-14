@@ -6,7 +6,7 @@ from .samplelist import Sample, StageName, SampleStatus
 from .bedlayout import LHBedLayout
 from .dryrun import DryRunQueue
 from .items import Item
-from .error import MethodError
+from .status import MethodError
 
 class SampleContainer(BaseModel):
     """Specialized sample dictionary allowing convenient referencing by sample ID or sample name"""

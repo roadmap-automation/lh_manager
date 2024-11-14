@@ -1,5 +1,5 @@
 from .bedlayout import LHBedLayout, WellLocation
-from .error import MethodError
+from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodContainer, MethodsType, method_manager
 from .devices import DeviceBase, device_manager

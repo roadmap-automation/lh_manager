@@ -1,12 +1,13 @@
-from pydantic import BaseModel, fields
+from pydantic import BaseModel, Field, validator
 from enum import Enum
 from copy import copy
-from typing import Dict, List, Literal, Union, Set, ClassVar
+from typing import Any, Dict, List, Literal, Union, Set, ClassVar
+from uuid import uuid4
 
 from .bedlayout import LHBedLayout
-from .error import MethodError
+from .status import MethodError, SampleStatus
 
-EXCLUDE_FIELDS = set(["method_name", "display_name", "complete", "method_type"])
+EXCLUDE_FIELDS = set(["method_name", "display_name", "complete", "method_type", "id", "tasks", "status"])
 
 ## ========== Base Methods specification =============
 
@@ -19,13 +20,27 @@ class MethodType(str, Enum):
     PREPARE = 'prepare'
     MEASURE = 'measure'
 
+class TaskContainer(BaseModel):
+    id: str | None = None
+    task: Any = Field(default_factory=dict)
+    subtasks: list = Field(default_factory=list)
+    status: SampleStatus | None = None
+
 class BaseMethod(BaseModel):
     """Base class for LH methods"""
 
+    id: str | None = None
+    tasks: list[TaskContainer] = Field(default_factory=list)
+    status: SampleStatus = SampleStatus.INACTIVE
     method_name: Literal['BaseMethod'] = 'BaseMethod'
     display_name: Literal['BaseMethod'] = 'BaseMethod'
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
+
+    def model_post_init(self, __context):
+        
+        if self.id is None:
+            self.id = str(uuid4())
 
     def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""
@@ -170,4 +185,13 @@ class Release(BaseMethod):
     
     display_name: Literal['---release---'] = '---release---'
     method_name: Literal[''] = ''
+
+
+# =============== Sample list handling =================
+
+class TaskContainer(BaseModel):
+    id: str | None = None
+    task: Any = Field(default_factory=dict)
+    subtasks: list = Field(default_factory=list)
+    status: SampleStatus | None = None
 

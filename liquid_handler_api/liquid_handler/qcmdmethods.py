@@ -1,5 +1,4 @@
 from .bedlayout import LHBedLayout
-from .error import MethodError
 from .methods import BaseMethod, MethodType, register
 from .devices import DeviceBase, device_manager
 from .job import JobBase

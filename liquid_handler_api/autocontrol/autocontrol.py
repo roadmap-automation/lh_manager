@@ -14,9 +14,9 @@ from ..gui_api.events import trigger_samples_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
-from ..liquid_handler.methods import MethodsType, MethodType
+from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer
 from ..liquid_handler.bedlayout import LHBedLayout
-from ..liquid_handler.samplelist import Sample, StageName, TaskTracker
+from ..liquid_handler.samplelist import Sample, StageName
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
@@ -88,7 +88,7 @@ def submission_callback(data: dict):
 
     return 'sample not found'
 
-class AutocontrolTaskTracker(TaskTracker):
+class AutocontrolTaskTracker(TaskContainer):
     id: str | None = None
     task: Task | None = None
     status: SampleStatus | None = None
@@ -123,8 +123,8 @@ def prepare_method(sample: Sample, stage: StageName, method_index: int, layout: 
     """
    
     # Generate real-time tasks based on layout
-    m = sample.stages[stage].methods[method_index]
-    all_methods: List[MethodsType] = m.method.get_methods(layout)
+    m: MethodsType = sample.stages[stage].methods[method_index]
+    all_methods: List[MethodsType] = m.get_methods(layout)
 
     # render all the methods. Can be multiple rendered submethod per main method
     rendered_methods: List[List[dict]] = [m.render_method(sample_name=sample.name,

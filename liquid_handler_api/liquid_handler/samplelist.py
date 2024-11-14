@@ -1,5 +1,4 @@
-from dataclasses import field
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
 from enum import Enum
 from uuid import uuid4
 from typing import Dict, List, Union, Any
@@ -8,57 +7,32 @@ from .lhmethods import Sleep
 from .bedlayout import LHBedLayout
 from .lhinterface import DATE_FORMAT
 from .items import StageName
-from .error import MethodError
-from .methods import MethodsType, BaseMethod, method_manager
+from .status import MethodError, SampleStatus
+from .methods import MethodsType, BaseMethod, method_manager, TaskContainer
 from datetime import datetime
-
-# =============== Sample list handling =================
-
-class SampleStatus(str, Enum):
-    INACTIVE = 'inactive'
-    PENDING = 'pending'
-    ACTIVE = 'active'
-    PARTIAL = 'partially complete'
-    FAILED = 'failed'
-    COMPLETED = 'completed'
-
-class TaskTracker(BaseModel):
-    id: str | None = None
-    task: dict = field(default_factory={})
-    status: SampleStatus | None = None
-
-class MethodTracker(BaseModel):
-    id: str | None = None
-    method: Any = None
-    tasks: List[TaskTracker] = field(default_factory=list)
-    status: SampleStatus | None = None
-
-    @validator('method')
-    def validate_method(cls, v):
-
-        if isinstance(v, dict):
-            return method_manager.get_method_by_name(v['method_name'])(**v)
-
-        if not (isinstance(v, BaseMethod)):
-            raise ValueError(f"{v} must be derived from BaseMethod")
-
-        return v
-
-    def model_post_init(self, __context):
-
-        if self.id is None:
-            self.id = str(uuid4())
-
-        if isinstance(self.method, dict):
-            self.method = method_manager.get_method_by_name(self.method['method_name'])(**self.method)
 
 class MethodList(BaseModel):
     """Class representing a list of methods representing one LH job. Can be nested
         in a single stage"""
     createdDate: str | None = None
-    methods: List[MethodTracker] = field(default_factory=list)
-    active: List[MethodTracker] = field(default_factory=list)
+    methods: list = Field(default_factory=list)
+    active: list = Field(default_factory=list)
     status: SampleStatus = SampleStatus.INACTIVE
+
+    @validator('methods', 'active')
+    def validate_methods(cls, v):
+
+        if not isinstance(v, list):
+            raise ValueError(f"{v} must be a list")
+
+        for i, iv in enumerate(v):
+            if isinstance(iv, dict):
+                v[i] = method_manager.get_method_by_name(iv['method_name'])(**iv)
+            else:
+                if not (isinstance(iv, BaseMethod)):
+                    raise ValueError(f"{iv} must be derived from BaseMethod")
+
+        return v
 
     @property
     def run_jobs(self) -> List[str]:
@@ -67,7 +41,7 @@ class MethodList(BaseModel):
 
     def add(self, method: MethodsType) -> None:
         """Adds new method"""
-        self.methods.append(MethodTracker(method=method))
+        self.methods.append(method)
 
     def activate(self, index: int) -> None:
         """Moves method to active category
@@ -86,8 +60,7 @@ class MethodList(BaseModel):
         """
 
         # NOTE: Does not currently update estimated time based on completion
-
-        return sum(m.method.estimated_time(layout) for m in self.methods)
+        return sum(m.estimated_time(layout) for m in self.methods)
 
     def explode(self, layout: LHBedLayout):
         """Permanently replaces the original methods with "exploded" methods, i.e. rendered methods
@@ -102,12 +75,12 @@ class MethodList(BaseModel):
         new_methods = []
         for m in self.methods:
             print('m', type(m))
-            print('m exploded', m.method.explode(layout))
-            for im in m.method.explode(layout):
+            print('m exploded', m.explode(layout))
+            for im in m.explode(layout):
                 print('im', type(im))
                 #print(im.explode(layout))
                 for iim in im.explode(layout):
-                    new_methods.append(MethodTracker(method=iim))
+                    new_methods.append(iim)
         self.methods = new_methods
 
     def execute(self, layout: LHBedLayout) -> List[MethodError | None]:
@@ -136,7 +109,7 @@ class Sample(BaseModel):
     description: str
     id: str | None = None
     channel: int = 0
-    stages: Dict[StageName, MethodList] = field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
+    stages: Dict[StageName, MethodList] = Field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
     current_contents: str = ''
