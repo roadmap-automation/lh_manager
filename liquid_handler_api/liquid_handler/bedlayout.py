@@ -113,7 +113,8 @@ class WellLocation(BaseModel):
     expected_composition: Composition | None = None    
 
 class InferredWellLocation(WellLocation):
-    def __post_init__(self):
+    def model_post_init(self, __context):
+
         if self.id is None:
             self.id = str(uuid4())
 

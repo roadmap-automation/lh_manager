@@ -91,6 +91,8 @@ class BaseLHMethod(BaseMethod):
 
 class LHMethodCluster(BaseLHMethod):
 
+    method_name: Literal['LHMethodCluster'] = 'LHMethodCluster'
+    display_name: Literal['LHMethodCluster'] = 'LHMethodCluster'
     method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
     methods: List[MethodsType] = field(default_factory=list)
 
@@ -125,6 +127,8 @@ class SetWellID(BaseMethod):
 class InjectMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
+    method_name: Literal['InjectMethod'] = 'InjectMethod'
+    display_name: Literal['InjectMethod'] = 'InjectMethod'
     method_type: Literal[MethodType.INJECT] = MethodType.INJECT
     Source: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
@@ -150,6 +154,8 @@ class InjectMethod(BaseLHMethod):
 class MixMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
+    method_name: str = 'MixMethod'
+    display_name: str = 'MixMethod'
     method_type: Literal[MethodType.MIX] = MethodType.MIX
     Target: WellLocation = field(default_factory=WellLocation)
     Volume: float = 1.0
@@ -172,6 +178,8 @@ class MixMethod(BaseLHMethod):
 class TransferMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
 
+    method_name: str = 'TransferMethod'
+    display_name: str = 'TransferMethod'
     method_type: Literal[MethodType.TRANSFER] = MethodType.TRANSFER
     Source: WellLocation = field(default_factory=WellLocation)
     Target: WellLocation = field(default_factory=WellLocation)
@@ -209,6 +217,9 @@ class TransferWithRinse(TransferMethod):
     """Transfer with rinse"""
 
     # Source, Target, and Volume defined in MixMethod
+    method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
+    display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'    
+
     Flow_Rate: float = 2.5
     Aspirate_Flow_Rate: float = 2.0
     Extra_Volume: float = 0.1
@@ -216,8 +227,6 @@ class TransferWithRinse(TransferMethod):
     Inside_Rinse_Volume: float = 0.5
     Air_Gap: float = 0.1
     Use_Liquid_Level_Detection: bool = True
-    display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
-    method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
 
     class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone

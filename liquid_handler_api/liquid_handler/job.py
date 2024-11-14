@@ -26,7 +26,7 @@ class JobBase(BaseModel):
     results: list = field(default_factory=list)
     parent: Item | None = None
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
 
         if isinstance(self.parent, dict):
             self.parent = Item(**self.parent)

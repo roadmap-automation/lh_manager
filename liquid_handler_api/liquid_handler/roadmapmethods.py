@@ -10,7 +10,7 @@ import numpy as np
 from copy import copy
 from typing import List, Literal, Tuple
 
-from dataclasses import field
+from pydantic import Field
 
 def find_well_and_volume(composition: Composition, volume: float, wells: List[Well]) -> Tuple[Well | None, str | None]:
     """Finds the well with the target composition and the most available volume
@@ -213,7 +213,7 @@ class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
 
 @register
 class MultiTransfer(MethodContainer):
-    Source: WellLocation = field(default_factory=WellLocation)
+    Source: WellLocation = Field(default_factory=WellLocation)
     display_name: Literal['TestWellInference'] = 'TestWellInference'
     method_name: Literal['Test Well Inference'] = 'Test Well Inference'
 

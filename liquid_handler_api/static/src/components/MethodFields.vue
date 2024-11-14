@@ -117,7 +117,7 @@ function available_solute_units(solute_name: string) {
 }
 
 function activateSelector({name, type}) {
-  if (type === '#/definitions/WellLocation') {
+  if (type === '#/$defs/WellLocation') {
     active_well_field.value = name;
   }
 }
@@ -126,7 +126,7 @@ function activateSelector({name, type}) {
 <template>
   <fieldset :disabled="!editable">
     <tr v-for="param of parameters.filter((p) => (!hide_fields.includes(p.name)))" @click="activateSelector(param)">
-      <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: param.type === '#/definitions/WellLocation' }">
+      <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: param.type === '#/$defs/WellLocation' }">
         <div class="form-check">
           <label>
             {{ param.name }}:
@@ -144,7 +144,7 @@ function activateSelector({name, type}) {
       <td v-if="param.type === 'boolean'">
         <input type="checkbox" v-model="param.value" :name="`param_${param.name}`" @change="send_changes(param)" />
       </td>
-      <td v-if="param.type === '#/definitions/WellLocation'">
+      <td v-if="param.type === '#/$defs/WellLocation'">
         <select v-if="layout != null && param.value && 'rack_id' in param.value" v-model="param.value.rack_id"
           @change="send_changes(param)">
           <option :value="null" disabled></option>
@@ -154,12 +154,12 @@ function activateSelector({name, type}) {
           v-model="param.value.well_number" :name="`param_${param.name}_well`" @keydown.enter="send_changes(param)"
           @blur="send_changes(param)" />
       </td>
-      <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/definitions/Zone'">
+      <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/$defs/Zone'">
         <select v-model="param.value" multiple @change="send_changes(param)">
-          <option v-for="zone in param.schema.definitions?.Zone?.enum" :value="zone">{{ zone }}</option>
+          <option v-for="zone in param.schema.$defs?.Zone?.enum" :value="zone">{{ zone }}</option>
         </select>
       </td>
-      <td v-if="param.type === '#/definitions/Composition'">
+      <td v-if="param.type === '#/$defs/Composition'">
         <div>
           <div>Solutes:
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solutes')">add</button>
@@ -198,7 +198,7 @@ function activateSelector({name, type}) {
           </div>
         </div>
       </td>
-      <td v-if="param.type === '#/definitions/TransferMethod' || param.type === '#/definitions/MixMethod' || param.type === '#/definitions/InjectMethod'">
+      <td v-if="param.type === '#/$defs/TransferMethod' || param.type === '#/$defs/MixMethod' || param.type === '#/$defs/InjectMethod'">
         <select v-model="param.value.method_name" @change="param.value = {method_name: param.value.method_name}; send_changes(param)">
             <option v-for="mname of get_template_names(param.type, param.schema)" >
               {{ mname }}</option>

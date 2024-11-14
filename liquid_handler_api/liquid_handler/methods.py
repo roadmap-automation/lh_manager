@@ -144,7 +144,7 @@ class MethodManager:
             for name, fi in method.model_fields.items():
                 if not name in EXCLUDE_FIELDS:
                     fieldlist.append(name)
-            lh_method_fields[method.model_fields['method_name'].default] = {'fields': fieldlist, 'display_name': method.model_fields['display_name'].default, 'schema': method.model_json_schema()}
+            lh_method_fields[method.model_fields['method_name'].default] = {'fields': fieldlist, 'display_name': method.model_fields['display_name'].default, 'schema': method.model_json_schema(mode='serialization')}
 
         return lh_method_fields
     

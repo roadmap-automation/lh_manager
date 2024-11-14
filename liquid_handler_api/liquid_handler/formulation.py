@@ -2,11 +2,11 @@ from typing import List, Tuple, Literal
 from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
-from dataclasses import field
+from pydantic import Field, validator, SerializeAsAny
 
 from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
 
-from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
+from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation, empty
 from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import example_sample_list, StageName
 from .methods import MethodContainer, MethodsType, register, method_manager
@@ -20,23 +20,24 @@ class Formulation(MethodContainer):
     # complete: bool
     method_name: Literal['Formulation'] = 'Formulation'
     display_name: Literal['Formulation'] = 'Formulation'
-    target_composition: Composition | None = None
+    target_composition: Composition = Field(default_factory=Composition)
     target_volume: float = 0.0
-    Target: WellLocation = field(default_factory=WellLocation)
-    include_zones: List[Zone] = field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
+    Target: WellLocation = Field(default_factory=WellLocation)
+    include_zones: List[Zone] = Field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
     """include_zones (List[Zone]): list of zones to include for calculating formulations. Defaults to [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]"""
     exact_match: bool = True
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition
                 is achieved. Defaults to True."""
-    transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
-    mix_template: MixMethod = field(default_factory=MixWithRinse)
+    transfer_template: SerializeAsAny[TransferMethod] = Field(default_factory=TransferWithRinse)
+    mix_template: SerializeAsAny[MixMethod] = Field(default_factory=MixWithRinse)
 
-    def __post_init__(self):
-        for attr_name in ('mix_template', 'transfer_template'):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, dict):
-                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
+    @validator('mix_template', 'transfer_template', pre=True)
+    def validate_templates(cls, v):
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+        
+        return v
 
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:

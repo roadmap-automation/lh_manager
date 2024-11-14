@@ -1,6 +1,6 @@
 from typing import List, Tuple, Literal
 from copy import copy
-from dataclasses import field
+from pydantic import Field, SerializeAsAny, validator
 
 import numpy as np
 
@@ -16,19 +16,26 @@ class SerialDilution(MethodContainer):
     # complete: bool
     method_name: Literal['SerialDilution'] = 'SerialDilution'
     display_name: Literal['Serial Dilution'] = 'Serial Dilution'
-    sample_source: WellLocation = field(default_factory=WellLocation)
-    diluent_source: WellLocation = field(default_factory=WellLocation)
-    first_target_well: WellLocation = field(default_factory=WellLocation)
+    sample_source: WellLocation = Field(default_factory=WellLocation)
+    diluent_source: WellLocation = Field(default_factory=WellLocation)
+    first_target_well: WellLocation = Field(default_factory=WellLocation)
     number_of_dilutions: int = 10
     initial_dilution_factor: float = 1.0
     dilution_factor: float = 2.0
     min_volume: float = 1.0
     max_volume: float = 1.0
     extra_volume: float = 0.15
-    transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
-    mix_template: MixMethod = field(default_factory=MixWithRinse)
+    transfer_template: SerializeAsAny[TransferMethod] = Field(default_factory=TransferWithRinse)
+    mix_template: SerializeAsAny[MixMethod] = Field(default_factory=MixWithRinse)
 
-    def __post_init__(self):
+    @validator('mix_template', 'transfer_template', pre=True)
+    def validate_templates(cls, v):
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+        
+        return v
+
+    def model_post_init(self, __context):
         for attr_name in ('mix_template', 'transfer_template'):
             attr = getattr(self, attr_name)
             if isinstance(attr, dict):
@@ -138,14 +145,14 @@ class SerialDilutionInject(SerialDilution):
 
     method_name: Literal['SerialDilutionInject'] = 'SerialDilutionInject'
     display_name: Literal['Serial Dilution with Injection'] = 'Serial Dilution with Injection'
-    inject_template: InjectMethod = field(default_factory=InjectWithRinse)
+    inject_template: InjectMethod = Field(default_factory=InjectWithRinse)
 
-    def __post_init__(self):
-        for attr_name in ('mix_template', 'transfer_template', 'inject_template'):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, dict):
-                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
-
+    @validator('inject_template', 'mix_template', 'transfer_template', pre=True)
+    def validate_templates(cls, v):
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+        
+        return v
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
@@ -176,23 +183,24 @@ class StandardDilution(MethodContainer):
     # complete: bool
     method_name: Literal['StandardDilution'] = 'StandardDilution'
     display_name: Literal['Standard Dilution'] = 'Standard Dilution'
-    sample_source: WellLocation = field(default_factory=WellLocation)
-    diluent_source: WellLocation = field(default_factory=WellLocation)
-    first_target_well: WellLocation = field(default_factory=WellLocation)
+    sample_source: WellLocation = Field(default_factory=WellLocation)
+    diluent_source: WellLocation = Field(default_factory=WellLocation)
+    first_target_well: WellLocation = Field(default_factory=WellLocation)
     number_of_dilutions: int = 10
     dilution_factor: float = 2.0
     min_volume: float = 1.0
     max_volume: float = 1.0
     extra_volume: float = 0.15
-    transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
-    mix_template: MixMethod = field(default_factory=MixWithRinse)
+    transfer_template: SerializeAsAny[TransferMethod] = Field(default_factory=TransferWithRinse)
+    mix_template: SerializeAsAny[MixMethod] = Field(default_factory=MixWithRinse)
 
-    def __post_init__(self):
-        for attr_name in ('mix_template', 'transfer_template'):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, dict):
-                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
-
+    @validator('mix_template', 'transfer_template', pre=True)
+    def validate_templates(cls, v):
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+        
+        return v
+    
     def _find_dilution_volumes(self,
                               layout: LHBedLayout):
         
@@ -284,14 +292,15 @@ class StandardDilutionInject(StandardDilution):
     # complete: bool
     method_name: Literal['StandardDilutionInject'] = 'StandardDilutionInject'
     display_name: Literal['Standard Dilution with Injection'] = 'Standard Dilution with Injection'
-    inject_template: InjectMethod = field(default_factory=InjectWithRinse)
+    inject_template: InjectMethod = Field(default_factory=InjectWithRinse)
 
-    def __post_init__(self):
-        for attr_name in ('mix_template', 'transfer_template', 'inject_template'):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, dict):
-                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
-
+    @validator('inject_template', 'mix_template', 'transfer_template', pre=True)
+    def validate_templates(cls, v):
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+        
+        return v
+    
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
         """
