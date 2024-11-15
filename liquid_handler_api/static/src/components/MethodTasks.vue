@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits, onMounted } from 'vue';
-import { update_at_pointer, resubmit_task, edit_task, task_modal_data } from '../store';
-import Modal from 'bootstrap/js/src/modal';
+import { update_at_pointer, resubmit_task, edit_task } from '../store';
 import type { MethodType } from '../store';
 
 const props = defineProps<{

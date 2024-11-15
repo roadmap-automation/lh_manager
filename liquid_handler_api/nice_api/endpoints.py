@@ -2,10 +2,8 @@
 from flask import make_response, Response, request
 
 from ..liquid_handler.lhqueue import validate_format, submit_handler
-from ..liquid_handler.lhmethods import LHJob
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.items import Item, StageName
 from ..liquid_handler.history import History
 from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
@@ -28,7 +26,7 @@ def _run_sample(data: dict) -> str | None:
                 return f'stage {stage} of sample {data["name"]} is not inactive'
             
             # only if an injection operation, set sample NICE_uuid and NICE_slotID
-            if data['stage'] == StageName.INJECT:
+            if data['stage'] == 'inject':
                 sample.NICE_uuid = data.get('uuid', None)
                 slot_id = data.get('slotID', 0)
                 sample.NICE_slotID = int(slot_id) if slot_id is not None else None

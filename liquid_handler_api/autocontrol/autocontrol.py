@@ -17,7 +17,7 @@ from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
 from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer
 from ..liquid_handler.bedlayout import LHBedLayout
-from ..liquid_handler.samplelist import Sample, StageName
+from ..liquid_handler.samplelist import Sample
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
@@ -111,7 +111,7 @@ class AutocontrolTaskContainer(TaskContainer):
 class AutocontrolItem(Item):
     method_id: str | None = None
 
-def prepare_and_submit_stage(sample: Sample, stage: StageName, layout: LHBedLayout) -> List[Task]:
+def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout) -> List[Task]:
     """Runs all draft methods in an entire stage
     """
    
@@ -119,7 +119,7 @@ def prepare_and_submit_stage(sample: Sample, stage: StageName, layout: LHBedLayo
     for _ in range(len(sample.stages[stage].methods)):
         prepare_and_submit_method(sample, stage, 0, layout)
 
-def prepare_and_submit_method(sample: Sample, stage: StageName, method_index: int, layout: LHBedLayout) -> List[Task]:
+def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout) -> List[Task]:
     """Runs a specific method by index
     """
    

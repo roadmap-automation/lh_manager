@@ -13,7 +13,7 @@ from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
 from ..liquid_handler.lhmethods import LHDevice
 from ..liquid_handler.methods import MethodsType
 from ..liquid_handler.bedlayout import LHBedLayout
-from ..liquid_handler.samplelist import Sample, StageName
+from ..liquid_handler.samplelist import Sample
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
@@ -42,7 +42,7 @@ def submission_callback(data: dict):
                 return f'stage {stage} of sample {data["name"]} is not inactive'
             
             # only if an injection operation, set sample NICE_uuid and NICE_slotID
-            if stage == StageName.INJECT:
+            if stage == 'inject':
                 sample.NICE_uuid = data.get('uuid', None)
                 slot_id = data.get('slotID', 0)
                 sample.NICE_slotID = int(slot_id) if slot_id is not None else None

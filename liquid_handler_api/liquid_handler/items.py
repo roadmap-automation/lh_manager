@@ -2,14 +2,10 @@ from enum import Enum
 from dataclasses import field
 from pydantic import BaseModel
 
-class StageName(str, Enum):
-    PREP = 'prep'
-    INJECT = 'inject'
-
 class Item(BaseModel):
 
     id: str
-    stage: StageName
+    stage: str
     data: dict = field(default_factory=dict)
 
     def __repr__(self) -> str:

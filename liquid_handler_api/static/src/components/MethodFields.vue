@@ -2,7 +2,7 @@
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
 import { active_well_field, method_defs, source_components, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, layout, update_at_pointer } from '../store';
 import json_pointer from 'json-pointer';
-import type { MethodType, StageName, SoluteMassUnits, SoluteVolumeUnits } from '../store';
+import type { MethodType } from '../store';
 
 const props = defineProps<{
   sample_id: string,

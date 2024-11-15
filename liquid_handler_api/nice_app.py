@@ -3,6 +3,7 @@ from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .nice_api import nice_blueprint
 from .sio import socketio
+import liquid_handler_api.app_config as app_config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -34,6 +35,10 @@ def test_emit():
     return render_template('test_emit.html')
 
 if __name__ == '__main__':
+
+    config = app_config.config
+    config.samples_path = config.log_path / 'nice_samples.json'
+
     socketio.run(app, host='localhost', port=5001, debug=True)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)

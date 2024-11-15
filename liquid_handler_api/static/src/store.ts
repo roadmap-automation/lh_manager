@@ -81,7 +81,6 @@ export interface MethodList {
     active: MethodType[],
 }
 
-export type StageName = 'prep' | 'inject';
 export type WellFieldName = 'Source' | 'Target';
 
 export interface Sample {
@@ -89,7 +88,7 @@ export interface Sample {
   id: string,
   name: string,
   description: string,
-  stages: {[stagename in StageName]: MethodList},
+  stages: {string: MethodList},
   NICE_uuid: string,
   NICE_slotID: number | null,
   current_contents: string,
@@ -106,7 +105,7 @@ export interface SampleStatusMap {
   [sample_id: string]: {
     status: StatusType,
     stages: {
-      [stage_name in StageName]: SampleStatus
+      string: SampleStatus
     }
   }
 }
@@ -234,7 +233,7 @@ export async function archive_and_remove_sample(sample_id: string) {
   return response_body;
 }
 
-export function add_method(sample_id: string, stage_name: StageName, event: Event) {
+export function add_method(sample_id: string, stage_name: string, event: Event) {
   const sample = get_sample_by_id(sample_id);
   // event comes from a select element:
   const event_target = event.target as HTMLOptionElement;
@@ -263,7 +262,7 @@ export async function update_at_pointer(sample_id: string, pointer: string | str
   }
 }
 
-export function update_method(sample_id: string, stage_name: StageName, method_index: number, field_name: string, field_value) {
+export function update_method(sample_id: string, stage_name: string, method_index: number, field_name: string, field_value) {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
@@ -275,7 +274,7 @@ export function update_method(sample_id: string, stage_name: StageName, method_i
   }
 }
 
-export function get_number_of_methods(sample_id: string, stage_name: StageName) {
+export function get_number_of_methods(sample_id: string, stage_name: string) {
     const sample = get_sample_by_id(sample_id);
     if (sample !== undefined) {
       const s: Sample = structuredClone(toRaw(sample));
@@ -287,7 +286,7 @@ export function get_number_of_methods(sample_id: string, stage_name: StageName) 
     return 0
   }
 
-export function move_method(sample_id: string, stage_name: StageName, method_index: number, new_index: number) {
+export function move_method(sample_id: string, stage_name: string, method_index: number, new_index: number) {
     const sample = get_sample_by_id(sample_id);
     if (sample !== undefined) {
       const s: Sample = structuredClone(toRaw(sample));
@@ -302,7 +301,7 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
     }
   }
 
-  export function copy_method(sample_id: string, stage_name: StageName, method_index: number) {
+  export function copy_method(sample_id: string, stage_name: string, method_index: number) {
     const sample = get_sample_by_id(sample_id);
     if (sample !== undefined) {
       const s: Sample = structuredClone(toRaw(sample));
@@ -318,7 +317,7 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
     }
   }
 
-  export function reuse_method(sample_id: string, stage_name: StageName, method_index: number) {
+  export function reuse_method(sample_id: string, stage_name: string, method_index: number) {
     const sample = get_sample_by_id(sample_id);
     if (sample !== undefined) {
       const s: Sample = structuredClone(toRaw(sample));
@@ -336,7 +335,7 @@ export function move_method(sample_id: string, stage_name: StageName, method_ind
     }
   }
 
-export function remove_method(sample_id: string, stage_name: StageName, method_index: number) {
+export function remove_method(sample_id: string, stage_name: string, method_index: number) {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
@@ -350,7 +349,7 @@ export function remove_method(sample_id: string, stage_name: StageName, method_i
   }
 }
 
-export function set_location(method_index: number, name: WellFieldName, rack_id: string, well_number: number, sample_id: string, stage_name: StageName) {
+export function set_location(method_index: number, name: WellFieldName, rack_id: string, well_number: number, sample_id: string, stage_name: string) {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
@@ -406,7 +405,7 @@ export async function remove_well_definition(well: Well) {
   return response_body;
 }
 
-export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep', 'inject']): Promise<object> {
+export async function run_sample(sample_obj: Sample, stage: string[] = ['prep', 'inject']): Promise<object> {
   const { name, id, NICE_uuid, NICE_slotID } = sample_obj;
   const uuid = NICE_uuid ?? null;
   const slotID = NICE_slotID ?? null; // don't send undefined.
@@ -421,7 +420,7 @@ export async function run_sample(sample_obj: Sample, stage: StageName[] = ['prep
   return response_body;
 }
 
-export async function run_method(sample_id: string, stage: StageName, method_index: number ): Promise<object> {
+export async function run_method(sample_id: string, stage: string, method_index: number ): Promise<object> {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
@@ -442,7 +441,7 @@ export async function run_method(sample_id: string, stage: StageName, method_ind
   }
 }
 
-export async function resubmit_all_tasks(sample_id: string, stage: StageName, method_index: number ): Promise<object> {
+export async function resubmit_all_tasks(sample_id: string, stage: string, method_index: number ): Promise<object> {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
@@ -473,7 +472,7 @@ export async function resubmit_task(task: TaskType): Promise<object> {
   return response_body;
 }
 
-export async function explode_stage(sample_obj: Sample, stage: StageName): Promise<object> {
+export async function explode_stage(sample_obj: Sample, stage: string): Promise<object> {
   const { id } = sample_obj;
   const data = { id, stage };
   const update_result = await fetch("/GUI/ExplodeSample/", {
@@ -606,6 +605,6 @@ export const target_well = ref<WellLocation | null>(null);
 
 export const active_sample_index = ref<number | null>(null);
 export const active_method_index = ref<number | null>(null);
-export const active_stage = ref<StageName | null>(null);
+export const active_stage = ref<string | null>(null);
 export const active_stage_label = ref<string | null>(null);
 export const active_well_field = ref<WellFieldName | null>(null);

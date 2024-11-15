@@ -6,7 +6,7 @@ import MethodList from './MethodList.vue';
 import TaskEditor from './TaskEditor.vue';
 // import { socket_emit } from '../store.ts';
 import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample, remove_sample, duplicate_sample, explode_stage } from '../store';
-import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
+import type { StatusType, Sample } from '../store';
 
 const props = defineProps<{
   channel: number,
@@ -56,7 +56,7 @@ function update_sample_name() {
   close_modal();
 }
 
-async function run_stage(sample: Sample, stage: StageName[]) {
+async function run_stage(sample: Sample, stage: string[]) {
   const result = await run_sample(sample, stage);
   console.log("result of run_stage: ", result);
 }

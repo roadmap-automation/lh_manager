@@ -5,6 +5,7 @@ from .sio import socketio
 from .material_db import blueprint as material_db_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
+import liquid_handler_api.app_config as app_config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -37,6 +38,10 @@ def test_emit():
     return render_template('test_emit.html')
 
 if __name__ == '__main__':
+
+    config = app_config.config
+    config.stage_names = ['methods']
+
     launch_autocontrol_interface(poll_delay=5)
     socketio.run(app, host='localhost', port=5001, debug=False)
 

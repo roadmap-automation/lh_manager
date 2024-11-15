@@ -3,10 +3,10 @@ from enum import Enum
 from uuid import uuid4
 from typing import Dict, List, Union, Any
 
+from ..app_config import config
 from .lhmethods import Sleep
 from .bedlayout import LHBedLayout
 from .lhinterface import DATE_FORMAT
-from .items import StageName
 from .status import MethodError, SampleStatus
 from .methods import MethodsType, BaseMethod, method_manager
 from datetime import datetime
@@ -109,15 +109,20 @@ class Sample(BaseModel):
     description: str
     id: str | None = None
     channel: int = 0
-    stages: Dict[StageName, MethodList] = Field(default_factory=lambda: {StageName.PREP: MethodList(), StageName.INJECT: MethodList()})
+    stages: Dict[str, MethodList] = Field(default_factory=dict)
     NICE_uuid: str | None = None
     NICE_slotID: int | None = None
     current_contents: str = ''
 
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context) -> None:
 
         if self.id is None:
             self.generate_new_id()
+
+        # if empty, create new based on the config file
+        if not len(self.stages):
+            for stage_name in config.stage_names:
+                self.stages.update({stage_name: MethodList()})
 
         # back compatibility
         if not hasattr(self, 'channel'):

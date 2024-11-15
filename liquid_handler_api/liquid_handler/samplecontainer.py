@@ -2,7 +2,7 @@ from typing import List, Tuple, Dict
 from dataclasses import field
 from pydantic import BaseModel
 from .history import History
-from .samplelist import Sample, StageName, SampleStatus
+from .samplelist import Sample, SampleStatus
 from .bedlayout import LHBedLayout
 from .dryrun import DryRunQueue
 from .items import Item

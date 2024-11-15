@@ -3,16 +3,14 @@ import json
 import os
 from pathlib import Path
 from .samplecontainer import SampleContainer
-from .samplelist import example_sample_list, StageName
+from .samplelist import example_sample_list
 from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmethods, roadmapmethods
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item
-from ..app_config import parser
+from ..app_config import parser, config
 
-LOG_PATH = Path(__file__).parent.parent.parent / 'persistent_state'
-LAYOUT_LOG = LOG_PATH / 'layout.json'
-SAMPLES_LOG = LOG_PATH / 'samples.json'
+LOG_PATH, LAYOUT_LOG, SAMPLES_LOG = config.log_path, config.layout_path, config.samples_path
 
 def load_state():
 

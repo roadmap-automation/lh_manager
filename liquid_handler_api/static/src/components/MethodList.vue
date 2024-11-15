@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
 import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label } from '../store';
-import type { MethodType, StageName } from '../store';
+import type { MethodType } from '../store';
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
 
 const props = defineProps<{
   sample_id: string,
-  stage_name: StageName,
+  stage_name: string,
   methods: MethodType[],
   editable: boolean,
   stage_label: string

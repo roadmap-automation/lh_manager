@@ -5,7 +5,7 @@ from flask import make_response, request, Response
 from typing import List, Tuple, Optional
 
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.samplelist import Sample, StageName, SampleStatus, MethodList
+from ..liquid_handler.samplelist import Sample, SampleStatus, MethodList
 from ..liquid_handler.methods import method_manager
 from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
@@ -26,10 +26,10 @@ def AddSample() -> Response:
 
     # dry run (testing only)
     test_layout = deepcopy(layout)
-    for method in new_sample.stages[StageName.PREP].methods:
+    for method in new_sample.stages['prep'].methods:
         method.execute(test_layout)
 
-    return make_response({'new sample': new_sample.toSampleList(StageName.PREP, test_layout), 'layout': test_layout.model_dump()}, 200)
+    return make_response({'new sample': new_sample.toSampleList('prep', test_layout), 'layout': test_layout.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/UpdateSample/', methods=['POST'])
 @trigger_samples_update

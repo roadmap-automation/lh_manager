@@ -8,7 +8,7 @@ from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRins
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation, empty
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import example_sample_list, StageName
+from .samplelist import example_sample_list
 from .methods import MethodContainer, MethodsType, register, method_manager
 
 ZERO_VOLUME_TOLERANCE = 1e-8

@@ -39,7 +39,7 @@ class DryRunQueue(BaseModel):
         """Moves a stage item up (lower index) in the queue. Error if item not present
 
         Args:
-            item (DryRunItem): (id, stage_name) to move up
+            item (DryRunItem): item to move up
         """
 
         idx = self.stages.index(item)
@@ -49,7 +49,7 @@ class DryRunQueue(BaseModel):
         """Moves a stage item down (higher index) in the queue. Error if item not present
 
         Args:
-            item (Tuple[str, StageName]): (id, stage_name) to move down
+            item (Item): item to move down
         """
 
         idx = self.stages.index(item)
