@@ -27,6 +27,8 @@ class LHDevice(DeviceBase):
 
 device_manager.register(LHDevice())
 
+EXCLUDE_FIELDS = ['status', 'tasks']
+
 class BaseLHMethod(BaseMethod):
     """Base class for LH methods"""
 
@@ -79,7 +81,8 @@ class BaseLHMethod(BaseMethod):
         
         return [{LHDevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
-                                             method=self.model_dump())]}]
+                                             method_name=self.method_name,
+                                             method_data=self.model_dump(exclude=EXCLUDE_FIELDS))]}]
     
     def render_lh_method(self,
                          sample_name: str,
