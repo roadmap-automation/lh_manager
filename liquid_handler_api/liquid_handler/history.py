@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import List
 
 from .samplelist import Sample
+from ..app_config import config
 
-SAMPLE_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'completed_samples.sqlite'
+#SAMPLE_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'completed_samples.sqlite'
+SAMPLE_HISTORY = config.history_path
 
 class History:
     table_name = 'completed_samples'
