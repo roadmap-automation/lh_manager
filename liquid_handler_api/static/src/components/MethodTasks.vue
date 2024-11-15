@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { update_at_pointer, resubmit_task } from '../store';
-import json_pointer from 'json-pointer';
+import { ref, computed, watch, defineProps, defineEmits, onMounted } from 'vue';
+import { update_at_pointer, resubmit_task, edit_task, task_modal_data } from '../store';
+import Modal from 'bootstrap/js/src/modal';
 import type { MethodType } from '../store';
 
 const props = defineProps<{
@@ -23,9 +23,9 @@ function parse_tasks(method: MethodType) {
     const { task, status } = taskcontainer
     const subtasks = task.tasks.map((subtask) => {
       const methods = subtask.method_data?.method_list.map((method) => {
-        return {value: JSON.stringify(method, null, 2)}
+        return {name: method.method_name, method_data: method.method_data, value: JSON.stringify(method, null, 2)}
       })
-      return {id: subtask.id, device: subtask.device, methods: methods}
+      return {id: subtask.id, device: subtask.device, methods: methods, value: subtask.method_data?.method_list}
     })
     return {id: task.id, status: status, methods: subtasks, task: task};
   });
@@ -43,7 +43,7 @@ function clone(obj) {
 </script>
 
 <template>
-  <fieldset>
+  <table>
     <tr class="mx-0 py-0">
       <td class="mx-0 py-0">
         <div class="stage-label mx-0 py-0 row">
@@ -73,26 +73,25 @@ function clone(obj) {
                   class="btn-close btn-sm align-middle gear"
                   aria-label="View/edit task data"
                   title="View/edit task data"
-                  @click.stop="null">
+                  @click.stop="edit_task({'sample_id': props.sample_id, 'title': (!(task.status === 'completed') ? 'Edit' : 'View') + ' task data', 'device': imethod.device, 'editable': !(task.status === 'completed'), 'pointer': `${props.pointer}/tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list`, 'task_id': task.id, 'task': imethod.value ?? null})">
               </button>                
             </div>
             <div class="col">
-              <div class="row">{{ imethod.device }}</div>
+              <div class="row">{{ imethod.device }} </div>
               <div class="row uuid">{{ imethod.id }}</div>
               <div class="row method-data" v-for="(iimethod, iimethod_index) of imethod.methods">
-                {{ iimethod.value }}
-                <!-- <textarea :disabled="task.status === 'completed'" class="string" v-model="iimethod.value"
-                  @keydown.enter="send_changes(JSON.parse(iimethod.value), `tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list/${iimethod_index}`)"
-                  @blur="send_changes(JSON.parse(iimethod.value), `tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list/${iimethod_index}`)">
-                </textarea> -->
+                {{ iimethod.name }} : {{ iimethod.method_data }}
+                <!-- <textarea ref="task_input" :disabled="!modal_data.editable" class="string" v-model="task_to_edit"
+                @blur="validate_modal"></textarea>
+                <div v-if="modal_error" class="text-danger error-text"> {{ modal_error }}</div> -->
               </div>
             </div>
           </div>
         </div>
       </td>
     </tr>
-  </fieldset>
-</template>
+  </table>
+  </template>
 
 <style scoped>
 .btn-close.edit {
@@ -108,6 +107,10 @@ input.number {
 }
 
 .method-data {
+  font-size: 0.8rem;
+}
+
+.error-text {
   font-size: 0.8rem;
 }
 

@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue';
 import Modal from 'bootstrap/js/src/modal';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
+import TaskEditor from './TaskEditor.vue';
 // import { socket_emit } from '../store.ts';
 import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample, remove_sample, duplicate_sample, explode_stage } from '../store';
 import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
@@ -80,9 +81,9 @@ function update_method(sample, stage_name, index, field_name, field_value) {
 
 onMounted(() => {
   modal.value = new Modal(modal_node.value);
-  modal_node.value?.addEventListener('shown.bs.modal', function () {
-    name_input.value?.focus();
-  })
+  //modal_node.value?.addEventListener('shown.bs.modal', function () {
+  //  name_input.value?.focus();
+  //})
 });
 
 const status_class_map: {[status in StatusType]: string} = {
@@ -214,6 +215,7 @@ const status_class_map: {[status in StatusType]: string} = {
       </div>
     </div>
   </div>
+  <TaskEditor></TaskEditor>
 </template>
 
 <style>

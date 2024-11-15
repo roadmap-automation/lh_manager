@@ -145,15 +145,15 @@ const status = computed(() => {
               :method="method"
               :hide_fields="[]"
             />
-            <MethodTasks
-              v-if="stage_name === active_stage && index === active_method_index && method.tasks.length"
-              :sample_id="sample_id"
-              :pointer="`/stages/${stage_name}/${props.stage_label}/${index}`"
-              :editable="props.editable"
-              :method="method"
-              :hide_fields="[]"
-            />
           </table>
+          <MethodTasks
+            v-if="stage_name === active_stage && index === active_method_index && method.tasks.length"
+            :sample_id="sample_id"
+            :pointer="`/stages/${stage_name}/${props.stage_label}/${index}`"
+            :editable="props.editable"
+            :method="method"
+            :hide_fields="[]"
+          />
           <div v-if="props.editable" class="d-flex justify-content-end">
             <button class="btn-close btn-sm btn-secondary arrow-up-square" :class=" { disabled: index < 1} " aria-label="Move up" title="Move up" @click="move_method(sample_id, stage_name, index, index - 1)"></button>
             <button class="btn-close btn-sm btn-secondary arrow-down-square" :class=" { disabled: index == get_number_of_methods(sample_id, stage_name) - 1} " aria-label="Move down" title="Move down" @click="move_method(sample_id, stage_name, index, index + 1)"></button>

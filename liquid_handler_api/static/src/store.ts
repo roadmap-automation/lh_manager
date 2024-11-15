@@ -1,5 +1,6 @@
 import { computed, ref, shallowRef, toRaw } from 'vue';
 import json_pointer from 'json-pointer';
+import Modal from 'bootstrap/js/src/modal';
 import mitt from 'mitt';
 
 export interface MethodDef {
@@ -17,11 +18,16 @@ export interface WellLocation {
   id: string | null,
 }
 
+export type DeviceMethodType = {
+  method_name: string,
+  method_data: object
+}
+
 export type TaskDataType = {
   id: string,
   device: string,
   channel?: number,
-  method_data?: {'method_list': object[]},
+  method_data?: {'method_list': DeviceMethodType[]},
   md: object,
 
   device_type?: string,
@@ -167,6 +173,28 @@ export const well_editor_active = ref(false);
 export const well_to_edit = ref<WellLocation>();
 export const num_channels = ref<number>(1);
 export const materials = ref<Material[]>([]);
+
+export type ModalData = {
+  title: string,
+  sample_id: string,
+  task_id: string,
+  device: string,
+  pointer: string,
+  editable: boolean,
+  task: object | null
+}
+
+export const task_modal = ref<Modal>();
+export const show_task_modal = ref<boolean>(false)
+export const task_modal_data = ref<ModalData>({sample_id: '', title: '', task_id: '', device: '', pointer: '', editable: false, task: {}});
+export const task_to_edit = ref<string>("")
+
+export async function edit_task(data: ModalData) {
+  task_modal_data.value = data;
+  task_to_edit.value = JSON.stringify(task_modal_data.value.task, null, 2);
+  task_modal.value.show();
+}
+
 
 // export const layout_with_contents = computed(() => {
 //   const layout_copy = structuredClone(toRaw(layout.value));
