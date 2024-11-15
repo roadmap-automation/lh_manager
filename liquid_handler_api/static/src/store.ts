@@ -579,4 +579,5 @@ export const target_well = ref<WellLocation | null>(null);
 export const active_sample_index = ref<number | null>(null);
 export const active_method_index = ref<number | null>(null);
 export const active_stage = ref<StageName | null>(null);
+export const active_stage_label = ref<string | null>(null);
 export const active_well_field = ref<WellFieldName | null>(null);

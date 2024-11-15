@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label } from '../store';
 import type { MethodType, StageName } from '../store';
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
@@ -9,22 +9,25 @@ const props = defineProps<{
   sample_id: string,
   stage_name: StageName,
   methods: MethodType[],
-  editable: boolean
+  editable: boolean,
+  stage_label: string
 }>();
 
 // const active_well_field = ref<string | null>(null);
-const pointer_base = `/${props.stage_name}/methods`;
+const pointer_base = `/${props.stage_name}/${props.stage_label}`;
 
 function toggleItem(method_index) {
   const pointer = `${pointer_base}/${method_index}`;
-  if (active_stage.value === props.stage_name && active_method_index.value === method_index) {
+  if (active_stage.value === props.stage_name && active_stage_label.value === props.stage_label && active_method_index.value === method_index) {
     active_method_index.value = null;
     active_stage.value = null;
+    active_stage_label.value = null;
     source_well.value = null; // can be undefined
     target_well.value = null; // can be undefined
   }
   else {
     active_stage.value = props.stage_name;
+    active_stage_label.value = props.stage_label;
     active_method_index.value = method_index;
     const method = props.methods[method_index];
     source_well.value = method['Source'] ?? null; // can be undefined
@@ -86,14 +89,14 @@ const status = computed(() => {
   <div class="accordion accordion-flush">
     <div class="accordion-item" v-for="(method, index) of methods" :key="index">
       <h2 class="accordion-header">
-        <button class="accordion-button p-1" :class="{ collapsed: stage_name === active_stage || index !== active_method_index }" type="button"
+        <button class="accordion-button p-1" :class="{ collapsed: stage_name !== active_stage || index !== active_method_index || props.stage_label !== active_stage_label}" type="button"
           @click="toggleItem(index)" :aria-expanded="index === active_method_index">
           <span class="d-inline align-middle text-light bg-dark" > {{ method.display_name }}:</span>
           <span class="d-inline align-middle px-2 method-string" :class="{ 'text-danger': method.status === 'completed' }">
             {{ method_string(method) }}
           </span>
           <button
-            v-if="props.editable"
+            v-if="props.stage_label === 'methods'"
             type="button"
             class="btn-close btn-sm align-middle start"
             aria-label="Run method"
@@ -101,7 +104,7 @@ const status = computed(() => {
             @click.stop="run_method(sample_id, stage_name, index)">
           </button>
           <button
-            v-if="props.editable"
+            v-if="props.stage_label === 'methods'"
             type="button"
             class="btn-close btn-sm align-middle copy"
             aria-label="Duplicate method"
@@ -109,7 +112,7 @@ const status = computed(() => {
             @click.stop="copy_method(sample_id, stage_name, index)">
           </button>
           <button
-            v-if="!props.editable"
+            v-if="props.stage_label === 'active'"
             type="button"
             class="btn-close btn-sm align-middle arrow-90deg-up"
             aria-label="Reuse method"
@@ -117,7 +120,7 @@ const status = computed(() => {
             @click.stop="reuse_method(sample_id, stage_name, index)">
           </button>      
           <button
-            v-if="!props.editable && !(method.status === 'completed')"
+            v-if="(props.stage_label === 'active') && !(method.status === 'completed')"
             type="button"
             class="btn-close btn-sm align-middle arrow-repeat"
             aria-label="Resubmit all tasks"
@@ -132,21 +135,20 @@ const status = computed(() => {
             @click="remove_method(sample_id, stage_name, index)"></button>
           </button>
         </h2>
-      <div class="accordion-collapse collapse" :class="{ show: stage_name === active_stage && index === active_method_index }">
+      <div class="accordion-collapse collapse" :class="{ show: stage_name === active_stage && props.stage_label === active_stage_label && index === active_method_index }">
         <div class="accordion-body p-2 border bg-light">
           <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
             <MethodFields
               :sample_id="sample_id"
-              :pointer="`/stages/${stage_name}/${props.editable ? 'methods' : 'active'}/${index}`"
+              :pointer="`/stages/${stage_name}/${props.stage_label}/${index}`"
               :editable="props.editable"
               :method="method"
               :hide_fields="[]"
             />
-          </table>            
-          <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index && method.tasks.length">
             <MethodTasks
+              v-if="stage_name === active_stage && index === active_method_index && method.tasks.length"
               :sample_id="sample_id"
-              :pointer="`/stages/${stage_name}/${props.editable ? 'methods' : 'active'}/${index}`"
+              :pointer="`/stages/${stage_name}/${props.stage_label}/${index}`"
               :editable="props.editable"
               :method="method"
               :hide_fields="[]"
