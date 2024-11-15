@@ -414,6 +414,37 @@ export async function run_method(sample_id: string, stage: StageName, method_ind
   }
 }
 
+export async function resubmit_all_tasks(sample_id: string, stage: StageName, method_index: number ): Promise<object> {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+    const s: Sample = structuredClone(toRaw(sample));
+    const method = s.stages[stage].active[method_index];
+    const incomplete_tasks = method.tasks.filter((task) => task.status !== 'completed');
+    const tasklist = incomplete_tasks.map((task) => {
+      return task.task;
+    });
+    if (tasklist.length) {
+      const update_result = await fetch("/GUI/ResubmitTasks/", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({tasks: tasklist})
+      });
+      const response_body = await update_result.json();
+      return response_body;
+    }
+  }
+}
+
+export async function resubmit_task(task: TaskType): Promise<object> {
+  const update_result = await fetch("/GUI/ResubmitTasks/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({tasks: [task]})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
 export async function explode_stage(sample_obj: Sample, stage: StageName): Promise<object> {
   const { id } = sample_obj;
   const data = { id, stage };

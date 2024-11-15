@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, source_components, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, layout, update_at_pointer } from '../store';
+import { update_at_pointer, resubmit_task } from '../store';
 import json_pointer from 'json-pointer';
 import type { MethodType } from '../store';
 
@@ -27,7 +27,7 @@ function parse_tasks(method: MethodType) {
       })
       return {id: subtask.id, device: subtask.device, methods: methods}
     })
-    return {id: task.id, status: status, methods: subtasks};
+    return {id: task.id, status: status, methods: subtasks, task: task};
   });
   return tasks
 }
@@ -47,6 +47,14 @@ function clone(obj) {
     <td>
       <div>
         {{ task.id }}
+        <button
+                v-if="!(task.status === 'completed')"
+                type="button"
+                class="btn-close btn-sm arrow-repeat"
+                aria-label="Resubmit task"
+                title="Resubmit task"
+                @click.stop="resubmit_task(task.task)">
+        </button>     
       </div>
       <div v-for="(imethod, imethod_index) of task.methods">
         <div>{{ imethod.device }} : {{ imethod.id }}</div>

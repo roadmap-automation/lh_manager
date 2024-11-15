@@ -5,6 +5,7 @@ import requests
 import threading
 import time
 import copy
+import json
 from uuid import uuid4
 
 from autocontrol.task_struct import Task, TaskData, TaskType
@@ -69,27 +70,33 @@ def submission_callback(data: dict):
         data (dict): dictionary of submission data
     """
 
-    if 'id' in data:
-        _, sample = samples.getSampleById(data['id'])
+    if 'tasks' in data:
+
+        submit_tasks(tasks=[Task(**d) for d in data['tasks']], resubmit=True)
+
     else:
-        sample = samples.getSamplebyName(data['name'])
 
-    # check that sample name exists
-    if sample is not None:
-        # check if running a single method or an entire stage
-        if 'method_id' in data.keys():
-            prepare_and_submit_method(sample=sample,
-                                      stage=data['stage'],
-                                      method_index=[m.id for m in sample.stages[data['stage']].methods].index(data['method_id']),
-                                      layout=layout)
-
+        if 'id' in data:
+            _, sample = samples.getSampleById(data['id'])
         else:
-            for stage in data['stage']:
-                prepare_and_submit_stage(sample, stage, layout)
+            sample = samples.getSamplebyName(data['name'])
 
-        return
+        # check that sample name exists
+        if sample is not None:
+            # check if running a single method or an entire stage
+            if 'method_id' in data.keys():
+                prepare_and_submit_method(sample=sample,
+                                        stage=data['stage'],
+                                        method_index=[m.id for m in sample.stages[data['stage']].methods].index(data['method_id']),
+                                        layout=layout)
 
-    return 'sample not found'
+            else:
+                for stage in data['stage']:
+                    prepare_and_submit_stage(sample, stage, layout)
+
+            return
+
+        return 'sample not found'
 
 class AutocontrolTaskContainer(TaskContainer):
     id: str | None = None
@@ -183,18 +190,22 @@ def to_thread(**thread_kwargs):
     return decorator_to_thread
 
 @to_thread()
-def submit_tasks(tasks: List[Task]):
+def submit_tasks(tasks: List[Task], resubmit=False):
     for task in tasks:
         print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
-        data = task.model_dump_json()
-        response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=data)
-        print('Autocontrol response: ', response.status_code)
+        if resubmit:
+            response = requests.post(AUTOCONTROL_URL + '/resubmit', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'task': task.model_dump(mode='json')}))
+        else:
+            response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=task.model_dump_json())
+        print('Autocontrol response: ', response.status_code, response.text)
         if task.task_type != TaskType.INIT:
             with active_tasks.lock:
                 if response.ok:
-                    active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
+                    if str(task.id) in active_tasks.pending:
+                        active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
                 else:
-                    active_tasks.rejected.update({str(task.id): active_tasks.pending.pop(str(task.id))})
+                    if str(task.id) in active_tasks.pending:
+                        active_tasks.rejected.update({str(task.id): active_tasks.pending.pop(str(task.id))})
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,

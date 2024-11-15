@@ -205,6 +205,25 @@ def RunMethod() -> Response:
 
     return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
 
+@gui_blueprint.route('/GUI/ResubmitTasks/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def ResubmitTask() -> Response:
+    """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['tasks']):
+
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'task_id': <uuid>; 'task': Task"}, 400)
 
 @gui_blueprint.route('/GUI/UpdateDryRunQueue/', methods=['POST'])
 @trigger_samples_update
