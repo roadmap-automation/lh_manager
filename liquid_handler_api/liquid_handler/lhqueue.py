@@ -23,8 +23,11 @@ class JobRunner:
         Callbacks should accept data of the validate_format variety and be non-blocking.
     """
 
-    def __init__(self, submit_callbacks: List[Callable] = []) -> None:
+    def __init__(self,
+                 submit_callbacks: List[Callable] = [],
+                 cancel_callbacks: List[Callable] = []) -> None:
         self.submit_callbacks = submit_callbacks
+        self.cancel_callbacks = cancel_callbacks
 
     def submit(self, data: dict, *args, **kwargs) -> Response:
         """Runs submission callbacks and returns any errors
@@ -32,6 +35,16 @@ class JobRunner:
 
         results = []
         for callback in self.submit_callbacks:
+            results.append(callback(data, *args, **kwargs))
+        
+        return results
+
+    def cancel(self, data: dict, *args, **kwargs) -> Response:
+        """Runs cancellation callbacks and returns any errors
+        """
+
+        results = []
+        for callback in self.cancel_callbacks:
             results.append(callback(data, *args, **kwargs))
         
         return results

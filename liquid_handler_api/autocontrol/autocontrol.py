@@ -56,6 +56,7 @@ def launch_autocontrol_interface(poll_delay: int = 5):
 
         # register callback
         submit_handler.submit_callbacks.append(submission_callback)
+        submit_handler.cancel_callbacks.append(cancel_callback)
 
         # initialize devices
         init_devices()
@@ -97,6 +98,17 @@ def submission_callback(data: dict):
             return
 
         return 'sample not found'
+
+def cancel_callback(data: dict):
+    """Submission handler callback
+
+    Args:
+        data (dict): dictionary of cancellation data
+    """
+
+    return cancel_tasks(tasks=[Task(**d) for d in data['tasks']],
+                        include_active_queue=data.get('include_active_queue', False),
+                        drop_material=data.get('drop_material', False))
 
 class AutocontrolTaskContainer(TaskContainer):
     id: str | None = None
@@ -206,6 +218,33 @@ def submit_tasks(tasks: List[Task], resubmit=False):
                 else:
                     if str(task.id) in active_tasks.pending:
                         active_tasks.rejected.update({str(task.id): active_tasks.pending.pop(str(task.id))})
+
+@to_thread()
+def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_material: bool = True):
+
+    @trigger_samples_update
+    def mark_cancelled(id: str) -> None:
+        parent_item = active_tasks.active.pop(id)
+        _, sample = samples.getSampleById(parent_item.id)
+        stage = sample.stages[parent_item.stage]
+        for m in stage.active:
+            if m.status != SampleStatus.COMPLETED:
+                for t in copy.deepcopy(m.tasks):
+                    # coerce to str because t.id can be UUID
+                    if str(t.id) == id:
+                        m.tasks.pop(m.tasks.index(t))
+            
+                if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
+                    m.status = SampleStatus.COMPLETED
+
+    for task in tasks:
+        print('Cancelling task: ' + str(task.id))
+        response = requests.post(AUTOCONTROL_URL + '/cancel', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'include_active_queue': include_active_queue, 'drop_material': drop_material}))
+        print('Autocontrol response: ', response.status_code, response.text)
+        with active_tasks.lock:
+            if response.ok:
+                if str(task.id) in active_tasks.active:
+                    mark_cancelled(str(task.id))
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,

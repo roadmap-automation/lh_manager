@@ -209,13 +209,33 @@ def RunMethod() -> Response:
 @trigger_run_queue_update
 @trigger_samples_update
 def ResubmitTask() -> Response:
-    """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
+    """Resubmits a group of tasks. Returns errors if sample not found or sample is already active or completed."""
     data: dict = request.get_json(force=True)
     #print(data)
     # check for proper format
     if validate_format(data, ['tasks']):
 
         results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'task_id': <uuid>; 'task': Task"}, 400)
+
+@gui_blueprint.route('/GUI/CancelTasks/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def CancelTasks() -> Response:
+    """Cancels tasks by ID. Returns error if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['tasks']):
+
+        results = submit_handler.cancel(data)
 
         for result in results:
             if result is not None:

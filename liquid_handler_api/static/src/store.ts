@@ -454,7 +454,7 @@ export async function resubmit_all_tasks(sample_id: string, stage: string, metho
       const update_result = await fetch("/GUI/ResubmitTasks/", {
         method: "POST",
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({tasks: tasklist})
+        body: JSON.stringify({ tasks: tasklist })
       });
       const response_body = await update_result.json();
       return response_body;
@@ -467,6 +467,17 @@ export async function resubmit_task(task: TaskType): Promise<object> {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({tasks: [task]})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function cancel_task(task: TaskType, include_active_queue: boolean = false, drop_material: boolean = false): Promise<object> {
+  const data = { tasks: [task], include_active_queue, drop_material }
+  const update_result = await fetch("/GUI/CancelTasks/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
   });
   const response_body = await update_result.json();
   return response_body;
