@@ -15,16 +15,18 @@ from ..gui_api.events import trigger_samples_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
-from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer
+from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer, BaseMethod
 from ..liquid_handler.bedlayout import LHBedLayout
 from ..liquid_handler.samplelist import Sample
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
-from ..liquid_handler.samplecontainer import SampleStatus
+from ..liquid_handler.samplecontainer import SampleStatus, SampleContainer
 
 AUTOCONTROL_PORT = 5004
 AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
 DEFAULT_HEADERS = {'Content-Type': 'application/json'}
+
+COMPLETED_STATUS = [SampleStatus.COMPLETED, SampleStatus.FAILED, SampleStatus.CANCELLED, SampleStatus.UNKNOWN]
 
 active_tasks = ActiveTasks()
 
@@ -73,7 +75,7 @@ def submission_callback(data: dict):
 
     if 'tasks' in data:
 
-        submit_tasks(tasks=[Task(**d) for d in data['tasks']], resubmit=True)
+        submit_tasks(tasks=[AutocontrolTaskContainer(task=Task(**d), status=SampleStatus.PENDING) for d in data['tasks']], resubmit=True)
 
     else:
 
@@ -149,7 +151,7 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
                                     for m in all_methods]
 
     # create tasks, one per method
-    tasks: List[Task] = []
+    tasks: List[AutocontrolTaskContainer] = []
     for method_type, method_list in zip(method_types, rendered_methods):
         
         # should typically only ever be one method in method_list
@@ -177,15 +179,15 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
             else:
                 tasktype = TaskType.NOCHANNEL
                 
-            new_task = Task(sample_id=sample.id,
-                            task_type=tasktype,
-                            tasks=taskdata)
+            new_task = AutocontrolTaskContainer(task=Task(sample_id=sample.id,
+                                                          task_type=tasktype,
+                                                          tasks=taskdata),
+                                                status=SampleStatus.INACTIVE)
 
             # reserve active_tasks (and sample.stages[stage])
             with active_tasks.lock:
-                m.tasks.append(AutocontrolTaskContainer(task=new_task,
-                                                        status=SampleStatus.PENDING))
-                active_tasks.pending.update({str(new_task.id): AutocontrolItem(id=sample.id, stage=stage, method_id=m.id)})
+                m.tasks.append(new_task)
+                active_tasks.pending.update({str(new_task.task.id): AutocontrolItem(id=sample.id, stage=stage, method_id=m.id)})
 
             tasks.append(new_task)
 
@@ -202,8 +204,9 @@ def to_thread(**thread_kwargs):
     return decorator_to_thread
 
 @to_thread()
-def submit_tasks(tasks: List[Task], resubmit=False):
-    for task in tasks:
+def submit_tasks(tasks: List[AutocontrolTaskContainer], resubmit=False):
+    for taskcontainer in tasks:
+        task = taskcontainer.task
         print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
         if resubmit:
             response = requests.post(AUTOCONTROL_URL + '/resubmit', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'task': task.model_dump(mode='json')}))
@@ -214,10 +217,10 @@ def submit_tasks(tasks: List[Task], resubmit=False):
             with active_tasks.lock:
                 if response.ok:
                     if str(task.id) in active_tasks.pending:
+                        taskcontainer.status = SampleStatus.PENDING
                         active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
                 else:
-                    if str(task.id) in active_tasks.pending:
-                        active_tasks.rejected.update({str(task.id): active_tasks.pending.pop(str(task.id))})
+                    taskcontainer.status = SampleStatus.FAILED
 
 @to_thread()
 def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_material: bool = True):
@@ -226,16 +229,23 @@ def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_mat
     def mark_cancelled(id: str) -> None:
         parent_item = active_tasks.active.pop(id)
         _, sample = samples.getSampleById(parent_item.id)
-        stage = sample.stages[parent_item.stage]
-        for m in stage.active:
+        active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
+        for m in active_methods:
             if m.status != SampleStatus.COMPLETED:
-                for t in copy.deepcopy(m.tasks):
+                for t in m.tasks:
                     # coerce to str because t.id can be UUID
                     if str(t.id) == id:
-                        m.tasks.pop(m.tasks.index(t))
+                        t.status = SampleStatus.CANCELLED
+                        #m.tasks.pop(m.tasks.index(t))
             
                 if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
                     m.status = SampleStatus.COMPLETED
+                elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
+                    m.status = SampleStatus.ACTIVE
+                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                    m.status = SampleStatus.ERROR
+                else:
+                    m.status = SampleStatus.PENDING
 
     for task in tasks:
         print('Cancelling task: ' + str(task.id))
@@ -255,7 +265,7 @@ def init_devices():
                                        sample_mixing=device.allow_sample_mixing)])
                   for device in device_manager.device_list]
 
-    submit_tasks(init_tasks)
+    submit_tasks([AutocontrolTaskContainer(task=t) for t in init_tasks])
 
 @to_thread(daemon=True)
 def synchronize_status(poll_delay: int = 5):
@@ -276,6 +286,10 @@ def synchronize_status(poll_delay: int = 5):
         if response.ok:
             if response.json()['queue'] == 'history':
                 return 'complete'
+            elif response.json()['queue'] == 'active':
+                return 'active'
+            elif response.json()['queue'] == 'scheduled':
+                return 'pending'
         else:
             if 'No task found' in response.text:
                 return 'task not found'
@@ -283,21 +297,30 @@ def synchronize_status(poll_delay: int = 5):
         
         return 'uncaught error'
 
-    @trigger_layout_update
     @trigger_samples_update
-    def mark_complete(id: str) -> None:
+    def mark_status(id: str, status: SampleStatus) -> None:
         parent_item = active_tasks.active.pop(id)
         _, sample = samples.getSampleById(parent_item.id)
-        stage = sample.stages[parent_item.stage]
-        for m in stage.active:
+        active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
+        for m in active_methods:
             if m.status != SampleStatus.COMPLETED:
                 for t in m.tasks:
                     # coerce to str because t.id can be UUID
                     if str(t.id) == id:
-                        t.status = SampleStatus.COMPLETED
+                        t.status = status
             
                 if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
                     m.status = SampleStatus.COMPLETED
+                elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
+                    m.status = SampleStatus.ACTIVE
+                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                    m.status = SampleStatus.ERROR
+                else:
+                    m.status = SampleStatus.PENDING
+
+        if (status not in COMPLETED_STATUS):
+            # put it back if not marking complete
+            active_tasks.active.update({id: parent_item})
 
             #sample.stages[parent_item.stage].update_status()
 
@@ -313,12 +336,15 @@ def synchronize_status(poll_delay: int = 5):
         with active_tasks.lock:
             for task_id in copy.copy(list(active_tasks.active.keys())):
                 result = check_status_completion(task_id)
+                print(task_id, result)
                 if result == 'complete':
-                    mark_complete(task_id)
+                    mark_status(task_id, SampleStatus.COMPLETED)
+                elif result == 'active':
+                    mark_status(task_id, SampleStatus.ACTIVE)
                 elif result == 'task not found':
                     # Remove item without updating parent
                     print(f'Warning: id {task_id} not found, marking complete anyway')
-                    mark_complete(task_id)
+                    mark_status(task_id, SampleStatus.UNKNOWN)
 
         time.sleep(poll_delay)
 

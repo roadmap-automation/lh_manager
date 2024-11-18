@@ -51,11 +51,13 @@ function clone(obj) {
       </td>
     </tr>
     <tr class="mx-2" v-for="(task, task_index) of tasks">
-      <td class="mx-2">
+      <td class="mx-2" :class="task.status">
         <div class="mx-2 row">
-          <h6>{{ task.id }}
-            <div v-if="!(task.status === 'completed')">
+          <h6 class="col-sm-auto">{{ task.id }}          
+          </h6>
+          <div class="col">
               <button
+                v-if="(task.status === 'pending') || (task.status === 'error')"
                 type="button"
                 class="btn-close btn-sm arrow-repeat"
                 aria-label="Resubmit task"
@@ -63,6 +65,7 @@ function clone(obj) {
                 @click.stop="resubmit_task(task.task)">
               </button>
               <button
+                v-if="task.status === 'pending'"
                 type="button"
                 class="btn-close btn-sm cancel"
                 aria-label="Cancel task"
@@ -70,14 +73,22 @@ function clone(obj) {
                 @click.stop="cancel_task(task.task, false, false)">
               </button>
               <button
+                v-if="task.status === 'active'"
                 type="button"
                 class="btn-close btn-sm cancel-fill"
-                aria-label="Super cancel task"
-                title="Super cancel task"
-                @click.stop="cancel_task(task.task, true, true)">
+                aria-label="Cancel active task"
+                title="Cancel active task"
+                @click.stop="cancel_task(task.task, true, false)">
               </button>
+              <button
+                v-if="task.status === 'active'"
+                type="button"
+                class="btn-close btn-sm dash-circle-fill"
+                aria-label="Cancel active task and drop material"
+                title="Cancel active task and drop material"
+                @click.stop="cancel_task(task.task, true, true)">
+              </button>              
             </div>
-          </h6>
         </div>
         <div class="mx-2 row" v-for="(imethod, imethod_index) of task.methods">
           <div class="mx-2 row">
@@ -87,13 +98,13 @@ function clone(obj) {
                   class="btn-close btn-sm align-middle gear"
                   aria-label="View/edit task data"
                   title="View/edit task data"
-                  @click.stop="edit_task({'sample_id': props.sample_id, 'title': (!(task.status === 'completed') ? 'Edit' : 'View') + ' task data', 'device': imethod.device, 'editable': !(task.status === 'completed'), 'pointer': `${props.pointer}/tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list`, 'task_id': task.id, 'task': imethod.value ?? null})">
+                  @click.stop="edit_task({'sample_id': props.sample_id, 'title': ((task.status === 'pending') ? 'Edit' : 'View') + ' task data', 'device': imethod.device, 'editable': (task.status === 'pending'), 'pointer': `${props.pointer}/tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list`, 'task_id': task.id, 'task': imethod.value ?? null})">
               </button>                
             </div>
             <div class="col">
               <div class="row">{{ imethod.device }} </div>
               <div class="row uuid">{{ imethod.id }}</div>
-              <div class="row method-data" v-for="(iimethod, iimethod_index) of imethod.methods">
+              <div class="row method-data" :class="task.status" v-for="(iimethod, iimethod_index) of imethod.methods">
                 {{ iimethod.name }} : {{ iimethod.method_data }}
                 <!-- <textarea ref="task_input" :disabled="!modal_data.editable" class="string" v-model="task_to_edit"
                 @blur="validate_modal"></textarea>
@@ -122,6 +133,10 @@ function clone(obj) {
 
 .btn-close.cancel-fill {
   background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-x-circle-fill' viewBox='0 0 16 16'><path d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z'/></svg>")
+}
+
+.btn-close.dash-circle-fill {
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-dash-circle-fill' viewBox='0 0 16 16'><path d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M4.5 7.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1z'/></svg>")
 }
 
 input.number {

@@ -94,7 +94,7 @@ export interface Sample {
   current_contents: string,
 }
 
-export type StatusType = 'pending' | 'active' | 'completed' | 'inactive' | 'partially complete';
+export type StatusType = 'pending' | 'active' | 'completed' | 'inactive' | 'partially complete' | 'cancelled' | 'error' | 'unknown';
 
 export interface SampleStatus {
   status?: StatusType,
@@ -446,7 +446,7 @@ export async function resubmit_all_tasks(sample_id: string, stage: string, metho
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
     const method = s.stages[stage].active[method_index];
-    const incomplete_tasks = method.tasks.filter((task) => task.status !== 'completed');
+    const incomplete_tasks = method.tasks.filter((task) => (task.status === 'pending') || (task.status === 'error'));
     const tasklist = incomplete_tasks.map((task) => {
       return task.task;
     });

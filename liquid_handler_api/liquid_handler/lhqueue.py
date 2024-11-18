@@ -62,7 +62,6 @@ class ActiveTasks:
         self.lock: Lock = Lock()
         self.pending: Dict[str, Item] = {}
         self.active: Dict[str, Item] = {}
-        self.rejected: Dict[str, Item] = {}
 
         self.populate()
 
