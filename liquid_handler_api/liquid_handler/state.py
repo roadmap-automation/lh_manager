@@ -2,18 +2,16 @@
 import json
 import os
 from pathlib import Path
-from dataclasses import asdict
 from .samplecontainer import SampleContainer
-from .samplelist import example_sample_list, StageName
-from . import formulation, qcmd
+from .samplelist import example_sample_list
+from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmethods, roadmapmethods
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item
-from ..app_config import parser
+from .devices import device_manager
+from ..app_config import parser, config
 
-LOG_PATH = Path(__file__).parent.parent.parent / 'persistent_state'
-LAYOUT_LOG = LOG_PATH / 'layout.json'
-SAMPLES_LOG = LOG_PATH / 'samples.json'
+LOG_PATH, LAYOUT_LOG, SAMPLES_LOG, DEVICES_LOG = config.log_path, config.layout_path, config.samples_path, config.devices_path
 
 def load_state():
 
@@ -25,6 +23,12 @@ def load_state():
     if os.path.exists(SAMPLES_LOG):
         samples = SampleContainer(**json.load(open(SAMPLES_LOG, 'r')))
 
+    if os.path.exists(DEVICES_LOG):
+        device_data = json.load(open(DEVICES_LOG, 'r'))
+        for device in device_manager.device_list:
+            device = device.model_copy(update=device_data[device.device_name])
+            device_manager.register(device)
+
     return layout, samples
 
 def make_persistent_dir():
@@ -33,11 +37,18 @@ def make_persistent_dir():
     
 def save_layout():
     make_persistent_dir()
-    json.dump(asdict(layout), open(LAYOUT_LOG, 'w'))
+    with open(LAYOUT_LOG, 'w') as f:
+        f.write(layout.model_dump_json(indent=2))
 
 def save_samples():
     make_persistent_dir()
-    json.dump(asdict(samples), open(SAMPLES_LOG, 'w'))
+    with open(SAMPLES_LOG, 'w') as f:
+        f.write(samples.model_dump_json(indent=2))
+
+def save_devices():
+    make_persistent_dir()
+    with open(DEVICES_LOG, 'w') as f:
+        f.write(json.dumps(device_manager.get_all_schema(), indent=2))
 
 if not parser.parse_args().noload:
     print('loading state!')
@@ -49,11 +60,13 @@ if samples is None:
 
     ## ======= Initialize samples =========
     # samples is sent to the GUI
-    samples = SampleContainer()
+    samples = SampleContainer(n_channels=parser.parse_args().channels)
 
     # TODO: remove for production
     for example_sample in example_sample_list:
         samples.addSample(example_sample)
+
+samples.n_channels = parser.parse_args().channels
 
     ## ======= Initialize bed layout =========
 if layout is None:
@@ -66,6 +79,6 @@ if layout is None:
     for well in example_wells:
         layout.add_well_to_rack(well.rack_id, well)
 
-samples.dryrun_queue.add_item(Item(example_sample_list[9].id, StageName.PREP))
+#samples.dryrun_queue.add_item(Item(example_sample_list[9].id, StageName.PREP))
 #example_sample_list[1].NICE_uuid = 'test_NICE_uuid'
 #samples.archiveSample(example_sample_list[1])

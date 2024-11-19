@@ -1,117 +1,195 @@
 """Internal queue for feeding LH operations one at a time"""
+from flask import make_response, Response
+from typing import Dict, Callable, List
 from threading import Lock
-from pydantic.v1.dataclasses import dataclass
+from dataclasses import field
+from pydantic import BaseModel
 from datetime import datetime
 
-from .state import samples
-from .samplelist import SampleStatus, DATE_FORMAT, StageName, example_sample_list
-from .dryrun import DryRunQueue
+from .job import ResultStatus, ValidationStatus
 from .items import Item
 
-def validate_format(data: dict) -> bool:
+from .state import samples, layout
+from .samplelist import SampleStatus
+from .lhinterface import LHJob, lh_interface
+
+def validate_format(data: dict, fields: list[str]) -> bool:
     """Checks format of data input"""
     print('data in: ', list(data.keys()))
-    return all(val in data.keys() for val in ('name', 'uuid', 'slotID', 'stage'))
+    return all(val in data.keys() for val in fields)
 
-@dataclass
-class RunQueue(DryRunQueue):
+class JobRunner:
+    """Routes jobs to submission callbacks. Serves to enable plugins for various interfaces.
+        Callbacks should accept data of the validate_format variety and be non-blocking.
+    """
 
-    running: bool = True
-    active_sample: Item | None = None
+    def __init__(self,
+                 submit_callbacks: List[Callable] = [],
+                 cancel_callbacks: List[Callable] = []) -> None:
+        self.submit_callbacks = submit_callbacks
+        self.cancel_callbacks = cancel_callbacks
+
+    def submit(self, data: dict, *args, **kwargs) -> Response:
+        """Runs submission callbacks and returns any errors
+        """
+
+        results = []
+        for callback in self.submit_callbacks:
+            results.append(callback(data, *args, **kwargs))
+        
+        return results
+
+    def cancel(self, data: dict, *args, **kwargs) -> Response:
+        """Runs cancellation callbacks and returns any errors
+        """
+
+        results = []
+        for callback in self.cancel_callbacks:
+            results.append(callback(data, *args, **kwargs))
+        
+        return results
+
+class ActiveTasks:
+    """Active tasks, used for communication with threads. Structure is
+        active_tasks: {task_data_id: Item(sample_id, stage_name)}
+        pending_tasks: <same>
+        rejected_tasks: <same>
+
+    This is essentially a lookup table to keep track of MethodList.run_jobs for completion status
+    """
+
+    def __init__(self) -> None:
+        self.lock: Lock = Lock()
+        self.pending: Dict[str, Item] = {}
+        self.active: Dict[str, Item] = {}
+
+        self.populate()
+
+    def populate(self) -> None:
+        """Populates list of active jobs from SampleContainer
+        """
+
+#        self.active.update({
+#            id: Item(sample.id, stagename)
+#                for sample in samples.samples
+#                for stagename, stage in sample.stages.items()
+#                for id in stage.run_jobs if stage.run_jobs is not None
+#        })
+        for sample in samples.samples:
+            for stagename, stage in sample.stages.items():
+                for m in stage.methods:
+                    for t in m.tasks:
+                        if t.status != SampleStatus.COMPLETED:
+                            self.active.update({t.id: Item(id=sample.id, stage=stagename)})
+
+
+class JobQueue(BaseModel):
+    """Hub for interfacing (upstream) samples object to (downstream) running of jobs.
+        Use submit_callbacks to link submission to downstream activities. Also provides
+        an interface for the upstream objects based on validation and run results"""
+
+    jobs: Dict[str, LHJob] = field(default_factory=dict)
+    # all jobs that have been submitted
 
     def __post_init__(self) -> None:
-
+        
         self.lock = Lock()
+        self.active_job: LHJob | None = None
+        self.submit_callbacks: List[Callable] = []
 
-    def pause(self):
-        """Pauses operations
-        """
+        # TODO: Reconstruct from history (find all pending samples??)
 
-        self.running = False
-
-    def resume(self):
-        """Resumes operations"""
-
-        self.running = True
-
-    def put_safe(self, item: Item) -> None:
-        """Safe put that ignores duplicate requests.
+    def submit(self, job: LHJob, force=False) -> None:
+        """Safe put that ignores duplicate requests unless force is False
         
             Important for handling NICE stop/pause/restart requests"""
 
         with self.lock:
-            if item not in self.stages:
-                _, sample = samples.getSampleById(item.id)
-                sample.stages[item.stage].status = SampleStatus.PENDING
-                self.stages.append(item)
+            if not (job.id in self.jobs.keys()) | force:
 
-    def put_first(self, item: Item) -> None:
-        """Safe put that ignores duplicate requests.
-        
-            Important for handling NICE stop/pause/restart requests"""
+                self.jobs[job.id] = job
 
-        with self.lock:
-            if item not in self.stages:
-                _, sample = samples.getSampleById(item.id)
-                sample.stages[item.stage].status = SampleStatus.PENDING
-                self.stages.insert(0, item)
+                # route the job appropriately, e.g. self.submit_callbacks.append(lh_interface.activate_job)
+                for callback in self.submit_callbacks:
+                    callback(job)
 
-    def stop(self) -> int:
-        """Empties queue and resets status of incomplete methods to INACTIVE"""
+    def update_job_validation(self, job: LHJob, result: ValidationStatus) -> None:
+        """Handles an update to job validation
 
-        with self.lock:
-            while len(self.stages):
-                data = self.stages.pop(0)
-                _, sample = samples.getSampleById(data.id)
-                
-                # reset status of sample stage to INACTIVE
-                sample.stages[data.stage].status = SampleStatus.INACTIVE
-
-    def run_next(self) -> None:
-        """Runs next item in queue if queue is not busy and there are items to run.
-        Otherwise, does nothing"""
-
-        if self.running:
-            with self.lock:
-                # if there is something to run and there is no active sample
-                if len(self.stages) & (self.active_sample is None):
-                    # get next item in queue
-                    item = self.stages.pop(0)
-
-                    # get sample name
-                    # NOTE: checks for inactivity, etc. are done when the sample is enqueued.
-                    # If anything has changed in the meantime, it will not be captured here
-                    _, sample = samples.getSampleById(item.id)
-
-                    # set stage status to active, set date activated, give LH_id
-                    methodlist = sample.stages[item.stage]
-                    methodlist.status = SampleStatus.ACTIVE
-                    methodlist.createdDate = datetime.now().strftime(DATE_FORMAT)
-
-                    # set ID equal to max id and increment by 1
-                    methodlist.LH_id = samples.max_LH_id + 1
-                    samples.max_LH_id += 1
-
-                    # only if an injection operation, set sample NICE_uuid and NICE_slotID
-                    if item.stage == StageName.INJECT:
-                        sample.NICE_uuid = item.data.get('uuid', None)
-                        slot_id = item.data.get('slotID', 0)
-                        sample.NICE_slotID = int(slot_id) if slot_id is not None else None
-
-                    self.active_sample = item
-
-    def clear_active_sample(self) -> None:
-        """Clears the active sample
+        Args:
+            job (LHJob): job validated
+            result (ValidationStatus): result of validation
         """
 
-        self.active_sample = None
+        with self.lock:
+            _, sample = samples.getSampleById(job.parent.id)
+            self.jobs[job.id] = job
+            sample.stages[job.parent.stage].run_jobs[job.id].job = job
+
+            if result == ValidationStatus.SUCCESS:
+                sample.stages[job.parent.stage].status = SampleStatus.ACTIVE
+                self.active_job = job
+            elif result == ValidationStatus.FAIL:
+                sample.stages[job.parent.stage].status = SampleStatus.FAILED
+                # TODO: Handle error condition
+            elif result == ValidationStatus.UNVALIDATED:
+                print('Received ValidationStatus.UNVALIDATED; this should not happen')
+            else:
+                print(f'Received ValidationStatus {result}; this should not happen')
+
+    def update_job_result(self, job: LHJob, method_number: int, method_name: str, result: ResultStatus) -> None:
+        """Update job; if it's successful, remove from active list; otherwise,
+            update sample stage status
+
+        Args:
+            job (LHJob): job to update
+        """
+        with self.lock:
+            _, sample = samples.getSampleById(job.parent.id)
+            jobcontainer = sample.stages[job.parent.stage].run_jobs[job.id]
+            method = jobcontainer.methods[method_number]
+
+            assert method_name == method.method_name, f'Wrong method name {method_name} in result, expected {method.method_name}, full output {job}'
+
+            # update local copies
+            jobcontainer.job = job
+
+            if result == ResultStatus.SUCCESS:
+                # if successful, remove from jobs and execute the method (thereby updating layout)
+                self.jobs.pop(job.id)
+                sample.stages[job.parent.stage].update_status()
+                method.execute(layout)
+                self.clear_active_job()
+                return
+            elif job.get_result_status() == ResultStatus.FAIL:
+                # if failed, remove from jobs and updated parent status
+                # TODO: Handle errors here
+                self.jobs.pop(job.id)
+                sample.stages[job.parent.stage].status = SampleStatus.FAILED
+                self.clear_active_job()
+                return
+            else:
+                self.jobs[job.id] = job
+
+    def clear_active_job(self) -> None:
+        """Clears the active job
+        """
+
+        self.active_job = None
 
     def repr_queue(self) -> str:
         """Provides a string representation of the queue"""
 
-        return '\n'.join(': '.join((str(i), repr(item))) for i, item in enumerate(self.stages))
+        return '\n'.join(': '.join((str(i), repr(item))) for i, item in enumerate(self.jobs))
 
 
 ## ========== Liquid handler queue initialization ============
 
-LHqueue = RunQueue()
+LHqueue = JobQueue()
+
+submit_handler = JobRunner()
+
+# Add appropriate functions to lh_interface callbacks
+lh_interface.results_callbacks.append(print)
+lh_interface.validation_callbacks.append(print)
+lh_interface.validation_callbacks.append(print)

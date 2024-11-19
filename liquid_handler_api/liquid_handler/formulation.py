@@ -2,42 +2,42 @@ from typing import List, Tuple, Literal
 from copy import copy, deepcopy
 import numpy as np
 from scipy.optimize import nnls
-from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import Field, validator, SerializeAsAny
 
-from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation
+from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
+
+from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation, empty
 from .layoutmap import Zone, LayoutWell2ZoneWell
-from .samplelist import example_sample_list, StageName
-from .methods import MethodContainer, MethodsType, TransferWithRinse, MixWithRinse, \
-            TransferMethod, MixMethod, register, method_manager
+from .samplelist import example_sample_list
+from .methods import MethodContainer, MethodsType, register, method_manager
 
 ZERO_VOLUME_TOLERANCE = 1e-8
 
 @register
-@dataclass
 class Formulation(MethodContainer):
 
     # Defined from BaseMethod
     # complete: bool
     method_name: Literal['Formulation'] = 'Formulation'
     display_name: Literal['Formulation'] = 'Formulation'
-    target_composition: Composition | None = None
+    target_composition: Composition = Field(default_factory=Composition)
     target_volume: float = 0.0
-    Target: WellLocation = field(default_factory=WellLocation)
-    include_zones: List[Zone] = field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
+    Target: WellLocation = Field(default_factory=WellLocation)
+    include_zones: List[Zone] = Field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
     """include_zones (List[Zone]): list of zones to include for calculating formulations. Defaults to [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]"""
     exact_match: bool = True
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition
                 is achieved. Defaults to True."""
-    transfer_template: TransferMethod = field(default_factory=TransferWithRinse)
-    mix_template: MixMethod = field(default_factory=MixWithRinse)
+    transfer_template: SerializeAsAny[TransferMethod] = Field(default_factory=TransferWithRinse)
+    mix_template: SerializeAsAny[MixMethod] = Field(default_factory=MixWithRinse)
 
-    def __post_init__(self):
-        for attr_name in ('mix_template', 'transfer_template'):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, dict):
-                setattr(self, attr_name, method_manager.get_method_by_name(attr['method_name'])(**attr))
+    @validator('mix_template', 'transfer_template', pre=True)
+    def validate_templates(cls, v):
+        if isinstance(v, dict):
+            return method_manager.get_method_by_name(v['method_name'])(**v)
+        
+        return v
 
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
@@ -103,7 +103,27 @@ class Formulation(MethodContainer):
         source_wells = [well for well, vol in zip(source_wells, sol) if vol > ZERO_VOLUME_TOLERANCE]
 
         return (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
-    
+
+    def get_expected_composition(self, layout: LHBedLayout) -> Composition:
+        """Calculates the expected composition from the formulation
+
+        Returns:
+            Composition: expected composition
+        """
+
+        volumes, wells, success = self.formulate(layout)
+
+        if success:
+            mix_well = Well('', 0, Composition(), 0)
+            for volume, well in zip(volumes, wells):
+                mix_well.mix_with(volume, well.composition)
+
+            return mix_well.composition
+
+        else:
+            return Composition()
+
+
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
         """Overwrites base class method to dynamically create list of methods
         """
@@ -113,8 +133,9 @@ class Formulation(MethodContainer):
 
         if success:
             # sort by volume (largest first)
-            sorted_volumes = sorted(volumes)[::-1]
-            sort_index = [volumes.index(sv) for sv in sorted_volumes]
+            sort_index = np.argsort(volumes)[::-1]
+            sorted_volumes = [volumes[si] for si in sort_index]
+            #sort_index = [volumes.index(sv) for sv in sorted_volumes]
             sorted_wells = [wells[si] for si in sort_index]
 
             # Add transfer methods
@@ -125,18 +146,19 @@ class Formulation(MethodContainer):
                 new_transfer.Volume = volume
                 methods.append(new_transfer)
 
-            # Add a mix method. Use 90% of total volume in well, unless mix volume is too small.
+            # Add a mix method, only if there's more than one transfer. Use 90% of total volume in well, unless mix volume is too small.
             # Assumes well contains more than min_mix_volume
-            total_volume = sum(volumes)
-            min_mix_volume = 0.1
-            mix_volume = 0.9 * total_volume
-            if mix_volume < min_mix_volume:
-                mix_volume = min_mix_volume
+            if len(volumes) > 1:
+                total_volume = sum(volumes)
+                min_mix_volume = 0.1
+                mix_volume = 0.9 * total_volume
+                if mix_volume < min_mix_volume:
+                    mix_volume = min_mix_volume
 
-            new_mix = copy(self.mix_template)
-            new_mix.Target = self.Target
-            new_mix.Volume = mix_volume
-            methods.append(new_mix)
+                new_mix = copy(self.mix_template)
+                new_mix.Target = self.Target
+                new_mix.Volume = mix_volume
+                methods.append(new_mix)
 
         return methods
     
@@ -242,17 +264,67 @@ class Formulation(MethodContainer):
                 for w in rack.wells
                 if LayoutWell2ZoneWell(w.rack_id, w.well_number)[0] in self.include_zones]
 
-target_composition = Composition([Solvent('D2O', 1.0)], [Solute('peptide', 1e-6)])
+# TODO: NEEDS TESTING
 
-transfer = TransferWithRinse(Flow_Rate=2.0)
-mix = MixWithRinse(Repeats=2)
+@register
+class SoluteFormulation(Formulation):
+    """Subclass of Formulation. In target_composition, specify only the solutes
+        of interest; any missing volume will be filled in with the diluent. Diluent
+        must already exist"""
+    
+    method_name: Literal['SoluteFormulation'] = 'SoluteFormulation'
+    display_name: Literal['SoluteFormulation'] = 'SoluteFormulation'
+    exact_match: bool = False
+    diluent: Composition | None = None
 
-example_formulation = Formulation(target_composition=target_composition,
-                target_volume=7.0,
-                Target=WellLocation('Mix', 10),
-                mix_template=mix)
+    def formulate(self,
+                layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
+        """Create a formulation from a target composition with a target volume
 
-example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
+        Args:
+            layout (LHBedLayout): _description_
+
+
+        Returns:
+            Tuple[List[float], List[Well], bool]: _description_
+        """
+
+        volumes, wells, success = super().formulate(layout)
+
+        try:
+            diluent_well = next(well
+                                for well in self.get_all_wells(layout)
+                                    if all(well.composition.has_component(cmp) == self.diluent.has_component(cmp)
+                                        for cmp in (self.diluent.get_solute_names() + self.diluent.get_solvent_names() + well.composition.get_solvent_names() + well.composition.get_solute_names())))
+        except StopIteration:
+            print(f'Diluent ({self.diluent}) not available on bed')
+            return [], [], False
+
+        
+        diluent_volume = self.target_volume - sum(volumes)
+
+        if diluent_volume < 0:
+            print(f'Diluent volume less than zero; should never happen')
+            return [], [], False
+        
+        if not np.isclose(diluent_volume, 0.0, atol=1e-9):
+            volumes += [diluent_volume]
+            wells += [diluent_well]
+
+        return volumes, wells, True
+
+
+#target_composition = Composition(solvents=[Solvent('D2O', 1.0)], solutes=[Solute('peptide', 1e-6)])
+
+#transfer = TransferWithRinse(Flow_Rate=2.0)
+#mix = MixWithRinse(Repeats=2)
+
+#example_formulation = Formulation(target_composition=target_composition,
+#                target_volume=7.0,
+#                Target=WellLocation('Mix', 10),
+#                mix_template=mix)
+
+#example_sample_list[9].stages[StageName.PREP].methods[-1] = example_formulation
 
 if __name__ == '__main__':
 
@@ -275,7 +347,7 @@ if __name__ == '__main__':
     print(f.formulate(layout))
     print(f.get_methods(layout))
     print(f.execute(deepcopy(layout)))
-    print(f.render_lh_method('test_name', 'test_description', layout))
+    print(f.render_method('test_name', 'test_description', layout))
     print(samples.getSamplebyName(example_sample_list[9].name).toSampleList('prep', layout, False))
     #print(samples.getSamplebyName(example_sample_list[9].name).stages['prep'].methods)
 

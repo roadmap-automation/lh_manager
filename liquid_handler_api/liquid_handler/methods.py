@@ -1,12 +1,13 @@
-from dataclasses import fields, field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel, Field, validator
 from enum import Enum
-from typing import Dict, List, Literal, Union, Set
-from .bedlayout import LHBedLayout, WellLocation
-from .layoutmap import LayoutWell2ZoneWell, Zone
-from .items import MethodError
+from copy import copy
+from typing import Any, Dict, List, Literal, Union, Set, ClassVar
+from uuid import uuid4
 
-EXCLUDE_FIELDS = set(["method_name", "display_name", "complete", "method_type"])
+from .bedlayout import LHBedLayout
+from .status import MethodError, SampleStatus
+
+EXCLUDE_FIELDS = set(["method_name", "display_name", "complete", "method_type", "id", "tasks", "status"])
 
 ## ========== Base Methods specification =============
 
@@ -16,20 +17,29 @@ class MethodType(str, Enum):
     TRANSFER = 'transfer'
     MIX = 'mix'
     INJECT = 'inject'
+    PREPARE = 'prepare'
+    MEASURE = 'measure'
 
-@dataclass
-class BaseMethod:
+class TaskContainer(BaseModel):
+    id: str | None = None
+    task: Any = Field(default_factory=dict)
+    status: SampleStatus | None = None
+
+class BaseMethod(BaseModel):
     """Base class for LH methods"""
 
+    id: str | None = None
+    tasks: list[TaskContainer] = Field(default_factory=list)
+    status: SampleStatus = SampleStatus.INACTIVE
+    method_name: Literal['BaseMethod'] = 'BaseMethod'
+    display_name: Literal['BaseMethod'] = 'BaseMethod'
     method_type: Literal[MethodType.NONE] = MethodType.NONE
     #method_name: Literal['<name of Trilution method>'] = <name of Trilution method>
 
-    @dataclass
-    class lh_method:
-        """Base class for representation in Trilution LH sample lists"""
-        SAMPLENAME: str
-        SAMPLEDESCRIPTION: str
-        METHODNAME: str
+    def model_post_init(self, __context):
+        
+        if self.id is None:
+            self.id = str(uuid4())
 
     def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""
@@ -44,26 +54,26 @@ class BaseMethod:
         """Estimated time for method in default time units"""
         return 0.0
 
-    def get_methods(self, layout: LHBedLayout):
+    def get_methods(self, layout: LHBedLayout) -> List:
         return [self]
     
-    def explode(self, layout: LHBedLayout) -> None:
-        pass
+    def explode(self, layout: LHBedLayout) -> List:
+        return self.get_methods(layout)
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[lh_method]:
+                         layout: LHBedLayout) -> List[dict]:
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
-        return []
+        return [{}]
 
-@dataclass
 class MethodContainer(BaseMethod):
     """Special method that generates a list of basic methods when rendered"""
 
     method_type: Literal[MethodType.CONTAINER] = MethodType.CONTAINER
-    display_name: str = 'MethodContainer'
+    method_name: Literal['MethodContainer'] = 'MethodContainer'
+    display_name: Literal['MethodContainer'] = 'MethodContainer'
 
     def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:
         """Generates list of methods. Intended to be superceded for specific applications
@@ -87,103 +97,21 @@ class MethodContainer(BaseMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return sum(m.estimated_time() for m in self.get_methods(layout))
     
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[dict]:
         
         rendered_methods = []
         for m in self.get_methods(layout):
-            rendered_methods += m.render_lh_method(sample_name=sample_name,
+            rendered_methods += m.render_method(sample_name=sample_name,
                                                    sample_description=sample_description,
                                                    layout=layout)
         return rendered_methods
 
-@dataclass
-class InjectMethod(BaseMethod):
-    """Special class for methods that change the sample composition"""
-
-    method_type: Literal[MethodType.INJECT] = MethodType.INJECT
-    Source: WellLocation = field(default_factory=WellLocation)
-    Volume: float = 1.0
-
-    def new_sample_composition(self, layout: LHBedLayout) -> str:
-        """Returns string representation of source well composition"""
-        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
-        return repr(source_well.composition)
-    
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-        
-        # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
-        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
-
-        if self.Volume > source_well.volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Injection of volume {self.Volume} requested but well {source_well.well_number} in {source_well.rack_id} rack contains only {source_well.volume}"
-                                      )
-            
-        source_well.volume -= self.Volume
-
-@dataclass
-class MixMethod(BaseMethod):
-    """Special class for methods that change the sample composition"""
-
-    method_type: Literal[MethodType.MIX] = MethodType.MIX
-    Target: WellLocation = field(default_factory=WellLocation)
-    Volume: float = 1.0
-
-    def new_sample_composition(self, layout: LHBedLayout) -> str:
-        """Returns string representation of source well composition"""
-        target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
-        return repr(target_well.composition)
-    
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-
-        target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
-
-        if self.Volume > target_well.volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Mix with volume {self.Volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
-                                      )
-
-@dataclass
-class TransferMethod(BaseMethod):
-    """Special class for methods that change the sample composition"""
-
-    method_type: Literal[MethodType.TRANSFER] = MethodType.TRANSFER
-    Source: WellLocation = field(default_factory=WellLocation)
-    Target: WellLocation = field(default_factory=WellLocation)
-    Volume: float = 1.0
-
-    def new_sample_composition(self, layout: LHBedLayout) -> str:
-        """Returns string representation of source well composition"""
-        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
-        return repr(source_well.composition)
-    
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-
-        # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
-        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
-        target_well, target_rack = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
-
-        if self.Volume > source_well.volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Well {source_well.well_number} in {source_well.rack_id} \
-                                      rack contains {source_well.volume} but needs {self.Volume}")
-
-        source_well.volume -= self.Volume
-
-        if (target_well.volume + self.Volume) > target_rack.max_volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Total volume {target_well.volume + self.Volume} from existing volume {target_well.volume} and transfer volume {self.Volume} exceeds rack maximum volume {target_rack.max_volume}"
-                                      )
-
-        # Perform mix. Note that target_well volume is also changed by this operation
-        target_well.mix_with(self.Volume, source_well.composition)
-
 ### =========== Methods manager ==============
 
-MethodsType = Union[BaseMethod, InjectMethod, MixMethod, TransferMethod, MethodContainer]
+MethodsType = Union[BaseMethod, MethodContainer]
 
 class MethodManager:
     """Convenience class for managing methods."""
@@ -212,10 +140,10 @@ class MethodManager:
         lh_method_fields: Dict[str, Dict] = {}
         for method in self.method_list:
             fieldlist = []
-            for fi in fields(method):
-                if not fi.name in EXCLUDE_FIELDS:
-                    fieldlist.append(fi.name)
-            lh_method_fields[method.method_name] = {'fields': fieldlist, 'display_name': method.display_name, 'schema': method.__pydantic_model__.schema()}
+            for name, fi in method.model_fields.items():
+                if not name in EXCLUDE_FIELDS:
+                    fieldlist.append(name)
+            lh_method_fields[method.model_fields['method_name'].default] = {'fields': fieldlist, 'display_name': method.model_fields['display_name'].default, 'schema': method.model_json_schema(mode='serialization')}
 
         return lh_method_fields
     
@@ -229,7 +157,11 @@ class MethodManager:
             MethodsType: method class
         """
 
-        return next(m for m in self.method_list if m.method_name == method_name)
+        try:
+            return next(m for m in self.method_list if m.model_fields['method_name'].default == method_name)
+        except StopIteration:
+            print(f'{method_name} not found')
+            return BaseMethod
 
 method_manager = MethodManager()
 
@@ -243,268 +175,12 @@ def register(cls):
 # methods must be registered in methods manager
 
 @register
-@dataclass
-class TransferWithRinse(TransferMethod):
-    """Transfer with rinse"""
-
-    # Source, Target, and Volume defined in MixMethod
-    Flow_Rate: float = 2.5
-    Aspirate_Flow_Rate: float = 2.0
-    Extra_Volume: float = 0.1
-    Outside_Rinse_Volume: float = 0.5
-    Inside_Rinse_Volume: float = 0.5
-    Air_Gap: float = 0.1
-    Use_Liquid_Level_Detection: bool = True
-    display_name: Literal['Transfer With Rinse'] = 'Transfer With Rinse'
-    method_name: Literal['NCNR_TransferWithRinse'] = 'NCNR_TransferWithRinse'
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        Source_Zone: Zone
-        Source_Well: str
-        Volume: str
-        Flow_Rate: str
-        Aspirate_Flow_Rate: str
-        Extra_Volume: str
-        Outside_Rinse_Volume: str
-        Inside_Rinse_Volume: str
-        Air_Gap: str
-        Use_Liquid_Level_Detection: str
-        Target_Zone: Zone
-        Target_Well: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
-
-        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
-        target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Source_Zone=source_zone,
-            Source_Well=source_well,
-            Volume=f'{self.Volume}',
-            Flow_Rate=f'{self.Flow_Rate}',
-            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
-            Extra_Volume=f'{self.Extra_Volume}',
-            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
-            Inside_Rinse_Volume=f'{self.Inside_Rinse_Volume}',
-            Air_Gap=f'{self.Air_Gap}',
-            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-            Target_Zone=target_zone,
-            Target_Well=target_well
-        )]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate
-
-@register
-@dataclass
-class MixWithRinse(MixMethod):
-    """Inject with rinse"""
-    # Target and Volume defined in MixMethod
-    Flow_Rate: float = 2.5
-    Aspirate_Flow_Rate: float = 2.0
-    Extra_Volume: float = 0.1
-    Outside_Rinse_Volume: float = 0.5
-    Inside_Rinse_Volume: float = 0.5
-    Air_Gap: float = 0.1
-    Repeats: int = 3
-    Use_Liquid_Level_Detection: bool = True
-    display_name: Literal['Mix With Rinse'] = 'Mix With Rinse'
-    method_name: Literal['NCNR_MixWithRinse'] = 'NCNR_MixWithRinse'
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        Volume: str
-        Flow_Rate: str
-        Aspirate_Flow_Rate: str
-        Extra_Volume: str
-        Outside_Rinse_Volume: str
-        Inside_Rinse_Volume: str
-        Air_Gap: str
-        Use_Liquid_Level_Detection: str
-        Repeats: str
-        Target_Zone: Zone
-        Target_Well: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+class Release(BaseMethod):
+    """Special method that does nothing except "release" the liquid handler, i.e. signal to
+        the software that other higher priority methods can be inserted at this position and run in the interim.
         
-        target_zone, target_well = LayoutWell2ZoneWell(self.Target.rack_id, self.Target.well_number)
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Volume=f'{self.Volume}',
-            Flow_Rate=f'{self.Flow_Rate}',
-            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
-            Extra_Volume=f'{self.Extra_Volume}',
-            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
-            Inside_Rinse_Volume=f'{self.Inside_Rinse_Volume}',
-            Air_Gap=f'{self.Air_Gap}',
-            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-            Repeats=f'{self.Repeats}',
-            Target_Zone=target_zone,
-            Target_Well=target_well
-        )]
-
-    def execute(self, layout: LHBedLayout) -> MethodError | None:
-
-        target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
-
-        if self.Volume > target_well.volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Mix with volume {self.Volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
-                                      )
-
-        target_well.volume -= self.Extra_Volume
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate)
-
-@register
-@dataclass
-class InjectWithRinse(InjectMethod):
-    """Inject with rinse"""
-    #Source: WellLocation defined in InjectMethod
-    #Volume: float defined in InjectMethod
-    Aspirate_Flow_Rate: float = 2.0
-    Flow_Rate: float = 2.5
-    Extra_Volume: float = 0.1
-    Outside_Rinse_Volume: float = 0.5
-    Air_Gap: float = 0.1
-    Use_Liquid_Level_Detection: bool = True
-    display_name: Literal['Inject With Rinse'] = 'Inject With Rinse'
-    method_name: Literal['NCNR_InjectWithRinse'] = 'NCNR_InjectWithRinse'
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        Source_Zone: Zone
-        Source_Well: str
-        Volume: str
-        Aspirate_Flow_Rate: str
-        Flow_Rate: str
-        Extra_Volume: str
-        Outside_Rinse_Volume: str
-        Air_Gap: str
-        Use_Liquid_Level_Detection: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
-        
-        source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Source_Zone=source_zone,
-            Source_Well=source_well,
-            Volume=f'{self.Volume}',
-            Aspirate_Flow_Rate=f'{self.Aspirate_Flow_Rate}',
-            Flow_Rate=f'{self.Flow_Rate}',
-            Extra_Volume=f'{self.Extra_Volume}',
-            Outside_Rinse_Volume=f'{self.Outside_Rinse_Volume}',
-            Air_Gap=f'{self.Air_Gap}',
-            Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}'
-        )]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
-
-@register
-@dataclass
-class Sleep(BaseMethod):
-    """Sleep"""
-
-    Time: float = 1.0
-    display_name: Literal['Sleep'] = 'Sleep'
-    method_name: Literal['NCNR_Sleep'] = 'NCNR_Sleep'
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        Time: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
-        
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Time=f'{self.Time}'
-        )]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return float(self.Time)
+        Basic usage is that groups of methods that need to be clustered are separated by this method, i.e.      
+        this method is used to separate the individual groups of methods into individual jobs."""
     
-@register
-@dataclass
-class Sleep2(BaseMethod):
-    """Sleep"""
-
-    Time2: float = 1.0
-    display_name: Literal['Sleep2'] = 'Sleep2'
-    method_name: Literal['NCNR_Sleep2'] = 'NCNR_Sleep2'
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        Time2: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
-        
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Time2=f'{self.Time2}'
-        )]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return float(self.Time2)
-
-@register
-@dataclass
-class Prime(BaseMethod):
-    """Prime"""
-
-    Volume: float = 10.0
-    Repeats: int = 1
-    display_name: Literal['Prime'] = 'Prime'
-    method_name: Literal['NCNR_Prime'] = 'NCNR_Prime'
-
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
-        Volume: str
-        Repeats: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
-        
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Volume=f'{self.Volume}',
-            Repeats=f'{self.Repeats:0.0f}'
-        )]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        flow_rate = 10.0 # mL/min
-        return 2 * float(self.Repeats) * float(self.Volume) / flow_rate
-
-
+    display_name: Literal['---release---'] = '---release---'
+    method_name: Literal[''] = ''

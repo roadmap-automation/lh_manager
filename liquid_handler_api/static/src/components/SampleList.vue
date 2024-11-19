@@ -3,9 +3,14 @@ import { onMounted, ref, computed } from 'vue';
 import Modal from 'bootstrap/js/src/modal';
 import { v4 as uuidv4 } from 'uuid';
 import MethodList from './MethodList.vue';
+import TaskEditor from './TaskEditor.vue';
 // import { socket_emit } from '../store.ts';
-import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample } from '../store';
-import type { SampleStatus, SampleStatusMap, StatusType, Sample, StageName } from '../store';
+import { samples, sample_status, update_sample, run_sample, active_sample_index, active_stage, active_method_index, archive_and_remove_sample, remove_sample, duplicate_sample, explode_stage } from '../store';
+import type { StatusType, Sample } from '../store';
+
+const props = defineProps<{
+  channel: number,
+}>();
 
 const emit = defineEmits(['update_sample']);
 
@@ -15,6 +20,11 @@ const modal = ref<Modal>();
 const name_input = ref<HTMLInputElement>();
 const modal_title = ref("Edit Sample Name and Description")
 const sample_to_edit = ref<Partial<Sample>>({ name: '', description: '', id: '' });
+const channel_samples = computed(() => {
+  const filtered_samples = samples.value.filter(s => s.channel === props.channel);
+  console.log('filtered_samples', filtered_samples, samples.value, props.channel);
+  return filtered_samples;
+});
 
 function toggleItem(index) {
   active_sample_index.value = (index === active_sample_index.value) ? null : index;
@@ -29,22 +39,16 @@ function add_sample() {
   const name = "";
   const description = "";
   modal_title.value = "Create New Sample";
-  sample_to_edit.value = { id, name, description };
+  sample_to_edit.value = { id, name, description, channel: props.channel };
   modal.value?.show();
 }
 
 async function edit_sample_name(index) {
-  const s = samples[index];
+  const s = channel_samples.value[index];
   const { id, name, description } = s;
   modal_title.value = "Edit Sample Name and Description";
   sample_to_edit.value = { id, name, description };
   modal.value?.show();
-}
-
-async function archive_sample(index) {
-  const s = samples[index];
-  const result = await archive_and_remove_sample(s);
-  return result;
 }
 
 function update_sample_name() {
@@ -52,7 +56,7 @@ function update_sample_name() {
   close_modal();
 }
 
-async function run_stage(sample: Sample, stage: StageName[]) {
+async function run_stage(sample: Sample, stage: string[]) {
   const result = await run_sample(sample, stage);
   console.log("result of run_stage: ", result);
 }
@@ -77,9 +81,9 @@ function update_method(sample, stage_name, index, field_name, field_value) {
 
 onMounted(() => {
   modal.value = new Modal(modal_node.value);
-  modal_node.value?.addEventListener('shown.bs.modal', function () {
-    name_input.value?.focus();
-  })
+  //modal_node.value?.addEventListener('shown.bs.modal', function () {
+  //  name_input.value?.focus();
+  //})
 });
 
 const status_class_map: {[status in StatusType]: string} = {
@@ -93,9 +97,9 @@ const status_class_map: {[status in StatusType]: string} = {
 </script>
 
 <template>
-  <button class="btn btn-outline-primary btn-sm" @click="add_sample">+ Add sample</button>
+  <button class="btn btn-outline-primary btn-sm" @click="add_sample">+ Add sample in channel {{ props.channel }}</button>
   <div class="accordion">
-    <div class="accordion-item" v-for="(sample, sindex) of samples" :key="sample.id">
+    <div class="accordion-item" v-for="(sample, sindex) of channel_samples" :key="sample.id">
       <div class="accordion-header">
         <button class="accordion-button p-1"
           :class="{ collapsed: sindex !== active_sample_index, [status_class_map[sample_status[sample.id]?.status ?? 'inactive']]: true }" type="button"
@@ -105,42 +109,79 @@ const status_class_map: {[status in StatusType]: string} = {
           <button type="button" class="btn-close btn-sm align-middle edit"
             aria-label="Edit Name or Description"
             title="Edit Name or Description"
-            @click.stop="edit_sample_name(sindex)"></button>
-            <button 
-              v-if="(sample_status?.[sample.id]?.status ?? 'inactive') === 'inactive'"
-              type="button"
-              class="btn-close btn-sm align-middle start"
-              aria-label="Run all stages"
-              title="Run all stages"
-              @click.stop="run_stage(sample, ['prep', 'inject'])">
-            </button>
-            <button
-              v-if="['active', 'completed', 'partially_completed'].includes(sample_status[sample.id]?.status)"
-              type="button"
-              class="btn-close btn-sm align-middle archive"
-              aria-label="Archive sample"
-              title="Archive sample"
-              @click.stop="archive_and_remove_sample(sample.id)">
-            </button>
+            @click.stop="edit_sample_name(sindex)">
+          </button>
+          <button 
+            v-if="(sample_status?.[sample.id]?.status ?? 'inactive') === 'inactive'"
+            type="button"
+            class="btn-close btn-sm align-middle start"
+            aria-label="Run all stages"
+            title="Run all stages"
+            @click.stop="run_stage(sample, ['prep', 'inject'])">
+          </button>
+          <button
+            v-if="true || (['active', 'completed', 'partially_completed'].includes(sample_status[sample.id]?.status))"
+            type="button"
+            class="btn-close btn-sm align-middle archive"
+            aria-label="Archive sample"
+            title="Archive sample"
+            @click.stop="archive_and_remove_sample(sample.id)">
+          </button>
+          <button
+            type="button"
+            class="btn-close btn-sm align-middle trash"
+            aria-label="Remove sample (not archived)"
+            title="Remove (trash) sample"
+            @click.stop="remove_sample(sample.id)">
+          </button>
+          <button
+            type="button"
+            class="btn-close btn-sm align-middle copy"
+            aria-label="Duplicate sample"
+            title="Duplicate sample"
+            @click.stop="duplicate_sample(sample.id)">
+          </button>
         </button>
       </div>
       <div class="accordion-collapse collapse" :class="{ show: sindex === active_sample_index }">
-        <div v-if="sindex === active_sample_index" class="accordion-body py-0">
-          <div v-for="(stage, stage_name) of sample.stages">
+        <div v-if="sindex === active_sample_index" class="samplelist accordion-body py-0">
+          <div class="methodlist" v-for="(stage, stage_name) of sample.stages">
             <h6 :class="status_class_map[sample_status?.[sample.id]?.[stage_name]?.status ?? 'inactive']">{{ stage_name }}:
+              <button
+                type="button"
+                class="btn-close btn-sm align-middle expand-up-down"
+                aria-label="explode"
+                title="explode"
+                @click.stop="explode_stage(sample, stage_name)">
+              </button>
               <button 
-                v-if="sample_status?.[sample.id]?.stages?.[stage_name]?.status === 'inactive'"
                 type="button"
                 class="btn-close btn-sm align-middle start"
                 aria-label="Run stage"
+                title="Run stage"
                 @click.stop="run_stage(sample, [stage_name])">
               </button>
             </h6>
-            <MethodList
+            <div class="pm-2">
+              <div class="stage-label">Draft</div>
+              <MethodList
+                :sample_id="sample.id"
+                :stage_name="stage_name"
+                :methods="stage.methods"
+                :editable="true"
+                :stage_label="'methods'"
+                @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />
+            </div>
+            <div class="pm-2" v-if="!!stage.active.length">
+              <div class="stage-label">Submitted</div>
+              <MethodList
               :sample_id="sample.id"
               :stage_name="stage_name"
-              :methods="stage.methods"
-              @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />
+              :methods="stage.active"
+              :editable="false"
+              :stage_label="'active'"
+              @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />              
+            </div>
           </div>
         </div>
       </div>
@@ -174,6 +215,7 @@ const status_class_map: {[status in StatusType]: string} = {
       </div>
     </div>
   </div>
+  <TaskEditor></TaskEditor>
 </template>
 
 <style>
@@ -188,4 +230,29 @@ const status_class_map: {[status in StatusType]: string} = {
 .btn-close.archive {
   background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-in-down" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.5 6a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.5.5 0 0 1 0-1h2A1.5 1.5 0 0 1 14 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 14.5v-8A1.5 1.5 0 0 1 3.5 5h2a.5.5 0 0 1 0 1h-2z"/><path fill-rule="evenodd" d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>')
 }
+
+.btn-close.copy {
+  background-image: url('data:image/svg+xml,<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve"><g><path d="M232.7,186.2v23.3h209.5c12.8,0,23.2,10.4,23.3,23.3v209.5c0,12.8-10.4,23.2-23.3,23.3H232.7c-12.8,0-23.2-10.4-23.3-23.3V232.7c0-12.8,10.4-23.3,23.3-23.3V186.2v-23.3c-38.6,0-69.8,31.2-69.8,69.8v209.5c0,38.6,31.2,69.8,69.8,69.8h209.5c38.6,0,69.8-31.2,69.8-69.8V232.7c0-38.6-31.2-69.8-69.8-69.8H232.7V186.2z"/><path d="M93.1,302.5H69.8c-12.8,0-23.2-10.4-23.3-23.3V69.8C46.6,57,57,46.6,69.8,46.5h209.5c12.8,0,23.2,10.4,23.3,23.3v23.3c0,12.9,10.4,23.3,23.3,23.3c12.9,0,23.3-10.4,23.3-23.3V69.8c0-38.6-31.2-69.8-69.8-69.8H69.8C31.2,0,0,31.2,0,69.8v209.5c0,38.6,31.2,69.8,69.8,69.8l23.3,0c12.9,0,23.3-10.4,23.3-23.3C116.4,313,105.9,302.5,93.1,302.5z"/></g></svg>')
+}
+
+.btn-close.trash {
+  background-image: url('data:image/svg+xml,<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800px" height="800px" viewBox="0 0 482 482" xml:space="preserve"><g><g><path d="M381.163,57.799h-75.094C302.323,25.316,274.686,0,241.214,0c-33.471,0-61.104,25.315-64.85,57.799h-75.098c-30.39,0-55.111,24.728-55.111,55.117v2.828c0,23.223,14.46,43.1,34.83,51.199v260.369c0,30.39,24.724,55.117,55.112,55.117h210.236c30.389,0,55.111-24.729,55.111-55.117V166.944c20.369-8.1,34.83-27.977,34.83-51.199v-2.828C436.274,82.527,411.551,57.799,381.163,57.799z M241.214,26.139c19.037,0,34.927,13.645,38.443,31.66h-76.879C206.293,39.783,222.184,26.139,241.214,26.139z M375.305,427.312c0,15.978-13,28.979-28.973,28.979H136.096c-15.973,0-28.973-13.002-28.973-28.979V170.861h268.182V427.312z M410.135,115.744c0,15.978-13,28.979-28.973,28.979H101.266c-15.973,0-28.973-13.001-28.973-28.979v-2.828c0-15.978,13-28.979,28.973-28.979h279.897c15.973,0,28.973,13.001,28.973,28.979V115.744z"/><path d="M171.144,422.863c7.218,0,13.069-5.853,13.069-13.068V262.641c0-7.216-5.852-13.07-13.069-13.07c-7.217,0-13.069,5.854-13.069,13.07v147.154C158.074,417.012,163.926,422.863,171.144,422.863z"/><path d="M241.214,422.863c7.218,0,13.07-5.853,13.07-13.068V262.641c0-7.216-5.854-13.07-13.07-13.07c-7.217,0-13.069,5.854-13.069,13.07v147.154C228.145,417.012,233.996,422.863,241.214,422.863z"/><path d="M311.284,422.863c7.217,0,13.068-5.853,13.068-13.068V262.641c0-7.216-5.852-13.07-13.068-13.07c-7.219,0-13.07,5.854-13.07,13.07v147.154C298.213,417.012,304.067,422.863,311.284,422.863z"/></g></g></svg>')
+}
+
+.btn-close.expand-up-down {
+  background-image: url('data:image/svg+xml,<svg height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xml:space="preserve"><g><g><g><path d="M199.541,365.792c-4.237-4.093-10.99-3.976-15.083,0.262c-3.993,4.134-3.993,10.687,0,14.821l64,64c4.157,4.174,10.911,4.187,15.085,0.03c0.01-0.01,0.02-0.02,0.03-0.03l64-64c4.093-4.237,3.976-10.99-0.261-15.083c-4.134-3.993-10.688-3.993-14.821,0l-45.824,45.792V100.416l45.792,45.792c4.237,4.093,10.99,3.976,15.083-0.262c3.993-4.134,3.993-10.687,0-14.821l-64-64c-4.157-4.174-10.911-4.187-15.085-0.03c-0.01,0.01-0.02,0.02-0.03,0.03l-64,64c-4.093,4.237-3.975,10.99,0.262,15.083c4.134,3.992,10.687,3.992,14.82,0l45.824-45.792v311.168L199.541,365.792z"/><path d="M394.667,490.667H117.333c-5.891,0-10.667,4.776-10.667,10.667S111.442,512,117.333,512h277.333c5.891,0,10.667-4.776,10.667-10.667S400.558,490.667,394.667,490.667z"/><path d="M117.333,21.333h277.333c5.891,0,10.667-4.776,10.667-10.667C405.333,4.776,400.558,0,394.667,0H117.333c-5.891,0-10.667,4.776-10.667,10.667C106.667,16.558,111.442,21.333,117.333,21.333z"/></g></g></g></svg>')
+}
+
+.stage-label {
+  font-style:italic;
+}
+
+.samplelist {
+  background-image: linear-gradient(to bottom, #BBBBBB, #FFFFFF);
+}
+
+.methodlist {
+  opacity: 90%;
+}
+
 </style>

@@ -1,12 +1,12 @@
-from pydantic.v1.dataclasses import dataclass
 from typing import List, Literal
-from .methods import BaseMethod, register, InjectMethod
+
+from .lhmethods import InjectMethod, BaseLHMethod
+from .methods import register
 from .bedlayout import LHBedLayout
 from .layoutmap import LayoutWell2ZoneWell, Zone
 
 @register
-@dataclass
-class QCMD_Record_Sync(BaseMethod):
+class QCMD_Record_Sync(BaseLHMethod):
     """Records QCMD Data"""
 
     Tag_Name: str = ''
@@ -15,16 +15,15 @@ class QCMD_Record_Sync(BaseMethod):
     display_name: Literal['QCMD Record'] = 'QCMD Record'
     method_name: Literal['NCNR_QCMD_Record_Sync'] = 'NCNR_QCMD_Record_Sync'
 
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
+    class lh_method(BaseLHMethod.lh_method):
         Tag_Name: str
         Record_Time: str
         Equilibration_Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
         return [self.lh_method(
             SAMPLENAME=sample_name,
@@ -36,8 +35,7 @@ class QCMD_Record_Sync(BaseMethod):
         )]
 
 @register
-@dataclass
-class QCMD_Setup(BaseMethod):
+class QCMD_Setup(BaseLHMethod):
     """NCNR_QCMD_Setup
     
     NOTE: This probably doesn't work because it sets global variables. Might need an intermediary method
@@ -49,16 +47,15 @@ class QCMD_Setup(BaseMethod):
     display_name: Literal['QCMD Setup'] = 'QCMD Setup'
     method_name: Literal['NCNR_QCMD_Setup'] = 'NCNR_QCMD_Setup'
 
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
+    class lh_method(BaseLHMethod.lh_method):
         QCMD_ADDRESS: str
         QCMD_PORT: int
         GSIOC_ADDRESS: int
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
         return [self.lh_method(
             SAMPLENAME=sample_name,
@@ -69,22 +66,20 @@ class QCMD_Setup(BaseMethod):
             GSIOC_ADDRESS=f'{self.GSIOC_Address}'
         )]
 
-@register
-@dataclass
-class QCMD_Stop(BaseMethod):
+#@register
+class QCMD_Stop(BaseLHMethod):
     """Stops QCMD recording"""
 
     display_name: Literal['QCMD Stop'] = 'QCMD Stop'
     method_name: Literal['NCNR_QCMD_Stop'] = 'NCNR_QCMD_Stop'
 
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
+    class lh_method(BaseLHMethod.lh_method):
         pass
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
         return [self.lh_method(
             SAMPLENAME=sample_name,
@@ -93,7 +88,6 @@ class QCMD_Stop(BaseMethod):
         )]
 
 @register
-@dataclass
 class InjectWithRinseSync(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -110,8 +104,7 @@ class InjectWithRinseSync(InjectMethod):
     display_name: Literal['Inject With Synchronization'] = 'Inject With Synchronization'
     method_name: Literal['NCNR_InjectWithRinse_Sync'] = 'NCNR_InjectWithRinse_Sync'
 
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
+    class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
         Volume: str
@@ -125,12 +118,17 @@ class InjectWithRinseSync(InjectMethod):
         Record_Time: str
         Equilibration_Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        comp = repr(well.composition)
+        if len(self.Tag_Name):
+            comp = ' ' + comp
+            
         return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
@@ -144,7 +142,7 @@ class InjectWithRinseSync(InjectMethod):
             Extra_Volume=f'{self.Extra_Volume}',
             Air_Gap=f'{self.Air_Gap}',
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-            Tag_Name=self.Tag_Name,
+            Tag_Name=self.Tag_Name + comp,
             Record_Time=f'{self.Record_Time}',
             Equilibration_Time=f'{self.Equilibration_Time}'
         )]
@@ -153,7 +151,6 @@ class InjectWithRinseSync(InjectMethod):
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
 
 @register
-@dataclass
 class InjectDoubleSync(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -172,8 +169,7 @@ class InjectDoubleSync(InjectMethod):
     display_name: Literal['Inject Double with Synchronization'] = 'Inject Double with Synchronization'
     method_name: Literal['NCNR_InjectDouble_Sync'] = 'NCNR_InjectDouble_Sync'
 
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
+    class lh_method(BaseLHMethod.lh_method):
         Source_Zone: Zone
         Source_Well: str
         Volume: str
@@ -189,12 +185,17 @@ class InjectDoubleSync(InjectMethod):
         Record_Time: str
         Equilibration_Time: str
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
         source_zone, source_well = LayoutWell2ZoneWell(self.Source.rack_id, self.Source.well_number)
+        well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        comp = repr(well.composition)
+        if len(self.Tag_Name):
+            comp = ' ' + comp
+
         return [self.lh_method(
             SAMPLENAME=sample_name,
             SAMPLEDESCRIPTION=sample_description,
@@ -210,7 +211,7 @@ class InjectDoubleSync(InjectMethod):
             Extra_Volume=f'{self.Extra_Volume}',
             Air_Gap=f'{self.Air_Gap}',
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}',
-            Tag_Name=self.Tag_Name,
+            Tag_Name=self.Tag_Name + comp,
             Record_Time=f'{self.Record_Time}',
             Equilibration_Time=f'{self.Equilibration_Time}'
         )]
@@ -219,21 +220,19 @@ class InjectDoubleSync(InjectMethod):
         return (self.Volume + self.Second_Volume) / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Second_Volume / self.Second_Flow_Rate
 
 @register
-@dataclass
-class Sync_WaitUntilIdle(BaseMethod):
+class Sync_WaitUntilIdle(BaseLHMethod):
     """Waits until idle signal is received"""
 
     display_name: Literal['Wait Until Idle'] = 'Wait Until Idle'
     method_name: Literal['NCNR_Sync_WaitUntilIdle'] = 'NCNR_Sync_WaitUntilIdle'
 
-    @dataclass
-    class lh_method(BaseMethod.lh_method):
+    class lh_method(BaseLHMethod.lh_method):
         pass
 
-    def render_lh_method(self,
+    def render_method(self,
                          sample_name: str,
                          sample_description: str,
-                         layout: LHBedLayout) -> List[BaseMethod.lh_method]:
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
         return [self.lh_method(
             SAMPLENAME=sample_name,

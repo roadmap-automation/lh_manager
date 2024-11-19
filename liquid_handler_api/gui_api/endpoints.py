@@ -1,18 +1,18 @@
 """HTTP Endpoints for GUI API"""
 import warnings
-from dataclasses import asdict, replace
 from copy import deepcopy
-from flask import make_response, request, Response
+from flask import make_response, request, Response, redirect, url_for
 from typing import List, Tuple, Optional
 
+from ..liquid_handler.devices import device_manager
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.samplelist import Sample, StageName
+from ..liquid_handler.samplelist import Sample, SampleStatus, MethodList
 from ..liquid_handler.methods import method_manager
 from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
-from ..liquid_handler.lhqueue import LHqueue, RunQueue
-from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update
+from ..liquid_handler.lhqueue import LHqueue, JobQueue, submit_handler, validate_format
+from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update, trigger_run_queue_update, trigger_device_update
 from . import gui_blueprint
 
 @gui_blueprint.route('/webform/AddSample/', methods=['POST'])
@@ -27,10 +27,10 @@ def AddSample() -> Response:
 
     # dry run (testing only)
     test_layout = deepcopy(layout)
-    for method in new_sample.stages[StageName.PREP].get_methods(test_layout):
+    for method in new_sample.stages['prep'].methods:
         method.execute(test_layout)
 
-    return make_response({'new sample': new_sample.toSampleList(StageName.PREP, test_layout), 'layout': asdict(test_layout)}, 200)
+    return make_response({'new sample': new_sample.toSampleList('prep', test_layout), 'layout': test_layout.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/UpdateSample/', methods=['POST'])
 @trigger_samples_update
@@ -45,7 +45,6 @@ def UpdateSample() -> Response:
         return make_response({'error': "no id in sample, can't update or add"}, 200)
 
     sample_index, sample = samples.getSampleById(id)
-    print(data, sample)
     if sample is None or sample_index is None:
         """ adding a new sample """
         new_sample = Sample(**data)
@@ -53,9 +52,89 @@ def UpdateSample() -> Response:
         return make_response({'sample added': id}, 200)
     else:
         """ replacing sample """
-        new_sample = replace(sample, **data)
+        new_sample = Sample(**sample.model_copy(update=data).model_dump())
         samples.samples[sample_index] = new_sample
         return make_response({'sample updated': id}, 200)
+
+@gui_blueprint.route('/GUI/ExplodeSample/', methods=['POST'])
+@trigger_samples_update
+def ExplodeSample() -> Response:
+    """Explodes an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't explode")
+        return make_response({'error': "no id in sample, can't explode"}, 200)
+    
+    stage = data.get("stage", None)
+    if stage is None:
+        warnings.warn("no stage specified, can't explode")
+        return make_response({'error': "no stage specified, can't explode"}, 200)
+
+    _, sample = samples.getSampleById(id)
+    print(data, sample)
+    """ exploding sample """
+    sample.stages[stage].explode(layout)
+    return make_response({'sample exploded': id}, 200)
+
+@gui_blueprint.route('/GUI/DuplicateSample/', methods=['POST'])
+@trigger_samples_update
+@trigger_sample_status_update
+def DuplicateSample() -> Response:
+    """Duplicates an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't duplicate")
+        return make_response({'error': "no id in sample, can't duplicate"}, 200)
+
+    sample_index, sample = samples.getSampleById(id)
+    print(data, sample)
+    if sample is None or sample_index is None:
+        """ sample not found """
+        return make_response({'error': "sample not found, can't duplicate"}, 200)
+    else:
+        """ duplicate sample, resetting all statuses """
+        new_sample = deepcopy(sample)
+
+        # generate new unique ID
+        new_sample.generate_new_id()
+
+        # make sure sample name is unique
+        while samples.getSamplebyName(new_sample.name) is not None:
+            new_sample.name = new_sample.name + ' copy'
+
+        # reset method lists and statuses
+        for key, mlist in new_sample.stages.items():
+            new_sample.stages[key] = MethodList(methods=mlist.methods)
+
+        # add to sample list immediately after the duplicated sample
+        samples.samples.insert(sample_index + 1, new_sample)
+
+        return make_response({'sample duplicated': new_sample.id}, 200)
+
+@gui_blueprint.route('/GUI/RemoveSample/', methods=['POST'])
+@trigger_samples_update
+def RemoveSample() -> Response:
+    """Deletes an existing sample"""
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    id = data.get("id", None)
+    if id is None:
+        warnings.warn("no id attached to sample, can't delete")
+        return make_response({'error': "no id in sample, can't delete"}, 200)
+
+    sample_index, sample = samples.getSampleById(id)
+    print(data, sample)
+    if sample is None or sample_index is None:
+        """ sample not found """
+        return make_response({'error': "sample not found, can't delete"}, 200)
+    else:
+        """ archive sample """
+        samples.deleteSample(sample)
+        return make_response({'sample removed': id}, 200)
 
 @gui_blueprint.route('/GUI/ArchiveandRemoveSample/', methods=['POST'])
 @trigger_samples_update
@@ -78,6 +157,94 @@ def ArchiveandRemoveSample() -> Response:
         samples.archiveSample(sample)
         samples.deleteSample(sample)
         return make_response({'sample archived and removed': id}, 200)
+
+@gui_blueprint.route('/GUI/RunSample/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def RunSample() -> Response:
+    """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['name', 'uuid', 'slotID', 'stage']):
+
+        # catch null UUID
+        if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
+            data['uuid'] = None
+
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
+
+@gui_blueprint.route('/GUI/RunMethod/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def RunMethod() -> Response:
+    """Runs a sample by ID. Returns error if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['name', 'uuid', 'slotID', 'stage', 'method_id']):
+
+        # catch null UUID
+        if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
+            data['uuid'] = None
+
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
+
+@gui_blueprint.route('/GUI/ResubmitTasks/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def ResubmitTask() -> Response:
+    """Resubmits a group of tasks. Returns errors if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['tasks']):
+
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'task_id': <uuid>; 'task': Task"}, 400)
+
+@gui_blueprint.route('/GUI/CancelTasks/', methods=['POST'])
+@trigger_run_queue_update
+@trigger_samples_update
+def CancelTasks() -> Response:
+    """Cancels tasks by ID. Returns error if sample not found or sample is already active or completed."""
+    data: dict = request.get_json(force=True)
+    #print(data)
+    # check for proper format
+    if validate_format(data, ['tasks']):
+
+        results = submit_handler.cancel(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
+    return make_response({'result': 'error', 'message': "bad request format; should be {'task_id': <uuid>; 'task': Task"}, 400)
 
 @gui_blueprint.route('/GUI/UpdateDryRunQueue/', methods=['POST'])
 @trigger_samples_update
@@ -108,9 +275,9 @@ def UpdateRunQueue() -> Response:
 
     data = request.get_json(force=True)
     assert isinstance(data, dict)
-    new_queue = RunQueue(**data)
+    new_queue = JobQueue(**data)
     with LHqueue.lock:
-        LHqueue.stages = new_queue.stages
+        LHqueue.jobs = new_queue.jobs
 
     return make_response({'run queue updated': None}, 200)
 
@@ -118,13 +285,13 @@ def UpdateRunQueue() -> Response:
 def GetRunQueue() -> Response:
     """Gets run queue as dict"""
 
-    return make_response({'run_queue': asdict(LHqueue)}, 200)
+    return make_response({'run_queue': LHqueue.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/GetSamples/', methods=['GET'])
 def GetSamples() -> Response:
     """Gets sample list as dict"""
 
-    return make_response({'samples': asdict(samples)}, 200)
+    return make_response({'samples': samples.model_dump()}, 200)
 
 @gui_blueprint.route('/GUI/GetSampleStatus/', methods=['GET'])
 def GetSamplesStatus() -> Response:
@@ -149,11 +316,48 @@ def GetAllMethodSchema() -> Response:
 
     return make_response({'methods': method_manager.get_all_schema()}, 200)
 
+@gui_blueprint.route('/GUI/GetAllDevices/', methods=['GET'])
+def GetAllDeviceSchema() -> Response:
+    """Gets method fields and pydantic schema of all devices"""
+
+    return make_response({'devices': device_manager.get_all_schema()}, 200)
+
+@gui_blueprint.route('/GUI/UpdateDevice/', methods=['POST'])
+@trigger_device_update
+def UpdateDevice() -> Response:
+    """Updates a single device from a (partial) dataclass representation. Must have
+        device_name as one of the fields"""
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    device_name = data.get("device_name", None)
+    if device_name is None:
+        warnings.warn("device name not attached to data, can't update")
+        return make_response({'error': "no name in sample, can't update"}, 400)
+
+    device = device_manager.get_device_by_name(device_name)
+    if device is None:
+        """ sample not found """
+        warnings.warn({'error': f"device {data['device_name']} not found"})
+        return make_response({'error': f"device {data['device_name']} not found"}, 400)
+
+    """ update sample """
+    device_manager.register(device.model_copy(update={data['param_name']: data['param_value']}))
+    return make_response({'device updated': device.device_name}, 200)
+
+@gui_blueprint.route('/GUI/InitializeDevices/', methods=['POST'])
+def InitializeDevices() -> Response:
+    """Triggers initialization of devices
+        NOTE: Could use JobRunner to do this, but this is much simpler"""
+    #data: dict = request.get_json(force=True)
+
+    return redirect('/autocontrol/InitializeDevices/', 307)
+
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:
     """Gets list of sample names, IDs, and status"""
 
-    return make_response(asdict(layout), 200)
+    return make_response(layout.model_dump(), 200)
 
 def _get_component_zones(wells: List[Well]) -> Tuple[List[Tuple[str, Zone]], List[Tuple[str, Zone]]]:
     """Gets lists of all solvents and solutes in the specified wells
@@ -198,7 +402,7 @@ def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
         for loc in well_locations:
             well, rack = layout.get_well_and_rack(loc.rack_id, loc.well_number)
             wells.append(well)
-    wells_dict = [asdict(well) for well in wells]
+    wells_dict = [well.model_dump() for well in wells]
     for wd in wells_dict:
         zone, _ = LayoutWell2ZoneWell(wd['rack_id'], wd['well_number'])
         wd['zone'] = zone
@@ -214,7 +418,7 @@ def UpdateWell() -> Response:
     assert isinstance(data, dict)
     well = Well(**data)
     layout.update_well(well)
-    return make_response(asdict(well), 200)
+    return make_response(well.model_dump(), 200)
 
 @gui_blueprint.route('/GUI/RemoveWellDefinition/', methods=['POST'])
 @trigger_layout_update

@@ -1,5 +1,17 @@
+#import socketio as sio
+
 from ..sio import socketio
-from ..liquid_handler.state import save_layout, save_samples
+from ..liquid_handler.state import save_layout, save_samples, save_devices
+
+def trigger_device_update(f):
+    """Decorator that announces that devices have changed"""
+    def wrap(*args, **kwargs):
+        ret_val = f(*args, **kwargs)
+        socketio.emit('update_devices', {'msg': 'update_devices'}, include_self=True)
+        save_devices()
+        return ret_val
+    wrap.__name__ = f.__name__
+    return wrap
 
 def trigger_layout_update(f):
     """Decorator that announces that layout has changed"""
@@ -39,4 +51,16 @@ def trigger_sample_status_update(f):
         return ret_val
     wrap.__name__ = f.__name__
     return wrap
+
+if False:
+    sio_client = sio.Client()
+    sio_client.connect('http://localhost:5001')
+
+    @sio_client.on('job_validation')
+    def job_validation(data):
+        print(f'I received {data}')
+
+    @sio_client.on('job_activation')
+    def job_activation(data):
+        print(f'job_activation: I received {data}')
 

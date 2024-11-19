@@ -1,23 +1,17 @@
 from enum import Enum
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 
-class StageName(str, Enum):
-    PREP = 'prep'
-    INJECT = 'inject'
-
-@dataclass
-class Item:
+class Item(BaseModel):
 
     id: str
-    stage: StageName
+    stage: str
     data: dict = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return f'Sample {self.id} Stage {self.stage} with data {self.data}'
 
-@dataclass
-class MethodError:
+class MethodError(BaseModel):
     
     name: str
     error: str

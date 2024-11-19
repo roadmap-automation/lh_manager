@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, defineProps, onMounted, watch, toRaw } from 'vue'
+import { ref, defineProps, onMounted, watch, toRaw, computed, nextTick } from 'vue'
 import { Modal } from 'bootstrap/dist/js/bootstrap.esm';
-import { well_editor_active, well_to_edit, layout, update_well_contents, remove_well_definition } from '../store';
-import type { Well, Solute, Solvent } from '../store';
+import { soluteMassUnits, soluteVolumeUnits, materials, well_editor_active, well_to_edit, layout, update_well_contents, remove_well_definition } from '../store';
+import type { Material, Well, Solute, Solvent } from '../store';
 
 const props = defineProps<{
   wells: Well[]
@@ -10,6 +10,12 @@ const props = defineProps<{
 
 const dialog = ref<HTMLDivElement>();
 const current_well = ref<Well>();
+const solute_search_regexp = ref<RegExp | null>(null);
+const solute_search_pattern = ref<string | null>(null);
+const solvent_search_regexp = ref<RegExp | null>(null);
+const solvent_search_pattern = ref<string | null>(null);
+
+const soluteUnits = [...soluteMassUnits, ...soluteVolumeUnits];
 
 let modal: Modal;
 
@@ -29,11 +35,26 @@ watch(well_to_edit, async(newval, oldval) => {
   current_well.value = structuredClone(toRaw(existing_well)) ?? {...structuredClone(empty_well), rack_id, well_number};
 });
 
-const solute_template: Solute = { name: "", concentration: 0, units: "M" };
-const solvent_template: Solvent = { name: "", fraction: 0 };
+const filtered_solute_materials = computed(() => {
+  return materials.value.filter((m) => {
+    return (m.type !== 'solvent' && (solute_search_regexp.value?.test(m.name) ?? true))
+  });
+});
+
+const filtered_solvent_materials = computed(() => {
+  return materials.value.filter((m) => {
+    console.log(m.name, m);
+    return ( (m.type === 'solvent' || m.type === null) && (solvent_search_regexp.value?.test(m.name) ?? true))
+  });
+});
+
+const generate_solute = () => ({ name: filtered_solute_materials.value[0]?.name ?? "", concentration: 0, units: "M" }) as Solute;
+const new_solute = ref(generate_solute());
+const generate_solvent = () => ({ name: filtered_solvent_materials.value[0]?.name ?? "", fraction: 0 }) as Solvent;
+const new_solvent = ref(generate_solvent());
 const component_templates = {
-  'solutes': solute_template,
-  'solvents': solvent_template,
+  'solutes': generate_solute(),
+  'solvents': generate_solvent(),
 }
 
 const empty_well = {
@@ -44,6 +65,34 @@ const empty_well = {
     solutes: [],
   },
   volume: 0,
+}
+
+function add_solute() {
+  current_well.value?.composition.solutes.push(structuredClone(toRaw(new_solute.value)));
+  new_solute.value = generate_solute();
+  solute_search_pattern.value = null;
+}
+
+async function do_solute_search() {
+  solute_search_regexp.value = new RegExp(solute_search_pattern.value ?? '.', 'i');
+  await nextTick();
+  if (filtered_solute_materials.value.length > 0) {
+    new_solute.value.name = filtered_solute_materials.value[0].name;
+  }
+}
+
+function add_solvent() {
+  current_well.value?.composition.solvents.push(structuredClone(toRaw(new_solvent.value)));
+  new_solvent.value = generate_solvent();
+  solvent_search_pattern.value = null;
+}
+
+async function do_solvent_search() {
+  solvent_search_regexp.value = new RegExp(solvent_search_pattern.value ?? '.', 'i');
+  await nextTick();
+  if (filtered_solvent_materials.value.length > 0) {
+    new_solvent.value.name = filtered_solvent_materials.value[0].name;
+  }
 }
 
 function add_component(target: 'solutes' | 'solvents') {
@@ -63,6 +112,7 @@ function remove_definition() {
   }
   well_editor_active.value = false;
 }
+
 
 </script>
 
@@ -87,24 +137,41 @@ function remove_definition() {
             </div>
           </div>
           <div>
-            <div>Solutes:
-              <button class="btn btn-sm btn-outline-primary" @click="add_component('solutes')">add</button>
+            <div>
+              <div class="input-group">
+                <span class="input-group-text">Solutes: </span>
+                <select class="form-select" v-model="new_solute.name">
+                  <option v-for="material in filtered_solute_materials" :key="material.name" :value="material.name">{{ material.name }}</option>
+                </select>
+                <input class="form-input" v-model="solute_search_pattern" @input="do_solute_search" placeholder="search" />
+                <button class="btn btn-sm btn-outline-primary" @click="add_solute">add</button>
+              </div>
             </div>
             <div class="ps-3" v-for="(solute, sindex) of (current_well?.composition?.solutes ?? [])">
-              <input type="text" v-model="solute.name" />
-              <label>concentration ({{ solute.units }}):
+              <input class="mx-2" type="text" :value="solute.name" disabled />
+              <label>concentration
                 <input class="number px-1 py-0" v-model="solute.concentration" />
               </label>
+              <select v-model="solute.units">
+                  <option v-for="unit in soluteUnits" :key="unit" :value="unit">{{ unit }}</option>
+              </select>
               <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
                 @click="current_well?.composition.solutes.splice(sindex, 1)"></button>
             </div>
           </div>
-          <div>
-            <div>Solvents:
-              <button class="btn btn-sm btn-outline-primary" @click="add_component('solvents')">add</button>
+          <div class="mt-2">
+            <div>
+              <div class="input-group">
+                <span class="input-group-text">Solvents: </span>
+                <select class="form-select" v-model="new_solvent.name">
+                  <option v-for="material in filtered_solvent_materials" :key="material.name" :value="material.name">{{ material.name }}</option>
+                </select>
+                <input class="form-input" v-model="solvent_search_pattern" @input="do_solvent_search" placeholder="search" />
+                <button class="btn btn-sm btn-outline-primary" @click="add_solvent">add</button>
+              </div>
             </div>
             <div class="ps-3" v-for="(solvent, sindex) of (current_well?.composition?.solvents ?? [])">
-              <input type="text" v-model="solvent.name" />
+              <input class="mx-2" type="text" :value="solvent.name" disabled />
               <label>fraction:
                 <input class="number px-1 py-0" v-model="solvent.fraction" />
               </label>

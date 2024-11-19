@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, source_components, source_well, target_well, layout, update_at_pointer } from '../store';
+import { active_well_field, method_defs, source_components, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, layout, update_at_pointer } from '../store';
 import json_pointer from 'json-pointer';
-import type { MethodType, StageName } from '../store';
+import type { MethodType } from '../store';
 
 const props = defineProps<{
   sample_id: string,
@@ -67,12 +67,14 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
   const first_available = filter_components(component_type)[0];
   console.log(component_type, first_available);
   if (first_available !== undefined) {
-    const new_component: {name: string, fraction?: number, concentration?: number} = {name: first_available};
+    const [name, values] = first_available;
+    const new_component: {name: string, fraction?: number, concentration?: number, units?: string} = { name };
     if (component_type === 'solvents') {
-      new_component.fraction = 0;
+      new_component.fraction = values[0].fraction ?? 0;
     }
     else {
-      new_component.concentration = 0;
+      new_component.concentration = values[0].concentration ?? 0;
+      new_component.units = values[0].units ?? 'M';
     }
     console.log({param});
     param.value[component_type].push(new_component);
@@ -81,18 +83,41 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
 }
 
 function filter_components(component_key: 'solutes' | 'solvents') {
-  const components = source_components.value?.[component_key] ?? [];
+  const components = source_components.value?.[component_key] ?? {};
+  console.log({component_key, components});
   const include_zones_param = parameters.value.find((p) => p.name === 'include_zones');
   const include_zones = include_zones_param?.value ?? null;
-  const filtered_components = (include_zones === null) ? [...components] : components.filter((c) => (include_zones.includes(c[1])));
-  const unique_components = new Set(filtered_components.map((c) => c[0]));
-  // console.log(source_components.value, component_key);
-  // console.log({components, filtered_components, include_zones, unique_components});
-  return [...unique_components];
+  const component_entries = Object.entries(components);
+  if (include_zones === null) {
+    return component_entries;
+  }
+  const filtered_components = component_entries.map(([name, values]) => {
+    return [name, values.filter((v) => include_zones.includes(v.zone))];
+  });
+  return filtered_components.filter(([name, values]) => values.length > 0);
+}
+
+function change_solute(solute, param) {
+  const { units, concentration } = source_components.value.solutes[solute.name][0];
+  solute.units = units;
+  solute.concentration = concentration;
+  send_changes(param);
+}
+
+function available_solute_units(solute_name: string) {
+  // if the molecular weight is defined, then we can use any units.
+  const material = materials.value.find((m) => m.name === solute_name);
+  if (material && material.molecular_weight !== undefined) {
+    return [...soluteMassUnits, ...soluteVolumeUnits];
+  }
+  const solute_instances = source_components.value.solutes[solute_name];
+  const massUnitsToAdd = solute_instances.some((s) => soluteMassUnits.includes(s.units)) ? soluteMassUnits : [];
+  const volumeUnitsToAdd = solute_instances.some((s) => soluteVolumeUnits.includes(s.units)) ? soluteVolumeUnits : [];
+  return [...massUnitsToAdd, ...volumeUnitsToAdd];
 }
 
 function activateSelector({name, type}) {
-  if (type === '#/definitions/WellLocation') {
+  if (type === '#/$defs/WellLocation') {
     active_well_field.value = name;
   }
 }
@@ -101,7 +126,7 @@ function activateSelector({name, type}) {
 <template>
   <fieldset :disabled="!editable">
     <tr v-for="param of parameters.filter((p) => (!hide_fields.includes(p.name)))" @click="activateSelector(param)">
-      <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: param.type === '#/definitions/WellLocation' }">
+      <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: param.type === '#/$defs/WellLocation' }">
         <div class="form-check">
           <label>
             {{ param.name }}:
@@ -112,10 +137,14 @@ function activateSelector({name, type}) {
         <input class="number px-1 py-0" v-model.number="param.value" :name="`param_${param.name}`"
           @keydown.enter="send_changes(param)" @blur="send_changes(param)" />
       </td>
+      <td v-if="param.type === 'string'">
+        <input class="string" v-model="param.value" :name="`param_${param.name}`"
+          @keydown.enter="send_changes(param)" @blur="send_changes(param)" />
+      </td>
       <td v-if="param.type === 'boolean'">
         <input type="checkbox" v-model="param.value" :name="`param_${param.name}`" @change="send_changes(param)" />
       </td>
-      <td v-if="param.type === '#/definitions/WellLocation'">
+      <td v-if="param.type === '#/$defs/WellLocation'">
         <select v-if="layout != null && param.value && 'rack_id' in param.value" v-model="param.value.rack_id"
           @change="send_changes(param)">
           <option :value="null" disabled></option>
@@ -125,25 +154,28 @@ function activateSelector({name, type}) {
           v-model="param.value.well_number" :name="`param_${param.name}_well`" @keydown.enter="send_changes(param)"
           @blur="send_changes(param)" />
       </td>
-      <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/definitions/Zone'">
+      <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/$defs/Zone'">
         <select v-model="param.value" multiple @change="send_changes(param)">
-          <option v-for="zone in param.schema.definitions?.Zone?.enum" :value="zone">{{ zone }}</option>
+          <option v-for="zone in param.schema.$defs?.Zone?.enum" :value="zone">{{ zone }}</option>
         </select>
       </td>
-      <td v-if="param.type === '#/definitions/Composition'">
+      <td v-if="param.type === '#/$defs/Composition'">
         <div>
           <div>Solutes:
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solutes')">add</button>
           </div>
           <div class="ps-3" v-for="(solute, sindex) of (param?.value?.solutes ?? [])">
-            <select v-model="solute.name" @change="send_changes(param)">
-              <option v-for="source_solute of filter_components('solutes')" :value="source_solute">{{
-                source_solute }}</option>
+            <select v-model="solute.name" @change="change_solute(solute, param)">
+              <option v-for="source_solute of filter_components('solutes')" :value="source_solute[0]">{{
+                source_solute[0] }}</option>
             </select>
-            <label>concentration ({{ solute.units }}):
+            <label>concentration:
               <input class="number px-1 py-0" v-model="solute.concentration" @keydown.enter="send_changes(param)"
                 @blur="send_changes(param)" />
             </label>
+            <select v-model="solute.units" @change="send_changes(param)">
+              <option v-for="unit of available_solute_units(solute.name)" :value="unit">{{ unit }}</option>
+            </select>
             <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
               @click="param.value.solutes.splice(sindex, 1); send_changes(param)"></button>
           </div>
@@ -153,9 +185,9 @@ function activateSelector({name, type}) {
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solvents')">add</button>
           </div>
           <div class="ps-3" v-for="(solvent, sindex) of (param?.value?.solvents ?? [])">
-            <select v-model="solvent.name">
-              <option v-for="source_solvent of filter_components('solvents')" :value="source_solvent">
-                {{ source_solvent }}</option>
+            <select v-model="solvent.name" @change="send_changes(param)">
+              <option v-for="source_solvent of filter_components('solvents')" :value="source_solvent[0]">
+                {{ source_solvent[0] }}</option>
             </select>
             <label>fraction:
               <input class="number px-1 py-0" v-model="solvent.fraction" @keydown.enter="send_changes(param)"
@@ -166,8 +198,8 @@ function activateSelector({name, type}) {
           </div>
         </div>
       </td>
-      <td v-if="param.type === '#/definitions/TransferMethod' || param.type === '#/definitions/MixMethod'">
-        <select v-model="param.value.method_name">
+      <td v-if="param.type === '#/$defs/TransferMethod' || param.type === '#/$defs/MixMethod' || param.type === '#/$defs/InjectMethod'">
+        <select v-model="param.value.method_name" @change="param.value = {method_name: param.value.method_name}; send_changes(param)">
             <option v-for="mname of get_template_names(param.type, param.schema)" >
               {{ mname }}</option>
         </select>

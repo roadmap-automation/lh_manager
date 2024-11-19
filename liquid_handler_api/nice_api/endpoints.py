@@ -1,17 +1,16 @@
 """NICE API Endpoints"""
-from dataclasses import asdict
 from flask import make_response, Response, request
 
-from ..liquid_handler.lhqueue import LHqueue, validate_format
+from ..liquid_handler.lhqueue import validate_format, submit_handler
 from ..liquid_handler.samplelist import SampleStatus
 from ..liquid_handler.state import samples, layout
-from ..liquid_handler.items import Item
 from ..liquid_handler.history import History
 from ..gui_api.events import trigger_sample_status_update, trigger_run_queue_update
 
 from . import nice_blueprint
+from .nice import LHqueue
 
-def _run_sample(data) -> Response:
+def _run_sample(data: dict) -> str | None:
     """ Generic function for processing a run request"""
 
     if 'id' in data:
@@ -24,16 +23,20 @@ def _run_sample(data) -> Response:
         # check that requested stages are inactive
         for stage in data['stage']:
             if sample.stages[stage].status != SampleStatus.INACTIVE:
-                return make_response({'result': 'error', 'message': f'stage {stage} of sample {data["name"]} is not inactive'}, 400)
+                return f'stage {stage} of sample {data["name"]} is not inactive'
             
-            # create new run command specific to stage and add to queue
-            #stagedata = {**data, 'stage': [stage]}
-            LHqueue.put_safe(Item(sample.id, stage, data))
-            LHqueue.run_next()
+            # only if an injection operation, set sample NICE_uuid and NICE_slotID
+            if data['stage'] == 'inject':
+                sample.NICE_uuid = data.get('uuid', None)
+                slot_id = data.get('slotID', 0)
+                sample.NICE_slotID = int(slot_id) if slot_id is not None else None
 
-        return make_response({'result': 'success', 'message': 'success'}, 200)
+            sample.stages[stage].status = SampleStatus.PENDING
+            # TODO: figure out the NICE queue here
 
-    return make_response({'result': 'error', 'message': 'sample not found'}, 400)
+        return
+
+    return 'sample not found'
 
 @nice_blueprint.route('/NICE/RunSample/<sample_name>/<uuid>/<slotID>/<stage>/', methods=['GET'])
 @trigger_run_queue_update
@@ -58,23 +61,29 @@ def RunSamplewithUUID() -> Response:
     data = request.get_json(force=True)
     #print(data)
     # check for proper format
-    if validate_format(data):
+    if validate_format(data, ('name', 'uuid', 'slotID', 'stage')):
 
         # catch null UUID
         if (data['uuid'] == chr(0)) | (data['uuid'] == '%00'):
             data['uuid'] = None
 
-        return _run_sample(data)
-    
+        results = submit_handler.submit(data)
+
+        for result in results:
+            if result is not None:
+                return make_response({'result': 'error', 'message': result}, 400)
+
+        return make_response({'result': 'success', 'message': 'success'}, 200)    
+
     return make_response({'result': 'error', 'message': "bad request format; should be {'name': <sample_name>; 'uuid': <uuid>; 'slotID': <slot_id>; 'stage': ['prep' | 'inject']"}, 400)
 
 def _getActiveSample() -> str:
     """Gets the currently active sample with the earliest createdDate."""
 
-    active_sample = LHqueue.active_sample
+    active_job = LHqueue.active_job
 
-    if active_sample is not None:
-        return samples.getSampleById(active_sample.id)[1].name
+    if active_job is not None:
+        return samples.getSampleById(active_job.parent.id)[1].name
 
     return ''
 
@@ -105,9 +114,8 @@ def GetMetaData(uuid) -> Response:
         # Get samples from history
         # NOTE: it may not be necessary to re-initialize historical data into Sample objects but
         # it makes the code cleaner.
-        history = History()
-        samples_history = history.get_samples_by_NICE_uuid(uuid)
-        history.close()
+        with History() as history:
+            samples_history = history.get_samples_by_NICE_uuid(uuid)
 
         # get currently active samples
         samples_uuid = [sample for sample in samples.samples if sample.NICE_uuid == uuid]
@@ -122,7 +130,7 @@ def GetMetaData(uuid) -> Response:
         
         if len(samples_uuid):
             samples_uuid.sort(key=lambda sample: sample.get_earliest_date())
-            return make_response({'metadata': [asdict(sample) for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
+            return make_response({'metadata': [sample.model_dump() for sample in samples_uuid], 'current contents': samples_uuid[-1].current_contents}, 200)
 
     return make_response({}, 200)
 
@@ -131,7 +139,7 @@ def DryRunSamplewithUUID() -> Response:
     """Dry runs a sample by name. UUID is ignored. Returns time estimate; otherwise error if sample not found."""
     data = request.get_json(force=True)
 
-    if validate_format(data):
+    if validate_format(data, ('name', 'uuid', 'slotID', 'stage')):
 
         sample = samples.getSamplebyName(data['name'])
         if sample is not None:
@@ -176,7 +184,7 @@ def Stop() -> Response:
         TODO: Remove GET for production"""
 
     with LHqueue.lock:
-        init_size = len(LHqueue.stages)
+        init_size = len(LHqueue.jobs)
 
     LHqueue.stop()
 
@@ -212,13 +220,12 @@ def Pause() -> Response:
 @trigger_run_queue_update
 @trigger_sample_status_update
 def Resume() -> Response:
-    """Pauses liquid handler queue.
+    """Resumes liquid handler queue (also runs next).
     
         Ignores request data.
         
         TODO: Remove GET for production"""
 
     LHqueue.resume()
-    LHqueue.run_next()
 
     return make_response({'result': 'success'}, 200)

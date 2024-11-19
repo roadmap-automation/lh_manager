@@ -5,11 +5,12 @@ import time
 
 from pathlib import Path
 from typing import List
-from dataclasses import asdict
 
 from .samplelist import Sample
+from ..app_config import config
 
-SAMPLE_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'completed_samples.sqlite'
+#SAMPLE_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'completed_samples.sqlite'
+SAMPLE_HISTORY = config.history_path
 
 class History:
     table_name = 'completed_samples'
@@ -24,7 +25,13 @@ class History:
     def __init__(self, database_path: str = SAMPLE_HISTORY) -> None:
         self.db_path = database_path
         self.db = None
+
+    def __enter__(self):
         self.open()
+        return self
+    
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.close()
 
     def open(self) -> None:
         db_exists = os.path.exists(self.db_path)
@@ -48,7 +55,7 @@ class History:
             ON CONFLICT(uuid) DO UPDATE SET 
               NICE_uuid=excluded.NICE_uuid,
               sample=excluded.sample;
-        """, (sample.id, sample.NICE_uuid, json.dumps(asdict(sample))))
+        """, (sample.id, sample.NICE_uuid, sample.model_dump_json()))
         
         self.db.commit()
 

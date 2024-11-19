@@ -1,10 +1,8 @@
 from flask import Flask, render_template, redirect
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
+from .nice_api import nice_blueprint
 from .sio import socketio
-from .material_db import blueprint as material_db_blueprint
-from .autocontrol.autocontrol import launch_autocontrol_interface
-from .autocontrol.autocontrol_api import autocontrol_blueprint
 import liquid_handler_api.app_config as app_config
 
 import mimetypes
@@ -20,9 +18,8 @@ app = Flask(__name__, static_folder='static')
 app.config['JSON_SORT_KEYS'] = False
 
 app.register_blueprint(gui_blueprint)
+app.register_blueprint(nice_blueprint)
 app.register_blueprint(lh_blueprint)
-app.register_blueprint(autocontrol_blueprint)
-app.register_blueprint(material_db_blueprint)
 socketio.init_app(app)
 
 #@app.route('/')
@@ -40,9 +37,9 @@ def test_emit():
 if __name__ == '__main__':
 
     config = app_config.config
-    config.stage_names = ['methods']
+    config.samples_path = config.log_path / 'nice_samples.json'
+    config.samples_path = config.log_path / 'nice_completed_samples.sqlite'
 
-    launch_autocontrol_interface(poll_delay=5)
-    socketio.run(app, host='localhost', port=5001, debug=False)
+    socketio.run(app, host='localhost', port=5001, debug=True)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)

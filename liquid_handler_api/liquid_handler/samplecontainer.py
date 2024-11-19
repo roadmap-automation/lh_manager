@@ -1,17 +1,18 @@
 from typing import List, Tuple, Dict
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from .history import History
-from .samplelist import Sample, StageName, SampleStatus
+from .samplelist import Sample, SampleStatus
 from .bedlayout import LHBedLayout
 from .dryrun import DryRunQueue
-from .items import Item, MethodError
+from .items import Item
+from .status import MethodError
 
-@dataclass
-class SampleContainer:
+class SampleContainer(BaseModel):
     """Specialized sample dictionary allowing convenient referencing by sample ID or sample name"""
 
     samples: list[Sample] = field(default_factory=list)
+    n_channels: int = 1
     dryrun_queue: DryRunQueue = field(default_factory=DryRunQueue)
     max_LH_id: int = 1
 
@@ -22,16 +23,6 @@ class SampleContainer:
     def _getNames(self) -> list[str]:
 
         return [s.name for s in self.samples]
-
-    def getSampleStagebyLH_ID(self, id: int) -> Tuple[Sample | None, StageName | None]:
-        """Return sample with specific id"""
-
-        for sample in self.samples:
-            if id in sample.get_LH_ids():
-                return sample, sample.getStageByID(id)
-
-        return None, None
-        #raise ValueError(f"Sample ID {id} not found!")
 
     def getSampleById(self, id: str) -> Tuple[int, Sample] | Tuple[None, None]:
         return next(((i,s) for i,s in enumerate(self.samples) if s.id == id), (None, None))
@@ -65,9 +56,8 @@ class SampleContainer:
             sample (Sample): sample to archive
         """
 
-        history = History()
-        history.smart_insert(sample)
-        history.close()
+        with History() as history:
+            history.smart_insert(sample)
 
     def dryrun(self, layout: LHBedLayout) -> List[Tuple[Item, List[MethodError]]]:
         """Executes dry run of everything in the queue by copying the layout and

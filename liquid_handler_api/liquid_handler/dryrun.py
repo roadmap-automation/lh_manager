@@ -1,10 +1,9 @@
 from typing import List
 from dataclasses import field
-from pydantic.v1.dataclasses import dataclass
+from pydantic import BaseModel
 from .items import Item
 
-@dataclass
-class DryRunQueue:
+class DryRunQueue(BaseModel):
     """Container for dry run objects. Unrelated to queue.Queue"""
 
     # Ordered list of tuples (uuid, stage name) to dry run
@@ -40,7 +39,7 @@ class DryRunQueue:
         """Moves a stage item up (lower index) in the queue. Error if item not present
 
         Args:
-            item (DryRunItem): (id, stage_name) to move up
+            item (DryRunItem): item to move up
         """
 
         idx = self.stages.index(item)
@@ -50,7 +49,7 @@ class DryRunQueue:
         """Moves a stage item down (higher index) in the queue. Error if item not present
 
         Args:
-            item (Tuple[str, StageName]): (id, stage_name) to move down
+            item (Item): item to move down
         """
 
         idx = self.stages.index(item)
