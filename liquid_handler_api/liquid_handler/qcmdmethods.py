@@ -11,8 +11,8 @@ class QCMDMeasurementDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: ClassVar[str] = 'QCMD Measurement Device'
-    device_type: str = 'qcmd'
+    device_name: Literal['QCMD Measurement Device'] = 'QCMD Measurement Device'
+    device_type: Literal['qcmd'] = 'qcmd'
     multichannel: bool = True
     allow_sample_mixing: bool = False
     address: str = 'http://localhost:5005'
@@ -20,7 +20,8 @@ class QCMDMeasurementDevice(DeviceBase):
     class Job(JobBase):
         pass
 
-device_manager.register(QCMDMeasurementDevice())
+qcmddevice = QCMDMeasurementDevice()
+device_manager.register(qcmddevice)
 
 class BaseQCMDMethod(BaseMethod):
     """Base class for LH methods"""
@@ -39,7 +40,7 @@ class BaseQCMDMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = {QCMDMeasurementDevice.device_name: [self.model_dump()]}
+            d2 = {qcmddevice.device_name: [self.model_dump()]}
 
             return d2
 

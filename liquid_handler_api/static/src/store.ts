@@ -73,6 +73,14 @@ export type MethodType = {
   status: StatusType
 }
 
+export type DeviceType = {
+  device_name: string,
+  device_type: string,
+  multichannel: boolean,
+  allow_sample_mixing: boolean,
+  address: string
+}
+
 // Class representing a list of methods representing one LH job. Allows dividing
 // prep and inject operations for a single sample.
 export interface MethodList {
@@ -163,6 +171,7 @@ export interface Material {
 }
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
+export const device_defs = shallowRef<Record<string, DeviceType>>({});
 export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
@@ -557,6 +566,32 @@ export async function refreshMethodDefs() {
   const { methods } = await (await fetch("/GUI/GetAllMethods/")).json() as {methods: Record<string, MethodDef>};
   method_defs.value = methods;
   console.log({methods});
+}
+
+export async function refreshDeviceDefs() {
+  const { devices } = await (await fetch("/GUI/GetAllDevices/")).json() as {devices: Record<string, DeviceType>};
+  device_defs.value = devices;
+  console.log({devices});
+}
+
+export async function update_device(device_name: string, param_name: string, param_value: any) {
+  const update_result = await fetch("/GUI/UpdateDevice/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_name, param_name, param_value })
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function initialize_devices() {
+  const update_result = await fetch("/GUI/InitializeDevices/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
 }
 
 export async function remove_sample(sample_id: string) {

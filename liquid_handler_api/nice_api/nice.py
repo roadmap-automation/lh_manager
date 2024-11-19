@@ -10,10 +10,8 @@ from threading import Lock
 from ..gui_api.events import trigger_sample_status_update, trigger_layout_update
 
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
-from ..liquid_handler.lhmethods import LHDevice
+from ..liquid_handler.lhmethods import lhdevice
 from ..liquid_handler.methods import MethodsType
-from ..liquid_handler.bedlayout import LHBedLayout
-from ..liquid_handler.samplelist import Sample
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus
@@ -63,7 +61,7 @@ def submission_callback(data: dict):
             sample.stages[stage].run_jobs = []
             for m in rendered_methods:
                 job = LHJob(id=str(uuid4()),
-                            method_data=LHDevice.create_job_data(m[LHDevice.device_name]),
+                            method_data=lhdevice.create_job_data(m[lhdevice.device_name]),
                             parent=Item(sample.id, stage))
             
                 # register job

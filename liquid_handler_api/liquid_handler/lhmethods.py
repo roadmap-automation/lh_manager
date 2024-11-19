@@ -1,7 +1,7 @@
 from .bedlayout import LHBedLayout, WellLocation
 from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .methods import BaseMethod, MethodType, register, MethodContainer, MethodsType, method_manager
+from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, device_manager
 
 from pydantic import BaseModel
@@ -19,13 +19,14 @@ class LHDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: ClassVar[str] = 'Gilson 271 Liquid Handler'
-    device_type: str = 'lh'
+    device_name: Literal['Gilson 271 Liquid Handler'] = 'Gilson 271 Liquid Handler'
+    device_type: Literal['lh'] = 'lh'
     multichannel: bool = True
     allow_sample_mixing: bool = True
     address: str = 'http://localhost:5001'
 
-device_manager.register(LHDevice())
+lhdevice = LHDevice()
+device_manager.register(lhdevice)
 
 EXCLUDE_FIELDS = ['status', 'tasks']
 
@@ -79,7 +80,7 @@ class BaseLHMethod(BaseMethod):
                          layout: LHBedLayout) -> List[dict]:
         """Renders the class to a dictionary"""
         
-        return [{LHDevice.device_name: [dict(sample_name=sample_name,
+        return [{lhdevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
                                              method_name=self.method_name,
                                              method_data=self.model_dump(exclude=EXCLUDE_FIELDS))]}]
@@ -108,7 +109,7 @@ class LHMethodCluster(BaseLHMethod):
 
     def render_method(self, sample_name: str, sample_description: str, layout: LHBedLayout) -> List[dict]:
         
-        return [{LHDevice.device_name: [dict(sample_name=sample_name,
+        return [{lhdevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
                                              method=m.model_dump())
                                         for m in self.methods]}]

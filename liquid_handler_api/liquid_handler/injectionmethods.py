@@ -14,8 +14,8 @@ class InjectionSystemDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: ClassVar[str] = 'Multichannel Injection System'
-    device_type: str = 'injection'
+    device_name: Literal['Multichannel Injection System'] = 'Multichannel Injection System'
+    device_type: Literal['injection'] = 'injection'
     multichannel: bool = True
     allow_sample_mixing: bool = True
     address: str = 'http://localhost:5003'
@@ -23,7 +23,8 @@ class InjectionSystemDevice(DeviceBase):
     class Job(JobBase):
         pass
 
-device_manager.register(InjectionSystemDevice())
+injectionsystem = InjectionSystemDevice()
+device_manager.register(injectionsystem)
 
 class BaseInjectionSystemMethod(BaseMethod):
     """Base class for LH methods"""
@@ -42,7 +43,7 @@ class BaseInjectionSystemMethod(BaseMethod):
                 dict: dictionary representation
             """
 
-            d2 = {InjectionSystemDevice.device_name: [self.model_dump()]}
+            d2 = {injectionsystem.device_name: [self.model_dump()]}
 
             return d2
 

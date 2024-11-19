@@ -1,9 +1,10 @@
 """HTTP Endpoints for GUI API"""
 import warnings
 from copy import deepcopy
-from flask import make_response, request, Response
+from flask import make_response, request, Response, redirect, url_for
 from typing import List, Tuple, Optional
 
+from ..liquid_handler.devices import device_manager
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.samplelist import Sample, SampleStatus, MethodList
 from ..liquid_handler.methods import method_manager
@@ -11,7 +12,7 @@ from ..liquid_handler.bedlayout import Well, WellLocation
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
 from ..liquid_handler.lhqueue import LHqueue, JobQueue, submit_handler, validate_format
-from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update, trigger_run_queue_update
+from .events import trigger_samples_update, trigger_sample_status_update, trigger_layout_update, trigger_run_queue_update, trigger_device_update
 from . import gui_blueprint
 
 @gui_blueprint.route('/webform/AddSample/', methods=['POST'])
@@ -314,6 +315,43 @@ def GetAllMethodSchema() -> Response:
     """Gets method fields and pydantic schema of all methods"""
 
     return make_response({'methods': method_manager.get_all_schema()}, 200)
+
+@gui_blueprint.route('/GUI/GetAllDevices/', methods=['GET'])
+def GetAllDeviceSchema() -> Response:
+    """Gets method fields and pydantic schema of all devices"""
+
+    return make_response({'devices': device_manager.get_all_schema()}, 200)
+
+@gui_blueprint.route('/GUI/UpdateDevice/', methods=['POST'])
+@trigger_device_update
+def UpdateDevice() -> Response:
+    """Updates a single device from a (partial) dataclass representation. Must have
+        device_name as one of the fields"""
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    device_name = data.get("device_name", None)
+    if device_name is None:
+        warnings.warn("device name not attached to data, can't update")
+        return make_response({'error': "no name in sample, can't update"}, 400)
+
+    device = device_manager.get_device_by_name(device_name)
+    if device is None:
+        """ sample not found """
+        warnings.warn({'error': f"device {data['device_name']} not found"})
+        return make_response({'error': f"device {data['device_name']} not found"}, 400)
+
+    """ update sample """
+    device_manager.register(device.model_copy(update={data['param_name']: data['param_value']}))
+    return make_response({'device updated': device.device_name}, 200)
+
+@gui_blueprint.route('/GUI/InitializeDevices/', methods=['POST'])
+def InitializeDevices() -> Response:
+    """Triggers initialization of devices
+        NOTE: Could use JobRunner to do this, but this is much simpler"""
+    #data: dict = request.get_json(force=True)
+
+    return redirect('/autocontrol/InitializeDevices/', 307)
 
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:

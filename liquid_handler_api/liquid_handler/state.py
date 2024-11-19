@@ -8,9 +8,10 @@ from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmeth
 from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item
+from .devices import device_manager
 from ..app_config import parser, config
 
-LOG_PATH, LAYOUT_LOG, SAMPLES_LOG = config.log_path, config.layout_path, config.samples_path
+LOG_PATH, LAYOUT_LOG, SAMPLES_LOG, DEVICES_LOG = config.log_path, config.layout_path, config.samples_path, config.devices_path
 
 def load_state():
 
@@ -22,6 +23,12 @@ def load_state():
     if os.path.exists(SAMPLES_LOG):
         samples = SampleContainer(**json.load(open(SAMPLES_LOG, 'r')))
 
+    if os.path.exists(DEVICES_LOG):
+        device_data = json.load(open(DEVICES_LOG, 'r'))
+        for device in device_manager.device_list:
+            device = device.model_copy(update=device_data[device.device_name])
+            device_manager.register(device)
+
     return layout, samples
 
 def make_persistent_dir():
@@ -31,12 +38,17 @@ def make_persistent_dir():
 def save_layout():
     make_persistent_dir()
     with open(LAYOUT_LOG, 'w') as f:
-        f.write(layout.model_dump_json(indent=4))
+        f.write(layout.model_dump_json(indent=2))
 
 def save_samples():
     make_persistent_dir()
     with open(SAMPLES_LOG, 'w') as f:
-        f.write(samples.model_dump_json(indent=4))
+        f.write(samples.model_dump_json(indent=2))
+
+def save_devices():
+    make_persistent_dir()
+    with open(DEVICES_LOG, 'w') as f:
+        f.write(json.dumps(device_manager.get_all_schema(), indent=2))
 
 if not parser.parse_args().noload:
     print('loading state!')

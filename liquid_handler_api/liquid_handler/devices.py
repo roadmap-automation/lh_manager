@@ -1,4 +1,4 @@
-from dataclasses import fields
+import json
 from pydantic import BaseModel
 from typing import Dict, List, Literal, Union, Set, ClassVar
 from .job import JobBase
@@ -9,8 +9,8 @@ class DeviceBase(BaseModel):
     """Base class for device definitions
     """
 
-    device_name: ClassVar[str] = 'none'
-    device_type: str = 'none'
+    device_name: Literal['none'] = 'none'
+    device_type: Literal['none'] = 'none'
     multichannel: bool = False
     allow_sample_mixing: bool = False
     address: str = 'http://0.0.0.0:0000'
@@ -51,7 +51,7 @@ class DeviceManager:
         """Registers a device in the manager
 
         Args:
-            device (DeviceBase): method to register
+            device (DeviceBase): device to register
         """
 
         self.devices.update({device.device_name: device})
@@ -64,15 +64,17 @@ class DeviceManager:
                                 'display_name', and 'schema'; the last is the pydantic schema
         """
 
-        lh_method_fields: Dict[str, Dict] = {}
-        for device in self.devices.values():
+        """
+        device_fields: Dict[str, Dict] = {}
+        for device in self.device_list:
             fieldlist = []
-            for fi in fields(device):
-                if not fi.name in EXCLUDE_FIELDS:
-                    fieldlist.append(fi.name)
-            lh_method_fields[device.device_name] = {'fields': fieldlist, 'device_name': device.device_name, 'schema': device.model_json_schema()}
-
-        return lh_method_fields
+            for name, fi in device.model_fields.items():
+                if not name in EXCLUDE_FIELDS:
+                    fieldlist.append(name)
+            device_fields[device.device_name] = {'fields': fieldlist, 'device_name': device.device_name, 'schema': device.model_json_schema()}
+        """
+            
+        return {device.device_name: device.model_dump() for device in self.device_list}
     
     def get_device_by_name(self, device_name: str) -> DevicesType:
         """Gets device object by name
@@ -84,7 +86,7 @@ class DeviceManager:
             DevicesType: device class
         """
 
-        return self.devices[device_name]
+        return self.devices.get(device_name, None)
 
 device_manager = DeviceManager()
 

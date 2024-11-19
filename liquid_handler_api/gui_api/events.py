@@ -1,7 +1,17 @@
 #import socketio as sio
 
 from ..sio import socketio
-from ..liquid_handler.state import save_layout, save_samples, samples
+from ..liquid_handler.state import save_layout, save_samples, save_devices
+
+def trigger_device_update(f):
+    """Decorator that announces that devices have changed"""
+    def wrap(*args, **kwargs):
+        ret_val = f(*args, **kwargs)
+        socketio.emit('update_devices', {'msg': 'update_devices'}, include_self=True)
+        save_devices()
+        return ret_val
+    wrap.__name__ = f.__name__
+    return wrap
 
 def trigger_layout_update(f):
     """Decorator that announces that layout has changed"""
