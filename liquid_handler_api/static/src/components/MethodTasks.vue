@@ -51,7 +51,7 @@ function clone(obj) {
       </td>
     </tr>
     <tr class="mx-2" v-for="(task, task_index) of tasks">
-      <td class="mx-2" :class="task.status">
+      <td class="mx-2" :class="'task-' + task.status">
         <div class="mx-2 row">
           <h6 class="col-sm-auto">{{ task.id }}          
           </h6>
