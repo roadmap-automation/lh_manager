@@ -57,10 +57,10 @@ class InjectOrganicsWithRinse(InjectWithRinse):
 @register
 class ROADMAP_QCMD_MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
-    Bilayer_Composition: Composition | None = None
-    Bilayer_Solvent: Composition | None = None
+    Bilayer_Composition: Composition = Field(default_factory=Composition)
+    Bilayer_Solvent: Composition = Field(default_factory=Composition)
     Lipid_Injection_Volume: float = 0.0
-    Buffer_Composition: Composition | None = None
+    Buffer_Composition: Composition = Field(default_factory=Composition)
     Buffer_Injection_Volume: float = 0.0
     Extra_Volume: float = 0.1
     Rinse_Volume: float = 2.0
@@ -359,7 +359,7 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
 @register
 class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
-    Target_Composition: Composition | None = None
+    Target_Composition: Composition = Field(default_factory=Composition)
     Volume: float = 0.0
     Injection_Flow_Rate: float = 1.0
     Extra_Volume: float = 0.1
@@ -432,7 +432,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
 @register
 class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
-    Target_Composition: Composition | None = None
+    Target_Composition: Composition = Field(default_factory=Composition)
     Volume: float = 0.0
     Injection_Flow_Rate: float = 1.0
     Extra_Volume: float = 0.1

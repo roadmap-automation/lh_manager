@@ -275,7 +275,7 @@ class SoluteFormulation(Formulation):
     method_name: Literal['SoluteFormulation'] = 'SoluteFormulation'
     display_name: Literal['SoluteFormulation'] = 'SoluteFormulation'
     exact_match: bool = False
-    diluent: Composition | None = None
+    diluent: Composition = Field(default_factory=Composition)
 
     def formulate(self,
                 layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
