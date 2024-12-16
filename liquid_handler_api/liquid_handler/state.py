@@ -17,11 +17,13 @@ def load_state():
 
     layout, samples = None, None
 
-    if os.path.exists(LAYOUT_LOG):
-        layout = LHBedLayout(**json.load(open(LAYOUT_LOG, 'r')))
-    
-    if os.path.exists(SAMPLES_LOG):
-        samples = SampleContainer(**json.load(open(SAMPLES_LOG, 'r')))
+    if not parser.parse_args().noload_layout:
+        if os.path.exists(LAYOUT_LOG):
+            layout = LHBedLayout(**json.load(open(LAYOUT_LOG, 'r')))
+
+    if not parser.parse_args().noload_samples:
+        if os.path.exists(SAMPLES_LOG):
+            samples = SampleContainer(**json.load(open(SAMPLES_LOG, 'r')))
 
     if os.path.exists(DEVICES_LOG):
         device_data = json.load(open(DEVICES_LOG, 'r'))
@@ -50,11 +52,8 @@ def save_devices():
     with open(DEVICES_LOG, 'w') as f:
         f.write(json.dumps(device_manager.get_all_schema(), indent=2))
 
-if not parser.parse_args().noload:
-    print('loading state!')
-    layout, samples = load_state()
-else:
-    layout, samples = None, None
+print('loading state!')
+layout, samples = load_state()
 
 if samples is None:
 

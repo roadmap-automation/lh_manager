@@ -2,7 +2,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 parser = ArgumentParser()
-parser.add_argument('--noload', action='store_true')
+parser.add_argument('--noload_samples', action='store_true')
+parser.add_argument('--noload_layout', action='store_true')
 parser.add_argument('--channels', type=int, default=2)
 
 LOG_PATH = Path(__file__).parent.parent / 'persistent_state'
