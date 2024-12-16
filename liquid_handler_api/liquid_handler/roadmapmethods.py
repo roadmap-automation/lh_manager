@@ -116,7 +116,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         required_volume = minimum_volume + extra_volume + self.Lipid_Injection_Volume
         lipid_mixing_well, error = find_well_and_volume(self.Bilayer_Composition, required_volume, layout.get_all_wells())
         if lipid_mixing_well is None:
-            lipid_mixing_well = InferredWellLocation('Mix')
+            lipid_mixing_well = InferredWellLocation(rack_id='Mix')
 
             bilayer_formulation = SoluteFormulation(target_composition=self.Bilayer_Composition,
                                             diluent=self.Bilayer_Solvent,
@@ -131,7 +131,9 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
             methods += [LHMethodCluster(method_type=MethodType.PREPARE,
                                         methods=bilayer_formulation.get_methods(layout))]
         else:
-            lipid_mixing_well = WellLocation(lipid_mixing_well.rack_id, lipid_mixing_well.well_number, expected_composition=lipid_mixing_well.composition)
+            lipid_mixing_well = WellLocation(rack_id=lipid_mixing_well.rack_id,
+                                             well_number=lipid_mixing_well.well_number,
+                                             expected_composition=lipid_mixing_well.composition)
 
         direct_inject = ROADMAP_DirectInjecttoQCMD(Source=lipid_mixing_well,
                              Volume=self.Lipid_Injection_Volume,
@@ -157,7 +159,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
         buffer_mixing_well, error = find_well_and_volume(self.Buffer_Composition, required_volume, layout.get_all_wells())
         if buffer_mixing_well is None:
-            buffer_mixing_well = InferredWellLocation('Mix')
+            buffer_mixing_well = InferredWellLocation(rack_id='Mix')
 
             buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
                                             target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
@@ -171,7 +173,9 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
             methods += [LHMethodCluster(method_type=MethodType.PREPARE,
                                         methods=buffer_formulation.get_methods(layout))]
         else:
-            buffer_mixing_well = InferredWellLocation(buffer_mixing_well.rack_id, buffer_mixing_well.well_number, expected_composition=buffer_mixing_well.composition)
+            buffer_mixing_well = InferredWellLocation(rack_id=buffer_mixing_well.rack_id,
+                                                      well_number=buffer_mixing_well.well_number,
+                                                      expected_composition=buffer_mixing_well.composition)
 
         inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
                                                          Volume=self.Buffer_Injection_Volume,
@@ -220,7 +224,7 @@ class MultiTransfer(MethodContainer):
     def get_methods(self, layout: LHBedLayout) -> List[BaseMethod]:
         
         methods = []
-        target_well = InferredWellLocation('Mix')
+        target_well = InferredWellLocation(rack_id='Mix')
 
         first_cluster = LHMethodCluster()
 
@@ -238,7 +242,7 @@ class MultiTransfer(MethodContainer):
 
         methods += [first_cluster]
 
-        new_target_well = InferredWellLocation('Mix')
+        new_target_well = InferredWellLocation(rack_id='Mix')
 
         third_transfer = TransferWithRinse(Source=self.Source,
                                            Target=new_target_well,
@@ -382,7 +386,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
 
         methods = []
 
-        load_loop = ROADMAP_LoadLoop_Sync(Source=WellLocation(target_well.rack_id, target_well.well_number),
+        load_loop = ROADMAP_LoadLoop_Sync(Source=WellLocation(rack_id=target_well.rack_id, well_number=target_well.well_number),
                              Volume=self.Volume,
                              Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
                              Flow_Rate=2.0,
@@ -455,7 +459,7 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
 
         methods = []
 
-        direct_inject = ROADMAP_DirectInjecttoQCMD(Source=WellLocation(target_well.rack_id, target_well.well_number),
+        direct_inject = ROADMAP_DirectInjecttoQCMD(Source=WellLocation(rack_id=target_well.rack_id, well_number=target_well.well_number),
                              Volume=self.Volume,
                              Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
                              Load_Flow_Rate=2.0,
