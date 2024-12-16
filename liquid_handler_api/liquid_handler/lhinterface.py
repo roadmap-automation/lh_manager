@@ -103,7 +103,7 @@ class LHJob(JobBase):
         
         createdDate = datetime.now().strftime(DATE_FORMAT)
 
-        all_methods: List[BaseLHMethod] = [method_manager.get_method_by_name(md['method_name'])(**md['method']) for md in self.method_data['method_list']]
+        all_methods: List[BaseLHMethod] = [method_manager.get_method_by_name(md['method_name'])(**md['method_data']) for md in self.method_data['method_list']]
 
         # reconstruct methods
         method_list = [m2 
