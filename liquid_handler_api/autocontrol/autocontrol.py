@@ -203,24 +203,28 @@ def to_thread(**thread_kwargs):
         return wrap
     return decorator_to_thread
 
+submission_lock = threading.Lock()
+
 @to_thread()
 def submit_tasks(tasks: List[AutocontrolTaskContainer], resubmit=False):
-    for taskcontainer in tasks:
-        task = taskcontainer.task
-        print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
-        if resubmit:
-            response = requests.post(AUTOCONTROL_URL + '/resubmit', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'task': task.model_dump(mode='json')}))
-        else:
-            response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=task.model_dump_json())
-        print('Autocontrol response: ', response.status_code, response.text)
-        if task.task_type != TaskType.INIT:
-            with active_tasks.lock:
-                if response.ok:
-                    if str(task.id) in active_tasks.pending:
-                        taskcontainer.status = SampleStatus.PENDING
-                        active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
-                else:
-                    taskcontainer.status = SampleStatus.FAILED
+    # submission lock prevents multiple methods from being submitted at the same time
+    with submission_lock:
+        for taskcontainer in tasks:
+            task = taskcontainer.task
+            print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
+            if resubmit:
+                response = requests.post(AUTOCONTROL_URL + '/resubmit', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'task': task.model_dump(mode='json')}))
+            else:
+                response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=task.model_dump_json())
+            print('Autocontrol response: ', response.status_code, response.text)
+            if task.task_type != TaskType.INIT:
+                with active_tasks.lock:
+                    if response.ok:
+                        if str(task.id) in active_tasks.pending:
+                            taskcontainer.status = SampleStatus.PENDING
+                            active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
+                    else:
+                        taskcontainer.status = SampleStatus.FAILED
 
 @to_thread()
 def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_material: bool = True):
