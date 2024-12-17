@@ -145,7 +145,7 @@ class SerialDilutionInject(SerialDilution):
 
     method_name: Literal['SerialDilutionInject'] = 'SerialDilutionInject'
     display_name: Literal['Serial Dilution with Injection'] = 'Serial Dilution with Injection'
-    inject_template: InjectMethod = Field(default_factory=InjectWithRinse)
+    inject_template: SerializeAsAny[InjectMethod] = Field(default_factory=InjectWithRinse)
 
     @validator('inject_template', 'mix_template', 'transfer_template', pre=True)
     def validate_templates(cls, v):
@@ -292,7 +292,7 @@ class StandardDilutionInject(StandardDilution):
     # complete: bool
     method_name: Literal['StandardDilutionInject'] = 'StandardDilutionInject'
     display_name: Literal['Standard Dilution with Injection'] = 'Standard Dilution with Injection'
-    inject_template: InjectMethod = Field(default_factory=InjectWithRinse)
+    inject_template: SerializeAsAny[InjectMethod] = Field(default_factory=InjectWithRinse)
 
     @validator('inject_template', 'mix_template', 'transfer_template', pre=True)
     def validate_templates(cls, v):
