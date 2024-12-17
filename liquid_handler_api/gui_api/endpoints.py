@@ -97,7 +97,11 @@ def DuplicateSample() -> Response:
         return make_response({'error': "sample not found, can't duplicate"}, 200)
     else:
         """ duplicate sample, resetting all statuses """
+
         new_sample = deepcopy(sample)
+        channel = data.get("channel", None)
+        if channel is not None:
+            new_sample.channel = int(channel % samples.n_channels)
 
         # generate new unique ID
         new_sample.generate_new_id()

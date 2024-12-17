@@ -139,8 +139,15 @@ const status_class_map: {[status in StatusType]: string} = {
             class="btn-close btn-sm align-middle copy"
             aria-label="Duplicate sample"
             title="Duplicate sample"
-            @click.stop="duplicate_sample(sample.id)">
+            @click.stop="duplicate_sample(sample.id, sample.channel)">
           </button>
+          <button
+            type="button"
+            class="btn-close btn-sm align-middle box_arrow_right"
+            aria-label="Copy sample to next channel"
+            title="Copy sample to next channel"
+            @click.stop="duplicate_sample(sample.id, sample.channel + 1)">
+          </button>          
         </button>
       </div>
       <div class="accordion-collapse collapse" :class="{ show: sindex === active_sample_index }">
@@ -241,6 +248,11 @@ const status_class_map: {[status in StatusType]: string} = {
 
 .btn-close.expand-up-down {
   background-image: url('data:image/svg+xml,<svg height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xml:space="preserve"><g><g><g><path d="M199.541,365.792c-4.237-4.093-10.99-3.976-15.083,0.262c-3.993,4.134-3.993,10.687,0,14.821l64,64c4.157,4.174,10.911,4.187,15.085,0.03c0.01-0.01,0.02-0.02,0.03-0.03l64-64c4.093-4.237,3.976-10.99-0.261-15.083c-4.134-3.993-10.688-3.993-14.821,0l-45.824,45.792V100.416l45.792,45.792c4.237,4.093,10.99,3.976,15.083-0.262c3.993-4.134,3.993-10.687,0-14.821l-64-64c-4.157-4.174-10.911-4.187-15.085-0.03c-0.01,0.01-0.02,0.02-0.03,0.03l-64,64c-4.093,4.237-3.975,10.99,0.262,15.083c4.134,3.992,10.687,3.992,14.82,0l45.824-45.792v311.168L199.541,365.792z"/><path d="M394.667,490.667H117.333c-5.891,0-10.667,4.776-10.667,10.667S111.442,512,117.333,512h277.333c5.891,0,10.667-4.776,10.667-10.667S400.558,490.667,394.667,490.667z"/><path d="M117.333,21.333h277.333c5.891,0,10.667-4.776,10.667-10.667C405.333,4.776,400.558,0,394.667,0H117.333c-5.891,0-10.667,4.776-10.667,10.667C106.667,16.558,111.442,21.333,117.333,21.333z"/></g></g></g></svg>')
+}
+
+.btn-close.box_arrow_right {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/><path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/></svg>')
+ 
 }
 
 .stage-label {

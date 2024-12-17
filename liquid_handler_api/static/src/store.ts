@@ -604,11 +604,11 @@ export async function remove_sample(sample_id: string) {
   return response_body;
 }
 
-export async function duplicate_sample(sample_id: string) {
+export async function duplicate_sample(sample_id: string, channel: number) {
   const update_result = await fetch("/GUI/DuplicateSample/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({id: sample_id})
+    body: JSON.stringify({id: sample_id, channel })
   });
   const response_body = await update_result.json();
   return response_body;
