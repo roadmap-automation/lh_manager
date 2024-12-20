@@ -199,3 +199,12 @@ def ResetErrorState() -> Response:
     lh_interface.has_error = False
 
     return make_response({'success': 'error state reset'}, 200)
+
+@lh_blueprint.route('/LH/ResubmitActiveJob/', methods=['POST'])
+def ResubmitActiveJob() -> Response:
+    """Updates the active job with a +1 LH_ID to ensure it will run again
+    """
+
+    lh_interface._active_job.LH_id += 1
+
+    return make_response({'success': f'LH_id incremented to {lh_interface._active_job.LH_id}'}, 200)
