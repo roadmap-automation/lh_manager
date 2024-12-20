@@ -317,6 +317,49 @@ class ROADMAP_InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
         return self.Volume / self.Flow_Rate
 
 @register
+class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
+    """Flush direct injection line with carrier liquid"""
+    Volume: float = 3.0
+    Flow_Rate: float = 3.0
+    display_name: Literal['ROADMAP Direct Inject Prime'] = 'ROADMAP Direct Inject Prime'
+    method_name: Literal['ROADMAP_DirectInjectPrime'] = 'ROADMAP_DirectInjectPrime'
+    method_type: Literal[MethodType.NONE] = MethodType.NONE
+
+    class lh_method(BaseLHMethod.lh_method):
+        Volume: str
+        Flow_Rate: str
+
+    def render_lh_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
+
+        return [self.lh_method(
+            SAMPLENAME=sample_name,
+            SAMPLEDESCRIPTION=sample_description,
+            METHODNAME=self.method_name,
+            Volume=f'{self.Volume}',
+            Flow_Rate=f'{self.Flow_Rate}',
+        ).to_dict()]
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [super().render_method(sample_name=sample_name,
+                                        sample_description=sample_description,
+                                        layout=layout)[0] | 
+            BaseInjectionSystemMethod.sub_method(
+                method_name='DirectInjectPrime',
+                method_data=dict(pump_volume=self.Volume * 1000,
+                                 pump_flow_rate=self.Flow_Rate)
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return self.Volume / self.Flow_Rate
+
+@register
 class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemMethod, BaseQCMDMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod

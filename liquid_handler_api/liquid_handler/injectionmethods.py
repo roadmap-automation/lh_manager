@@ -119,6 +119,7 @@ class InjectLoop(BaseInjectionSystemMethod):
     Flow_Rate: float = 1
     display_name: Literal['Inject Injection System Loop'] = 'Inject Injection System Loop'
     method_name: Literal['InjectLoop'] = 'InjectLoop'
+    method_type: Literal[MethodType.INJECT] = MethodType.INJECT
 
     def render_method(self,
                          sample_name: str,

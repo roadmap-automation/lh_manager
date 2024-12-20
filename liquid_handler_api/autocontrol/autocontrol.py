@@ -169,9 +169,10 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
                 taskdata.append(newtaskdata)
             
             # transfer if multiple devices are involved
-            if len(method.keys()) > 1:
+            if method_type == MethodType.NONE:
+                tasktype = TaskType.NOCHANNEL
+            elif len(method.keys()) > 1:
                 tasktype = TaskType.TRANSFER
-            # prepare if multiple subtasks from a single device are involved
             elif method_type == MethodType.PREPARE:
                 tasktype = TaskType.PREPARE
             elif method_type == MethodType.MEASURE:
