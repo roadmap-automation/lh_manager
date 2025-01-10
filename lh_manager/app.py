@@ -3,6 +3,7 @@ from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .sio import socketio
 from .material_db import blueprint as material_db_blueprint
+from .waste_manager import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
 import app_config
@@ -23,6 +24,7 @@ app.register_blueprint(gui_blueprint)
 app.register_blueprint(lh_blueprint)
 app.register_blueprint(autocontrol_blueprint)
 app.register_blueprint(material_db_blueprint)
+app.register_blueprint(waste_blueprint)
 socketio.init_app(app)
 
 #@app.route('/')
