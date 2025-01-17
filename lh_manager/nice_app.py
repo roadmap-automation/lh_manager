@@ -3,7 +3,7 @@ from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .nice_api import nice_blueprint
 from .sio import socketio
-import liquid_handler_api.app_config as app_config
+import app_config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")

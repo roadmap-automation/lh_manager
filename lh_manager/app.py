@@ -5,7 +5,7 @@ from .sio import socketio
 from .material_db import blueprint as material_db_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
-import liquid_handler_api.app_config as app_config
+import app_config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
