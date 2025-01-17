@@ -23,10 +23,9 @@ def AddWaste() -> Response:
 
     data = request.get_json(force=True)
     assert isinstance(data, dict)
-    new_waste = Composition(**data['composition'])
-    new_volume = float(data['volume'])
+    waste_item = waste.WasteItem(**data)
     well = waste.waste_layout.racks[waste.WASTE_RACK].wells[0]
-    well.mix_with(new_volume, new_waste)
+    well.mix_with(waste_item.volume, waste_item.composition)
     return make_response(well.model_dump(), 200)
 
 @blueprint.route('/Waste/EmptyWaste/', methods=['POST'])

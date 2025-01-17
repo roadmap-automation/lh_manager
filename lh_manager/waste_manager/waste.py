@@ -1,12 +1,21 @@
 """Waste manager initialization"""
 import json
 import os
+
+from dataclasses import dataclass, field
+
 from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
 from ..liquid_handler.state import make_persistent_dir
 from ..app_config import parser, config
 
 WASTE_LOG = config.log_path / 'waste.json'
 WASTE_RACK = 'waste'
+
+@dataclass
+class WasteItem:
+
+    composition: Composition = field(default_factory=Composition())
+    volume: float = 0.0
 
 def load_waste():
 
