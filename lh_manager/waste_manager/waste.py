@@ -54,3 +54,7 @@ if waste_layout is None:
     waste_layout.add_well_to_rack(WASTE_RACK, carboy)    
 
     save_waste()
+
+def add_waste(new_waste: WasteItem):
+    carboy.mix_with(new_waste.volume, new_waste.composition)
+    save_waste()

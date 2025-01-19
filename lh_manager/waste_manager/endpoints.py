@@ -15,6 +15,7 @@ def GetWasteLayout() -> Response:
     return make_response(waste.waste_layout.model_dump(), 200)
 
 @blueprint.route('/Waste/AddWaste/', methods=['POST'])
+@trigger_waste_update
 def AddWaste() -> Response:
     """Adds waste. Data format:
         {'volume': <float (mL)>,
@@ -24,9 +25,8 @@ def AddWaste() -> Response:
     data = request.get_json(force=True)
     assert isinstance(data, dict)
     waste_item = waste.WasteItem(**data)
-    well = waste.waste_layout.racks[waste.WASTE_RACK].wells[0]
-    well.mix_with(waste_item.volume, waste_item.composition)
-    return make_response(well.model_dump(), 200)
+    waste.add_waste(waste_item)
+    return make_response(waste_item.model_dump(), 200)
 
 @blueprint.route('/Waste/EmptyWaste/', methods=['POST'])
 def EmptyWaste() -> Response:

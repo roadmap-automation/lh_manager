@@ -3,6 +3,7 @@ from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, device_manager
+from ..waste_manager.waste import WasteItem
 
 from pydantic import BaseModel
 
@@ -64,6 +65,18 @@ class BaseLHMethod(BaseMethod):
     def execute(self, layout: LHBedLayout) -> MethodError | None:
         """Actions to be taken upon executing method. Default is nothing changes"""
         return None
+    
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        """Generates a volume and composition of a waste stream
+
+        Args:
+            layout (LHBedLayout): current LH layout
+
+        Returns:
+            WasteItem: total waste
+        """
+
+        return WasteItem()
     
     def new_sample_composition(self, layout: LHBedLayout) -> str:
         """Returns new sample composition if applicable"""

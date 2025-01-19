@@ -6,6 +6,8 @@ from flask import make_response, Response, request
 from ..liquid_handler.job import ResultStatus, ValidationStatus
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
 from ..liquid_handler.state import layout
+from ..waste_manager.waste import add_waste
+from ..waste_manager.events import trigger_waste_update
 from ..sio import socketio
 from . import lh_blueprint
 
@@ -146,6 +148,7 @@ def PutSampleListValidation(sample_list_id):
     return make_response({sample_list_id: job.get_validation_status(), 'error': error}, 200)
 
 @lh_blueprint.route('/LH/PutSampleData/', methods=['POST'])
+@trigger_waste_update
 def PutSampleData():
     data = request.get_json(force=True)
     assert isinstance(data, dict)
@@ -176,6 +179,8 @@ def PutSampleData():
         lh_interface.deactivate()
     elif job.get_result_status() == ResultStatus.SUCCESS:
         job.execute_methods(layout)
+        for m in job.LH_methods:
+            add_waste(m.waste(layout))
 
     return make_response({'data': data}, 200)
 
