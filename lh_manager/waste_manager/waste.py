@@ -2,10 +2,7 @@
 import json
 import os
 
-from pydantic import BaseModel, Field
-
 from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition, Solution
-from ..liquid_handler.state import make_persistent_dir
 from ..app_config import parser, config
 
 WASTE_LOG = config.log_path / 'waste.json'
@@ -27,7 +24,6 @@ def load_waste():
     return layout
 
 def save_waste():
-    make_persistent_dir()
     with open(WASTE_LOG, 'w') as f:
         f.write(waste_layout.model_dump_json(indent=2))
 

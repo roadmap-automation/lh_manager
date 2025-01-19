@@ -6,7 +6,7 @@ from .material_db import blueprint as material_db_blueprint
 from .waste_manager import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
-import app_config
+from .app_config import config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -41,7 +41,6 @@ def test_emit():
 
 if __name__ == '__main__':
 
-    config = app_config.config
     config.stage_names = ['methods']
 
     launch_autocontrol_interface(poll_delay=5)
