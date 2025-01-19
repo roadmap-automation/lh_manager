@@ -5,6 +5,7 @@ from .formulation import Formulation, SoluteFormulation
 from .injectionmethods import InjectLoop, BaseInjectionSystemMethod
 from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod, ROADMAP_QCMD_LoadLoop, ROADMAP_QCMD_DirectInject, TransferMethod, LHMethodCluster
 from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
+from ..waste_manager.waste import WasteItem, WATER
 
 import numpy as np
 from copy import copy
@@ -358,6 +359,10 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
+    
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+
+        return WasteItem(volume=self.Volume, composition=WATER)
 
 @register
 class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemMethod, BaseQCMDMethod):

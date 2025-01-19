@@ -1,7 +1,6 @@
 """Class definitions for bed layout, wells, and compositions"""
 from uuid import uuid4
-from dataclasses import field
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Tuple, List
 
 class Solvent(BaseModel):
@@ -15,8 +14,8 @@ class Solute(BaseModel):
 
 class Composition(BaseModel):
     """Class representing a solution composition"""
-    solvents: list[Solvent] = field(default_factory=list)
-    solutes: list[Solute] = field(default_factory=list)
+    solvents: list[Solvent] = Field(default_factory=list)
+    solutes: list[Solute] = Field(default_factory=list)
 
     def __repr__(self) -> str:
         """Custom representation of composition for metadata"""
@@ -118,21 +117,11 @@ class InferredWellLocation(WellLocation):
         if self.id is None:
             self.id = str(uuid4())
 
-class Well(BaseModel):
-    """Class representing the contents of a single well
-    
-        rack_id (str): String description of rack where well is located
-        well_number (int): Well number in specified rack
-        composition (Composition): composition of solution in well
-        volume (float | None): total volume in the well in mL. None indicates unoccupied well
-        id (str | None): optional UUID of well. Used for matching InferredWellLocation to existing wells
-        """
+class Solution(BaseModel):
+    """Class representing a volume and composition of material"""
 
-    rack_id: str
-    well_number: int
-    composition: Composition
-    volume: float | None
-    id: str | None = None
+    composition: Composition = Field(default_factory=Composition)
+    volume: float = 0.0
 
     def mix_with(self, volume: float, composition: Composition) -> None:
         """Update volume and composition from mixing with new solution"""
@@ -152,6 +141,19 @@ class Well(BaseModel):
         self.volume = new_volume
         self.composition = Composition.from_list(new_solvents, new_fractions, new_solutes, new_concentrations)
 
+class Well(Solution):
+    """Class representing the contents of a single well
+    
+        rack_id (str): String description of rack where well is located
+        well_number (int): Well number in specified rack
+        composition (Composition): composition of solution in well
+        volume (float | None): total volume in the well in mL. None indicates unoccupied well
+        id (str | None): optional UUID of well. Used for matching InferredWellLocation to existing wells
+        """
+
+    rack_id: str
+    well_number: int
+    id: str | None = None
 
 def find_composition(composition: Composition, wells: List[Well]) -> List[Well]:
     """Finds wells containing the desired composition
@@ -177,7 +179,7 @@ class Rack(BaseModel):
 
 class LHBedLayout(BaseModel):
     """Class representing a general LH bed layout"""
-    racks: dict[str, Rack] = field(default_factory=dict)
+    racks: dict[str, Rack] = Field(default_factory=dict)
 
     def add_rack_from_dict(self, name, d: dict):
         """ Add a rack from dictionary definition (i.e. config file)"""

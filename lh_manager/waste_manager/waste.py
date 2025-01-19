@@ -4,17 +4,18 @@ import os
 
 from pydantic import BaseModel, Field
 
-from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
+from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition, Solution
 from ..liquid_handler.state import make_persistent_dir
 from ..app_config import parser, config
 
 WASTE_LOG = config.log_path / 'waste.json'
 WASTE_RACK = 'waste'
 
-class WasteItem(BaseModel):
+WATER = Composition(solvents=[dict(name='H2O',
+                                   fraction=1.0)])
 
-    composition: Composition = Field(default_factory=Composition)
-    volume: float = 0.0
+class WasteItem(Solution):
+    ...
 
 def load_waste():
 
