@@ -6,7 +6,7 @@ from flask import make_response, Response, request
 from ..liquid_handler.job import ResultStatus, ValidationStatus
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
 from ..liquid_handler.state import layout
-from ..waste_manager.waste import add_waste
+from ..waste_manager.waste import waste_layout
 from ..waste_manager.events import trigger_waste_update
 from ..sio import socketio
 from . import lh_blueprint
@@ -180,7 +180,7 @@ def PutSampleData():
     elif job.get_result_status() == ResultStatus.SUCCESS:
         job.execute_methods(layout)
         for m in job.LH_methods:
-            add_waste(m.waste(layout))
+            waste_layout.add_waste(m.waste(layout))
 
     return make_response({'data': data}, 200)
 

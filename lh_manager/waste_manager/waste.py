@@ -28,14 +28,15 @@ class WasteLayout(LHBedLayout):
         with open(WASTE_LOG, 'w') as f:
             f.write(self.model_dump_json(indent=2))
 
-    def empty_waste():
+    def empty_waste(self):
         new_carboy = Well(rack_id=WASTE_RACK,
                     well_number=1,
                     composition=Composition(),
                     volume=0.0,
-                    id=uuid4())
+                    id=str(uuid4()))
         
-        waste_layout.update_well(new_carboy)
+        self.update_well(new_carboy)
+        self.save_waste()
 
     @property
     def carboy(self):
@@ -68,6 +69,7 @@ def load_waste():
                         wells=[])
 
         layout = WasteLayout(racks={WASTE_RACK: waste_rack})
+        layout.empty_waste()
 
     return layout
 
@@ -111,7 +113,7 @@ class WasteHistory:
             new_waste (WasteItem): waste item to insert
         """
         res = self.db.execute(f"""\
-            INSERT INTO {self.table_name}(well_id, waste) VALUES (?, ?);
+            INSERT INTO {self.table_name}(bottle_id, waste) VALUES (?, ?);
         """, (bottle_id, new_waste.model_dump_json()))
         
         self.db.commit()

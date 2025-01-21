@@ -1,7 +1,6 @@
 #import socketio as sio
 
 from ..sio import socketio
-from .waste import save_waste
 
 def trigger_waste_update(f):
     """Decorator that announces that layout has changed"""
