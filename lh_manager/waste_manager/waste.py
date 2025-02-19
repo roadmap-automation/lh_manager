@@ -5,8 +5,9 @@ import sqlite3
 
 from uuid import uuid4
 
-from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition, Solution
-from ..app_config import parser, config
+from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
+from ..app_config import config
+from .wastedata import WasteItem
 
 WASTE_LOG = config.log_path / 'waste.json'
 WASTE_HISTORY = config.log_path / 'waste.sqlite'
@@ -14,9 +15,6 @@ WASTE_RACK = 'waste'
 
 WATER = Composition(solvents=[dict(name='H2O',
                                    fraction=1.0)])
-
-class WasteItem(Solution):
-    ...
 
 class WasteLayout(LHBedLayout):
     """Specialized layout class for waste handling. Has a single carboy well
