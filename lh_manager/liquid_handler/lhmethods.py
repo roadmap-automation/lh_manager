@@ -3,7 +3,7 @@ from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, MethodType, register, MethodsType
 from .devices import DeviceBase, device_manager
-from ..waste_manager.waste import WasteItem, WATER
+from ..waste_manager.wastedata import WasteItem, WATER
 
 from pydantic import BaseModel
 

@@ -5,7 +5,7 @@ from .formulation import Formulation, SoluteFormulation
 from .injectionmethods import InjectLoop, BaseInjectionSystemMethod
 from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod, ROADMAP_QCMD_LoadLoop, ROADMAP_QCMD_DirectInject, TransferMethod, LHMethodCluster
 from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
-from ..waste_manager.waste import WasteItem, WATER
+from ..waste_manager.wastedata import WasteItem, WATER
 
 import numpy as np
 from copy import copy
