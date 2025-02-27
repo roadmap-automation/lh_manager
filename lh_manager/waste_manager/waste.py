@@ -13,9 +13,6 @@ WASTE_LOG = config.log_path / 'waste.json'
 WASTE_HISTORY = config.log_path / 'waste.sqlite'
 WASTE_RACK = 'waste'
 
-WATER = Composition(solvents=[dict(name='H2O',
-                                   fraction=1.0)])
-
 class WasteLayout(LHBedLayout):
     """Specialized layout class for waste handling. Has a single carboy well
     """

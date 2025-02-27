@@ -7,7 +7,7 @@ from .waste import waste_layout
 from .wastedata import WasteItem
 from .events import trigger_waste_update
 
-blueprint = Blueprint('waste_manager', __name__)
+from . import blueprint
 
 @blueprint.route('/Waste/GetLayout/', methods=['GET'])
 def GetWasteLayout() -> Response:
