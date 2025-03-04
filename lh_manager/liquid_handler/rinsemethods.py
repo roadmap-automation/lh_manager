@@ -15,7 +15,7 @@ class RinseSystemDevice(DeviceBase):
     device_type: Literal['rinse'] = 'rinse'
     multichannel: bool = False
     allow_sample_mixing: bool = False
-    address: str = 'http://localhost:5004'
+    address: str = 'http://localhost:5014'
 
     class Job(JobBase):
         pass
