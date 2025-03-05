@@ -3,7 +3,7 @@ from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .sio import socketio
 from .material_db import blueprint as material_db_blueprint
-from .waste_manager import blueprint as waste_blueprint
+from .waste_manager.waste_api import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
 from .app_config import config
