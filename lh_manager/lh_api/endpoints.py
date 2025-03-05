@@ -6,8 +6,8 @@ from flask import make_response, Response, request
 from ..liquid_handler.job import ResultStatus, ValidationStatus
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
 from ..liquid_handler.state import layout
-from ..waste_manager.waste import waste_layout
-from ..waste_manager.events import trigger_waste_update
+from ..waste_manager.waste_api.waste import waste_layout
+from ..waste_manager.waste_api.events import trigger_waste_update
 from ..sio import socketio
 from . import lh_blueprint
 

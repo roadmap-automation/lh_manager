@@ -5,9 +5,9 @@ import sqlite3
 
 from uuid import uuid4
 
-from ..liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
-from ..app_config import config
-from .wastedata import WasteItem
+from ...liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
+from ...app_config import config
+from ..wastedata import WasteItem
 
 WASTE_LOG = config.log_path / 'waste.json'
 WASTE_HISTORY = config.log_path / 'waste.sqlite'

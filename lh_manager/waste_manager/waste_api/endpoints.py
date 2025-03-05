@@ -2,9 +2,9 @@
 from typing import List, Optional
 from flask import make_response, Response, request, Blueprint
 
-from ..liquid_handler.bedlayout import Well, WellLocation
+from ...liquid_handler.bedlayout import Well, WellLocation
 from .waste import waste_layout
-from .wastedata import WasteItem
+from ..wastedata import WasteItem
 from .events import trigger_waste_update
 
 from . import blueprint
