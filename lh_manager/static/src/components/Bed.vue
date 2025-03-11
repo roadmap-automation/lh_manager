@@ -11,9 +11,6 @@ const props = defineProps<{
 
 const text_size = 30;
 const padding = 6;
-const device_layout = device_layouts.value[props.device_name]
-const layout = device_layout?.layout
-const wells = device_layout?.wells
 
 //console.log(layout, wells)
 
@@ -84,7 +81,7 @@ function highlight_class(col, row) {
 }
 
 const filled_cells = computed(() => {
-  const local_wells = wells.filter((w) => (w.rack_id === props.rack_id));
+  const local_wells = device_layouts.value[props.device_name].wells.filter((w) => (w.rack_id === props.rack_id));
   const local_wells_lookup = Object.fromEntries(local_wells.map((w) => [w.well_number, w]));
   return local_wells_lookup;
 });
@@ -93,7 +90,7 @@ function fill_path(col, row) {
   const well_number = (row * props.rack.columns + col + 1).toFixed();
   if (well_number in filled_cells.value) {
     const well_volume = filled_cells.value[well_number].volume;
-    const max_volume = layout?.racks[props.rack_id].max_volume ?? well_volume;
+    const max_volume = device_layouts.value[props.device_name].layout.racks[props.rack_id].max_volume ?? well_volume;
     const epsilon = 1e-8;
     // keep fill fraction just below one so there's still an arc to draw...
     const fill_fraction = Math.min(well_volume / max_volume, 1-epsilon);

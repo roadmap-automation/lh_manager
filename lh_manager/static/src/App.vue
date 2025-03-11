@@ -4,7 +4,7 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
-import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshLayout, refreshComponents, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts } from './store';
+import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshLayout, refreshComponents, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, device_defs } from './store';
 import type { MethodDef } from './store';
 
 const connected = ref(false);
@@ -20,6 +20,7 @@ socket.on('connect', () => {
   refreshMethodDefs();
   refreshMaterials();
   refreshDeviceLayouts();
+  establish_socket_connections();
 });
 
 socket.on('disconnect', (payload) => {
@@ -37,9 +38,10 @@ socket.on('update_sample_status', () => {
   refreshSampleStatus();
 })
 
-socket.on('update_layout', () => {
-  refreshDeviceLayouts()
-})
+//socket.on('update_layout', () => {
+//  console.log('Got base refresh')
+//  refreshDeviceLayouts()
+//})
 
 socket.on('update_materials', () => {
   refreshMaterials();
@@ -48,6 +50,20 @@ socket.on('update_materials', () => {
 socket.on('update_devices', () => {
   refreshDeviceDefs();
 });
+
+async function establish_socket_connections() {
+  await refreshDeviceLayouts();
+  console.log(device_defs.value)
+  for (const device of Object.values(device_defs.value)) {
+    console.log('Creating new socket for ' + device.device_name)
+    const new_socket = io(device.address)
+
+    new_socket.on('update_layout', () => {
+      console.log('Got update layout from ' + device.device_name)
+      refreshWells(device.device_name);
+    })
+  }
+}
 
 </script>
 

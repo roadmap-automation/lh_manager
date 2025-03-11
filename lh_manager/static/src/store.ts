@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, toRaw } from 'vue';
+import { computed, nextTick, reactive, ref, shallowRef, toRaw } from 'vue';
 import json_pointer from 'json-pointer';
 import Modal from 'bootstrap/js/src/modal';
 import mitt from 'mitt';
@@ -190,7 +190,7 @@ export interface DeviceLayout {
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
-export const device_layouts = ref<Record<string, DeviceLayout>>({});
+export const device_layouts = shallowRef<Record<string, DeviceLayout>>({});
 //export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
@@ -525,14 +525,8 @@ export async function explode_stage(sample_obj: Sample, stage: string): Promise<
 
 export async function getDeviceLayout(device_name: string) {
   const layout = await (await fetch(device_defs.value[device_name].address + "/GUI/GetLayout/")).json();
-  console.log({device_name: layout});
+  //console.log({ layout });
   return { layout };
-}
-
-export async function refreshLayout(device_name: string) {
-  const new_layout = await getDeviceLayout(device_name)
-  console.log({new_layout});
-  device_layouts.value[device_name].layout = new_layout.layout;
 }
 
 function dedupe<T>(arr: T[]): T[] {
@@ -567,9 +561,10 @@ export async function getDeviceWells(device_name: string) {
 
 export async function refreshWells(device_name: string) {
   const new_wells = await getDeviceWells(device_name);
-  const current_layout = device_layouts.value[device_name]
-  device_layouts.value[device_name] = {...new_wells, layout: current_layout.layout};
-  console.log({new_wells});
+  const current_layout = device_layouts.value[device_name];
+  current_layout.wells = new_wells.wells;
+  current_layout.source_components = new_wells.source_components;
+  device_layouts.value = { ...device_layouts.value, ...{[device_name]: current_layout}};
 }
 
 export async function refreshSamples() {
@@ -606,15 +601,15 @@ export async function refreshDeviceDefs() {
 }
 
 export async function refreshDeviceLayouts() {
-  await refreshDeviceDefs()
-  const layouts = {}
+  await refreshDeviceDefs();
+  const layouts = {};
   for (const device_name in device_defs.value) {
-    console.log('Updating ' + device_name)
-    const new_layout = await getDeviceLayout(device_name)
-    const new_wells = await getDeviceWells(device_name)
-    layouts[device_name] = { ...new_layout, ...new_wells }
+    //console.log('Updating ' + device_name);
+    const new_layout = await getDeviceLayout(device_name);
+    const new_wells = await getDeviceWells(device_name);
+    layouts[device_name] = { ...new_layout, ...new_wells };
   }
-  device_layouts.value = layouts
+  device_layouts.value = layouts;
 }
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {
