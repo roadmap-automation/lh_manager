@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import BedLayout from './BedLayout.vue';
 
-import { materials, materialType, soluteMassUnits, soluteVolumeUnits, add_material, delete_material, wells } from '../store';
+import { materials, materialType, soluteMassUnits, soluteVolumeUnits, add_material, delete_material } from '../store';
 import type { Material, MaterialType } from '../store';
 
 type sortOrder = "name" | "full_name" | "iupac_name" | "molecular_weight" | "type";
@@ -190,9 +190,6 @@ function edit_material(material: Material) {
             </tr>
           </tbody>
         </table>
-      </div>
-      <div class="col">
-        <BedLayout :wells="wells" />
       </div>
   </div>
 </template>

@@ -15,7 +15,7 @@ export interface MethodDef {
 export interface WellLocation {
   rack_id: string,
   well_number: number,
-  id: string | null,
+  id?: string | null,
 }
 
 export type DeviceMethodType = {
@@ -191,11 +191,11 @@ export interface DeviceLayout {
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
 export const device_layouts = ref<Record<string, DeviceLayout>>({});
-export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
+//export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
-export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
-export const wells = ref<Well[]>([]);
+//export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
+//export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
 export const well_to_edit = ref<{device: string, well: WellLocation}>();
 export const num_channels = ref<number>(1);
@@ -561,6 +561,7 @@ export async function getDeviceWells(device_name: string) {
       solutes[s.name].push({ ...s, zone });
     });
   });
+  const source_components = { solvents, solutes };
   return { source_components, wells }
 }
 

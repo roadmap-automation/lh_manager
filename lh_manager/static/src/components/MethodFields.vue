@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, source_components, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, layout, update_at_pointer } from '../store';
+import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, } from '../store';
 import json_pointer from 'json-pointer';
 import type { MethodType } from '../store';
 
@@ -17,6 +17,15 @@ function send_changes(param) {
   update_at_pointer(props.sample_id, method_pointer, param.value);
 }
 
+const source_components = computed(() => {
+  let sc = {};
+  for (const device_name in device_layouts.value) {
+    const layout = device_layouts.value[device_name]
+    sc = {...sc, ...layout.source_components};
+  }
+  console.log({source_components: sc})
+  return sc;
+  });
 
 function get_parameters(method: MethodType) {
   const { method_name } = method;
