@@ -10,26 +10,8 @@ const props = defineProps<{
 
 const layout = device_layouts.value[props.device_name]
 
-const max_x = computed(() => {
-
-  var maxval = [0];
-  for (const rack_id in layout.layout.racks) {
-    const rack = layout.layout.racks[rack_id]
-    maxval.push(rack.x_translate + rack.width)
-  }
-  return Math.max(...maxval)
-});
-
-const max_y = computed(() => {
-
-  var maxval = [0];
-  for (const rack_id in layout.layout.racks) {
-    const rack = layout.layout.racks[rack_id]
-    maxval.push(rack.y_translate + rack.height)
-  }
-  return Math.max(...maxval)
-});
-
+const max_x = computed(() => Math.max(...Object.values(layout.layout.racks).map((rack) => rack.x_translate + rack.width)));
+const max_y = computed(() => Math.max(...Object.values(layout.layout.racks).map((rack) => rack.y_translate + rack.height)));
 
 </script>
 
