@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, defineProps } from 'vue'
+import { ref, computed, defineProps } from 'vue'
 import Bed from './Bed.vue';
 import { device_layouts } from '../store';
 import type { Well } from '../store';
@@ -9,6 +9,27 @@ const props = defineProps<{
 }>();
 
 const layout = device_layouts.value[props.device_name]
+
+const max_x = computed(() => {
+
+  var maxval = [0];
+  for (const rack_id in layout.layout.racks) {
+    const rack = layout.layout.racks[rack_id]
+    maxval.push(rack.x_translate + rack.width)
+  }
+  return Math.max(...maxval)
+});
+
+const max_y = computed(() => {
+
+  var maxval = [0];
+  for (const rack_id in layout.layout.racks) {
+    const rack = layout.layout.racks[rack_id]
+    maxval.push(rack.y_translate + rack.height)
+  }
+  return Math.max(...maxval)
+});
+
 
 </script>
 
@@ -38,7 +59,7 @@ const layout = device_layouts.value[props.device_name]
         <line stroke="pink" stroke-width="6px" x1="0" x2="0" y1="0" y2="10"/>
       </pattern>
     </defs>
-    <svg class="inner" viewBox="0 0 900 1000" x="0" y="0" preserveAspectRatio="xMinYMin meet">
+    <svg class="inner" :viewBox="'0 0 ' + max_x.toString() + ' ' + max_y.toString()" x="0" y="0" preserveAspectRatio="xMinYMin meet">
       <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
       <g v-for="(rack, rack_id) in layout.layout.racks" :transform="'translate(' + rack.x_translate + ',' + rack.y_translate + ')'">
         <Bed :rack_id="rack_id" :rack="rack" :device_name="props.device_name"/>

@@ -95,7 +95,7 @@ function openMixture() {
         :aria-controls="device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ device_name }}</button>
           </li>
         </ul>
-        <div class="tab-content d-flex flex-fill" id="layoutTabContent">
+        <div class="tab-content d-flex flex-fill" style="height:100%; width:100%" id="layoutTabContent">
           <div v-for="(layout, device_name, index) in device_layouts" :key="device_name" :class="{ active: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
             <BedLayout :device_name="device_name"/>
           </div>        
