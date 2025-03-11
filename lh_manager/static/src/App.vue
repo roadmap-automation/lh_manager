@@ -4,7 +4,7 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
-import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshLayout, refreshComponents, refreshWells, refreshMaterials, refreshDeviceDefs } from './store';
+import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshLayout, refreshComponents, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts } from './store';
 import type { MethodDef } from './store';
 
 const connected = ref(false);
@@ -15,13 +15,11 @@ const socket = io('', {
 socket.on('connect', () => {
   console.log("connected: ", socket.id);
   connected.value = true;
-  refreshLayout();
-  refreshWells();
   refreshSamples();
   refreshSampleStatus();
   refreshMethodDefs();
   refreshMaterials();
-  refreshDeviceDefs();
+  refreshDeviceLayouts();
 });
 
 socket.on('disconnect', (payload) => {
@@ -40,8 +38,7 @@ socket.on('update_sample_status', () => {
 })
 
 socket.on('update_layout', () => {
-  refreshLayout();
-  refreshWells();
+  refreshDeviceLayouts()
 })
 
 socket.on('update_materials', () => {

@@ -176,6 +176,11 @@ class Rack(BaseModel):
     max_volume: float
     wells: list[Well]
     style: str = 'grid' # grid | staggered
+    height: int
+    width: int
+    x_translate: int
+    y_translate: int
+    shape: str = 'rect' # rect | circle
 
 class LHBedLayout(BaseModel):
     """Class representing a general LH bed layout"""

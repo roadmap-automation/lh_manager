@@ -1,25 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { layout, pick_handler, source_well, target_well, well_editor_active, well_to_edit } from '../store';
-import type { Well } from '../store';
+import { pick_handler, source_well, target_well, well_editor_active, well_to_edit, device_layouts } from '../store';
+import type { Rack } from '../store';
 
 const props = defineProps<{
-  height: number,
-  width: number,
   rack_id: string,
-  shape: 'circle' | 'rect',
-  wells: Well[]
+  rack: Rack,
+  device_name: string,
 }>();
 
 const text_size = 30;
 const padding = 6;
+const device_layout = device_layouts.value[props.device_name]
+const layout = device_layout?.layout
+const wells = device_layout?.wells
 
-const rack = layout.value?.racks[props.rack_id] ?? {rows: 0, columns:0, style: 'grid'};
+//console.log(layout, wells)
 
-const row_array = computed(() => Array.from({ length: rack.rows }).map((_, i) => i))
-const col_array = computed(() => Array.from({ length: rack.columns }).map((_, i) => i));
-const max_col_width = computed(() => (props.width - text_size - 2 * padding) / rack.columns);
-const row_height = computed(() => (props.height - text_size - 2 * padding) / rack.rows);
+const row_array = computed(() => Array.from({ length: props.rack.rows }).map((_, i) => i))
+const col_array = computed(() => Array.from({ length: props.rack.columns }).map((_, i) => i));
+const max_col_width = computed(() => (props.rack.width - text_size - 2 * padding) / props.rack.columns);
+const row_height = computed(() => (props.rack.height - text_size - 2 * padding) / props.rack.rows);
 // For square cells (circle shape vials):
 const cell_size = computed(() => {
   return Math.min(row_height.value, max_col_width.value);
@@ -27,10 +28,10 @@ const cell_size = computed(() => {
 const r = computed(() => (cell_size.value / 2.0 - padding / 2.0));
 
 const col_width = computed(() => {
-  if (props.shape === 'rect') {
-    return props.width / rack.columns;
+  if (props.rack.shape === 'rect') {
+    return props.rack.width / props.rack.columns;
   }
-  else if (props.shape === 'circle') {
+  else if (props.rack.shape === 'circle') {
     return cell_size.value;
   }
 });
@@ -43,7 +44,7 @@ function y_offset(col: number, centered: boolean = true) {
 function x_offset(col: number, row: number, centered: boolean = true) {
   let start: number;
   const centering_offset = (centered) ? 0.5 : 0;
-  if (rack.style === 'staggered') {
+  if (props.rack.style === 'staggered') {
     start = (row % 2) * 0.5 + centering_offset;
   }
   else {
@@ -53,20 +54,20 @@ function x_offset(col: number, row: number, centered: boolean = true) {
 }
 
 function clicked(row: number, col: number) {
-  const well_number = row * rack.columns + col + 1;
+  const well_number = row * props.rack.columns + col + 1;
   const rack_id = props.rack_id;
   pick_handler({ rack_id, well_number });
 }
 
 function edit_well(row: number, col: number) {
-  const well_number = row * rack.columns + col + 1;
+  const well_number = row * props.rack.columns + col + 1;
   const rack_id = props.rack_id;
-  well_to_edit.value = {well_number, rack_id};
+  well_to_edit.value = {device: props.device_name, well: {well_number, rack_id}};
   well_editor_active.value = true;
 }
 
 function highlight_class(col, row) {
-  const well_number = row * rack.columns + col + 1;
+  const well_number = row * props.rack.columns + col + 1;
   const classList: string[] = [];
   const target = target_well.value;
   const source = source_well.value;
@@ -83,22 +84,22 @@ function highlight_class(col, row) {
 }
 
 const filled_cells = computed(() => {
-  const local_wells = props.wells.filter((w) => (w.rack_id === props.rack_id));
+  const local_wells = wells.filter((w) => (w.rack_id === props.rack_id));
   const local_wells_lookup = Object.fromEntries(local_wells.map((w) => [w.well_number, w]));
   return local_wells_lookup;
 });
 
 function fill_path(col, row) {
-  const well_number = (row * rack.columns + col + 1).toFixed();
+  const well_number = (row * props.rack.columns + col + 1).toFixed();
   if (well_number in filled_cells.value) {
     const well_volume = filled_cells.value[well_number].volume;
-    const max_volume = layout.value?.racks[props.rack_id].max_volume ?? well_volume;
+    const max_volume = layout?.racks[props.rack_id].max_volume ?? well_volume;
     const epsilon = 1e-8;
     // keep fill fraction just below one so there's still an arc to draw...
     const fill_fraction = Math.min(well_volume / max_volume, 1-epsilon);
     const cx = x_offset(col, row);
     const cy = y_offset(row);
-    if (props.shape === 'circle') {  
+    if (props.rack.shape === 'circle') {  
       const rr = r.value;
       const y = cy - rr * (2 * fill_fraction - 1);
       // const sweep_flag = (fill_fraction > 0.5) ? "0" : "1";
@@ -106,7 +107,7 @@ function fill_path(col, row) {
       const dx = 2 * rr * Math.sqrt(fill_fraction - fill_fraction**2);
       return `M${cx - dx} ${y} A ${rr} ${rr} 0 ${large_arc} 0 ${cx + dx} ${y} Z`;
     }
-    else if (props.shape === 'rect') {
+    else if (props.rack.shape === 'rect') {
       const dx = 0.5 * (col_width.value ?? 0) - padding;
       const dy = 0.5 * (row_height.value ?? 0) - padding;
       const x = cx - padding;
@@ -125,25 +126,25 @@ onMounted(() => {
 </script>
 
 <template>
-  <rect :width="width" :height="height"></rect>
+  <rect :width="props.rack.width" :height="props.rack.height"></rect>
   <g v-for="row of row_array" :index="row">
-    <g v-for="col of col_array" :index="col" :class="highlight_class(col, row)" :n="row * rack.columns + col">
-      <title>{{ row * rack.columns + col + 1 }}</title>
-      <circle v-if="props.shape === 'circle'" class="vial-button" :cx="x_offset(col, row)" :cy="y_offset(row)" :r="r"
+    <g v-for="col of col_array" :index="col" :class="highlight_class(col, row)" :n="row * props.rack.columns + col">
+      <title>{{ row * props.rack.columns + col + 1 }}</title>
+      <circle v-if="props.rack.shape === 'circle'" class="vial-button" :cx="x_offset(col, row)" :cy="y_offset(row)" :r="r"
         @click="clicked(row, col)"
         @contextmenu.prevent="edit_well(row, col)">
-        <title>{{ filled_cells[row*rack.columns + col + 1] }}</title>
+        <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
       </circle>
-      <rect :class="highlight_class(col, row)" v-if="props.shape === 'rect'" class="vial-button" :width="col_width - 2*padding" :height="row_height - 2*padding"
+      <rect :class="highlight_class(col, row)" v-if="props.rack.shape === 'rect'" class="vial-button" :width="col_width - 2*padding" :height="row_height - 2*padding"
         :x="x_offset(col, row, false)" :y="y_offset(row, false)" @click="clicked(row, col)" @contextmenu.prevent="edit_well(row, col)">
-        <title>{{ filled_cells[row*rack.columns + col + 1] }}</title>
+        <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
       </rect>
       <path class="fill-fraction" :d="fill_path(col, row)"></path>
       <text class="vial-label" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
-        {{ row * rack.columns + col + 1 }}</text>
+        {{ row * props.rack.columns + col + 1 }}</text>
     </g>
   </g>
-  <text class="title" :y="height - padding" :x="width / 2">{{ props.rack_id }}</text>
+  <text class="title" :y="props.rack.height - padding" :x="props.rack.width / 2">{{ props.rack_id }}</text>
 </template>
 
 <style scoped>

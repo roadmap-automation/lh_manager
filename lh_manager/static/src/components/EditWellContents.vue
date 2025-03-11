@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, defineProps, onMounted, watch, toRaw, computed, nextTick } from 'vue'
 import { Modal } from 'bootstrap/dist/js/bootstrap.esm';
-import { soluteMassUnits, soluteVolumeUnits, materials, well_editor_active, well_to_edit, layout, update_well_contents, remove_well_definition } from '../store';
+import { soluteMassUnits, soluteVolumeUnits, materials, well_editor_active, well_to_edit, update_well_contents, remove_well_definition, device_layouts } from '../store';
 import type { Material, Well, Solute, Solvent } from '../store';
 
-const props = defineProps<{
-  wells: Well[]
-}>();
+//const props = defineProps<{
+//  wells: Well[]
+//}>();
 
 const dialog = ref<HTMLDivElement>();
 const current_well = ref<Well>();
@@ -14,7 +14,6 @@ const solute_search_regexp = ref<RegExp | null>(null);
 const solute_search_pattern = ref<string | null>(null);
 const solvent_search_regexp = ref<RegExp | null>(null);
 const solvent_search_pattern = ref<string | null>(null);
-
 const soluteUnits = [...soluteMassUnits, ...soluteVolumeUnits];
 
 let modal: Modal;
@@ -30,8 +29,10 @@ watch(well_editor_active, async (newval, oldval) => {
 watch(well_to_edit, async(newval, oldval) => {
   // populate a local copy of a well, for editing.
   if (newval === undefined) { return }
-  const { rack_id, well_number } = toRaw(newval);
-  const existing_well = props.wells.find((well) => (well.rack_id === rack_id && well.well_number === well_number));
+  const { device, well } = toRaw(newval);
+  const { rack_id, well_number } = well;
+  const wells = device_layouts.value[device].wells
+  const existing_well = wells.find((well) => (well.rack_id === rack_id && well.well_number === well_number));
   current_well.value = structuredClone(toRaw(existing_well)) ?? {...structuredClone(empty_well), rack_id, well_number};
 });
 
@@ -101,14 +102,14 @@ function add_component(target: 'solutes' | 'solvents') {
 
 function send_changes() {
   if (current_well.value) {
-    update_well_contents(current_well.value);
+    update_well_contents(well_to_edit.value?.device, current_well.value);
   }
   well_editor_active.value = false;
 };
 
 function remove_definition() {
   if (current_well.value) {
-    remove_well_definition(current_well.value);
+    remove_well_definition(well_to_edit.value?.device, current_well.value);
   }
   well_editor_active.value = false;
 }
@@ -121,7 +122,7 @@ function remove_definition() {
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Edit Well {{  well_to_edit?.rack_id }}::{{ well_to_edit?.well_number }}</h5>
+          <h5 class="modal-title">Edit Well {{  well_to_edit?.well.rack_id }}::{{ well_to_edit?.well.well_number }}</h5>
           <button type="button" class="btn-close" aria-label="Close" @click="well_editor_active=false"></button>
         </div>
         <div class="modal-body">
@@ -129,11 +130,11 @@ function remove_definition() {
             <summary>json</summary>
             <pre>{{ JSON.stringify(toRaw(current_well), null, 2) }}</pre>
           </details>
-          <div v-if="current_well && layout">
-            <label>Volume: <input type="number" v-model="current_well.volume" :max="layout.racks[current_well.rack_id].max_volume" /></label>
-            <emph>(Max Volume: {{ layout.racks[current_well.rack_id].max_volume }})</emph>
+          <div v-if="current_well && device_layouts[well_to_edit.device].layout">
+            <label>Volume: <input type="number" v-model="current_well.volume" :max="device_layouts[well_to_edit.device].layout.racks[current_well.rack_id].max_volume" /></label>
+            <emph>(Max Volume: {{ device_layouts[well_to_edit.device].layout.racks[current_well.rack_id].max_volume }})</emph>
             <div>
-              <input type="range" class="form-range" v-model="current_well.volume" min="0" :max="layout.racks[current_well.rack_id].max_volume">
+              <input type="range" class="form-range" v-model="current_well.volume" min="0" :max="device_layouts[well_to_edit.device].layout.racks[current_well.rack_id].max_volume">
             </div>
           </div>
           <div>

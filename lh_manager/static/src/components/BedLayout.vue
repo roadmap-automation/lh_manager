@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, defineProps } from 'vue'
 import Bed from './Bed.vue';
-import { layout } from '../store';
+import { device_layouts } from '../store';
 import type { Well } from '../store';
 
 const props = defineProps<{
-  wells: Well[]
+  device_name: string
 }>();
+
+const layout = device_layouts.value[props.device_name]
 
 </script>
 
@@ -38,17 +40,8 @@ const props = defineProps<{
     </defs>
     <svg class="inner" viewBox="0 0 900 1000" x="0" y="0" preserveAspectRatio="xMinYMin meet">
       <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
-      <g transform="translate(0,0)">
-        <Bed width="900" height="200" rack_id="Solvent" shape="rect" :wells="wells"/>
-      </g>
-      <g transform="translate(0,200)">
-        <Bed width="300" height="800" rack_id="Samples" shape="circle" :wells="wells" />
-      </g>
-      <g transform="translate(300,200)">
-        <Bed width="300" height="800" rack_id="Stock" shape="circle" :wells="wells" />
-      </g>
-      <g transform="translate(600,200)">
-        <Bed width="300" height="800" rack_id="Mix" shape="circle" :wells="wells" />
+      <g v-for="(rack, rack_id) in layout.layout.racks" :transform="'translate(' + rack.x_translate + ',' + rack.y_translate + ')'">
+        <Bed :rack_id="rack_id" :rack="rack" :device_name="props.device_name"/>
       </g>
     </svg>
   </svg>

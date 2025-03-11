@@ -170,15 +170,34 @@ export interface Material {
   solute_concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
 }
 
+export interface Rack {
+  rows: number,
+  columns: number,
+  style: 'grid' | 'staggered',
+  max_volume: number,
+  height: number,
+  width: number,
+  x_translate: number,
+  y_translate: number,
+  shape: string
+}
+
+export interface DeviceLayout {
+  layout: {racks: {[rack_id: string]: Rack} },
+  wells: Well[],
+  source_components: SourceComponents
+}
+
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
+export const device_layouts = ref<Record<string, DeviceLayout>>({});
 export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
 export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
 export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
-export const well_to_edit = ref<WellLocation>();
+export const well_to_edit = ref<{device: string, well: WellLocation}>();
 export const num_channels = ref<number>(1);
 export const materials = ref<Material[]>([]);
 
@@ -393,9 +412,9 @@ export function pick_handler(well_location: WellLocation) {
   console.warn("no active well field to set");
 }
 
-export async function update_well_contents(well: Well) {
+export async function update_well_contents(device_name: string, well: Well) {
   console.log("updating well: ", well, JSON.stringify(well));
-  const update_result = await fetch("/GUI/UpdateWell/", {
+  const update_result = await fetch(device_defs.value[device_name].address + "/GUI/UpdateWell/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -404,8 +423,8 @@ export async function update_well_contents(well: Well) {
   return response_body;
 }
 
-export async function remove_well_definition(well: Well) {
-  const update_result = await fetch("/GUI/RemoveWellDefinition/", {
+export async function remove_well_definition(device_name: string, well: Well) {
+  const update_result = await fetch(device_defs.value[device_name].address + "/GUI/RemoveWellDefinition/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -504,10 +523,16 @@ export async function explode_stage(sample_obj: Sample, stage: string): Promise<
   return response_body;
 }
 
-export async function refreshLayout() {
-  const new_layout = await (await fetch("/GUI/GetLayout/")).json();
+export async function getDeviceLayout(device_name: string) {
+  const layout = await (await fetch(device_defs.value[device_name].address + "/GUI/GetLayout/")).json();
+  console.log({device_name: layout});
+  return { layout };
+}
+
+export async function refreshLayout(device_name: string) {
+  const new_layout = await getDeviceLayout(device_name)
   console.log({new_layout});
-  layout.value = new_layout;
+  device_layouts.value[device_name].layout = new_layout.layout;
 }
 
 function dedupe<T>(arr: T[]): T[] {
@@ -517,11 +542,11 @@ function dedupe<T>(arr: T[]): T[] {
   return vals;
 }
 
-export async function refreshWells() {
-  const new_wells = await (await fetch("/GUI/GetWells/")).json() as WellWithZone[];
+export async function getDeviceWells(device_name: string) {
+  const wells = await (await fetch(device_defs.value[device_name].address + "/GUI/GetWells/")).json() as WellWithZone[];
   const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
   const solutes = {} as {[name: string]: (Solute & { zone: string })[]};
-  new_wells.forEach((well) => {
+  wells.forEach((well) => {
     const { zone } = well;
     well.composition.solvents.forEach((s) => {
       if (!(s.name in solvents)) {
@@ -536,8 +561,13 @@ export async function refreshWells() {
       solutes[s.name].push({ ...s, zone });
     });
   });
-  source_components.value = { solvents, solutes };
-  wells.value = new_wells;
+  return { source_components, wells }
+}
+
+export async function refreshWells(device_name: string) {
+  const new_wells = await getDeviceWells(device_name);
+  const current_layout = device_layouts.value[device_name]
+  device_layouts.value[device_name] = {...new_wells, layout: current_layout.layout};
   console.log({new_wells});
 }
 
@@ -572,6 +602,18 @@ export async function refreshDeviceDefs() {
   const { devices } = await (await fetch("/GUI/GetAllDevices/")).json() as {devices: Record<string, DeviceType>};
   device_defs.value = devices;
   console.log({devices});
+}
+
+export async function refreshDeviceLayouts() {
+  await refreshDeviceDefs()
+  const layouts = {}
+  for (const device_name in device_defs.value) {
+    console.log('Updating ' + device_name)
+    const new_layout = await getDeviceLayout(device_name)
+    const new_wells = await getDeviceWells(device_name)
+    layouts[device_name] = { ...new_layout, ...new_wells }
+  }
+  device_layouts.value = layouts
 }
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {

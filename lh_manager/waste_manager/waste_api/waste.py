@@ -61,7 +61,12 @@ def load_waste():
         waste_rack = Rack(columns=1,
                         rows=1,
                         max_volume=10e3,
-                        wells=[])
+                        wells=[],
+                        height=100,
+                        width=100,
+                        x_translate=0,
+                        y_translate=0,
+                        shape='rect')
 
         layout = WasteLayout(racks={WASTE_RACK: waste_rack})
         layout.empty_waste()
