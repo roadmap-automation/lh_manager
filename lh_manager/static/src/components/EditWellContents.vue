@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, defineProps, onMounted, watch, toRaw, computed, nextTick } from 'vue'
 import { Modal } from 'bootstrap/dist/js/bootstrap.esm';
-import { soluteMassUnits, soluteVolumeUnits, materials, well_editor_active, well_to_edit, update_well_contents, remove_well_definition, device_layouts } from '../store';
-import type { Material, Well, Solute, Solvent } from '../store';
+import { soluteMassUnits, soluteVolumeUnits, materials, well_editor_active, well_to_edit, update_well_contents, remove_well_definition, device_defs, device_layouts, waste_layout } from '../store';
+import type { Material, Well, Solute, Solvent, DeviceLayout } from '../store';
 
 //const props = defineProps<{
 //  wells: Well[]
@@ -10,6 +10,8 @@ import type { Material, Well, Solute, Solvent } from '../store';
 
 const dialog = ref<HTMLDivElement>();
 const current_well = ref<Well>();
+const current_layout = ref<DeviceLayout>();
+const update_address = ref<string>();
 const solute_search_regexp = ref<RegExp | null>(null);
 const solute_search_pattern = ref<string | null>(null);
 const solvent_search_regexp = ref<RegExp | null>(null);
@@ -31,8 +33,15 @@ watch(well_to_edit, async(newval, oldval) => {
   if (newval === undefined) { return }
   const { device, well } = toRaw(newval);
   const { rack_id, well_number } = well;
-  const wells = device_layouts.value[device].wells
-  const existing_well = wells.find((well) => (well.rack_id === rack_id && well.well_number === well_number));
+  if (device in device_layouts.value) {
+    current_layout.value = device_layouts.value[device];
+    update_address.value = device_defs.value[device].address;
+  }
+  else {
+    current_layout.value = waste_layout.value;
+    update_address.value = "/Waste"
+  }
+  const existing_well = current_layout.value.wells.find((well) => (well.rack_id === rack_id && well.well_number === well_number));
   current_well.value = structuredClone(toRaw(existing_well)) ?? {...structuredClone(empty_well), rack_id, well_number};
 });
 
@@ -102,14 +111,14 @@ function add_component(target: 'solutes' | 'solvents') {
 
 function send_changes() {
   if (current_well.value) {
-    update_well_contents(well_to_edit.value?.device, current_well.value);
+    update_well_contents(update_address.value, current_well.value);
   }
   well_editor_active.value = false;
 };
 
 function remove_definition() {
   if (current_well.value) {
-    remove_well_definition(well_to_edit.value?.device, current_well.value);
+    remove_well_definition(update_address.value, current_well.value);
   }
   well_editor_active.value = false;
 }
@@ -130,11 +139,11 @@ function remove_definition() {
             <summary>json</summary>
             <pre>{{ JSON.stringify(toRaw(current_well), null, 2) }}</pre>
           </details>
-          <div v-if="current_well && device_layouts[well_to_edit.device].layout">
-            <label>Volume: <input type="number" v-model="current_well.volume" :max="device_layouts[well_to_edit.device].layout.racks[current_well.rack_id].max_volume" /></label>
-            <emph>(Max Volume: {{ device_layouts[well_to_edit.device].layout.racks[current_well.rack_id].max_volume }})</emph>
+          <div v-if="current_well && current_layout.layout">
+            <label>Volume: <input type="number" v-model="current_well.volume" :max="current_layout.layout.racks[current_well.rack_id].max_volume" /></label>
+            <emph>(Max Volume: {{ current_layout.layout.racks[current_well.rack_id].max_volume }})</emph>
             <div>
-              <input type="range" class="form-range" v-model="current_well.volume" min="0" :max="device_layouts[well_to_edit.device].layout.racks[current_well.rack_id].max_volume">
+              <input type="range" class="form-range" v-model="current_well.volume" min="0" :max="current_layout.layout.racks[current_well.rack_id].max_volume">
             </div>
           </div>
           <div>

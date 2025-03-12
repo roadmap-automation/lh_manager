@@ -26,7 +26,7 @@ class WasteDevice(DeviceBase):
     address: str = '/Waste'
 
 waste_device = WasteDevice()
-device_manager.register(waste_device)
+#device_manager.register(waste_device)
 
 class WasteLayout(LHBedLayout):
     """Specialized layout class for waste handling. Has a single carboy well

@@ -190,7 +190,8 @@ export interface DeviceLayout {
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
-export const device_layouts = shallowRef<Record<string, DeviceLayout>>({});
+export const device_layouts = ref<Record<string, DeviceLayout>>({});
+export const waste_layout = ref<DeviceLayout>();
 //export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
@@ -412,9 +413,9 @@ export function pick_handler(well_location: WellLocation) {
   console.warn("no active well field to set");
 }
 
-export async function update_well_contents(device_name: string, well: Well) {
+export async function update_well_contents(base_address: string, well: Well) {
   console.log("updating well: ", well, JSON.stringify(well));
-  const update_result = await fetch(device_defs.value[device_name].address + "/GUI/UpdateWell", {
+  const update_result = await fetch(base_address + "/GUI/UpdateWell", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -423,8 +424,8 @@ export async function update_well_contents(device_name: string, well: Well) {
   return response_body;
 }
 
-export async function remove_well_definition(device_name: string, well: Well) {
-  const update_result = await fetch(device_defs.value[device_name].address + "/GUI/RemoveWellDefinition", {
+export async function remove_well_definition(base_address, well: Well) {
+  const update_result = await fetch(base_address + "/GUI/RemoveWellDefinition", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -523,8 +524,8 @@ export async function explode_stage(sample_obj: Sample, stage: string): Promise<
   return response_body;
 }
 
-export async function getDeviceLayout(device_name: string) {
-  const layout = await fetch(device_defs.value[device_name].address + "/GUI/GetLayout")
+export async function getDeviceLayout(base_address: string) {
+  const layout = await fetch(base_address + "/GUI/GetLayout")
                             .then( response => {
                             if (!response.ok) { return undefined }
                             return response.json()})
@@ -539,8 +540,8 @@ function dedupe<T>(arr: T[]): T[] {
   return vals;
 }
 
-export async function getDeviceWells(device_name: string) {
-  const wells = await fetch(device_defs.value[device_name].address + "/GUI/GetWells").then( response => {
+export async function getDeviceWells(base_address: string) {
+  const wells = await fetch(base_address + "/GUI/GetWells").then( response => {
                         if (!response.ok) { return [] }
                         return response.json()}) as WellWithZone[];
   const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
@@ -567,7 +568,7 @@ export async function getDeviceWells(device_name: string) {
 }
 
 export async function refreshWells(device_name: string) {
-  const new_wells = await getDeviceWells(device_name);
+  const new_wells = await getDeviceWells(device_defs.value[device_name].address);
   const current_layout = device_layouts.value[device_name];
   current_layout.wells = new_wells.wells;
   current_layout.source_components = new_wells.source_components;
@@ -609,17 +610,30 @@ export async function refreshDeviceDefs() {
 
 export async function refreshDeviceLayouts() {
   await refreshDeviceDefs();
+  await refreshWaste();
   const layouts = {};
   for (const device_name in device_defs.value) {
     console.log('Updating ' + device_name);
-    const new_layout = await getDeviceLayout(device_name);
+    const new_layout = await getDeviceLayout(device_defs.value[device_name].address);
     if (new_layout !== undefined) {
-      const new_wells = await getDeviceWells(device_name);
+      const new_wells = await getDeviceWells(device_defs.value[device_name].address);
       layouts[device_name] = { ...new_layout, ...new_wells };
     }
   }
   device_layouts.value = layouts;
 }
+
+export async function refreshWaste() {
+  const new_layout = await getDeviceLayout("/Waste");
+  if (new_layout !== undefined) {
+    const new_wells = await getDeviceWells("/Waste");
+    waste_layout.value = { ...new_layout, ...new_wells };
+  }
+  else {
+    console.log('Waste layout not found')
+    waste_layout.value = undefined;
+  }
+};
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {
   const update_result = await fetch("/GUI/UpdateDevice/", {

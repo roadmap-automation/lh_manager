@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { pick_handler, source_well, target_well, well_editor_active, well_to_edit, device_layouts } from '../store';
-import type { Rack } from '../store';
+import { pick_handler, source_well, target_well, well_editor_active, well_to_edit } from '../store';
+import type { Rack, Well } from '../store';
 
 const props = defineProps<{
   rack_id: string,
   rack: Rack,
+  wells: Well[],
   device_name: string,
 }>();
 
 const text_size = 30;
 const padding = 6;
-
-//console.log(layout, wells)
 
 const row_array = computed(() => Array.from({ length: props.rack.rows }).map((_, i) => i))
 const col_array = computed(() => Array.from({ length: props.rack.columns }).map((_, i) => i));
@@ -81,7 +80,7 @@ function highlight_class(col, row) {
 }
 
 const filled_cells = computed(() => {
-  const local_wells = device_layouts.value[props.device_name].wells.filter((w) => (w.rack_id === props.rack_id));
+  const local_wells = props.wells.filter((w) => (w.rack_id === props.rack_id));
   const local_wells_lookup = Object.fromEntries(local_wells.map((w) => [w.well_number, w]));
   return local_wells_lookup;
 });
@@ -90,7 +89,7 @@ function fill_path(col, row) {
   const well_number = (row * props.rack.columns + col + 1).toFixed();
   if (well_number in filled_cells.value) {
     const well_volume = filled_cells.value[well_number].volume;
-    const max_volume = device_layouts.value[props.device_name].layout.racks[props.rack_id].max_volume ?? well_volume;
+    const max_volume = props.rack.max_volume ?? well_volume;
     const epsilon = 1e-8;
     // keep fill fraction just below one so there's still an arc to draw...
     const fill_fraction = Math.min(well_volume / max_volume, 1-epsilon);

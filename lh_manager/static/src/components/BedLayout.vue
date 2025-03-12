@@ -2,19 +2,20 @@
 import { ref, computed, defineProps } from 'vue'
 import Bed from './Bed.vue';
 import { device_layouts } from '../store';
-import type { Well } from '../store';
+import type { Well, DeviceLayout } from '../store';
 
 const props = defineProps<{
   device_name: string
+  layout: DeviceLayout
 }>();
 
-const max_x = computed(() => Math.max(...Object.values(device_layouts.value[props.device_name].layout.racks).map((rack) => rack.x_translate + rack.width)));
-const max_y = computed(() => Math.max(...Object.values(device_layouts.value[props.device_name].layout.racks).map((rack) => rack.y_translate + rack.height)));
+const max_x = computed(() => Math.max(...Object.values(props.layout.layout.racks).map((rack) => rack.x_translate + rack.width)));
+const max_y = computed(() => Math.max(...Object.values(props.layout.layout.racks).map((rack) => rack.y_translate + rack.height)));
 
 </script>
 
 <template>
-  <svg class="wrapper" v-if="device_layouts[props.device_name] !== undefined" xmlns="http://www.w3.org/2000/svg">
+  <svg class="wrapper" v-if="props.layout !== undefined" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <pattern id="pattern"
               width="8" height="10"
@@ -41,8 +42,8 @@ const max_y = computed(() => Math.max(...Object.values(device_layouts.value[prop
     </defs>
     <svg class="inner" :viewBox="'0 0 ' + max_x.toString() + ' ' + max_y.toString()" x="0" y="0" preserveAspectRatio="xMinYMin meet">
       <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
-      <g v-for="(rack, rack_id) in device_layouts[props.device_name].layout.racks" :transform="'translate(' + rack.x_translate + ',' + rack.y_translate + ')'">
-        <Bed :rack_id="rack_id" :rack="rack" :device_name="props.device_name"/>
+      <g v-for="(rack, rack_id) in props.layout.layout.racks" :transform="'translate(' + rack.x_translate + ',' + rack.y_translate + ')'">
+        <Bed :rack_id="rack_id" :rack="rack" :wells="props.layout.wells" :device_name="props.device_name"/>
       </g>
     </svg>
   </svg>

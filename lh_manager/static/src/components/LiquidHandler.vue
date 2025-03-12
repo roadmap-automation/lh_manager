@@ -1,11 +1,10 @@
 <script setup>
-import { ref } from 'vue'
-import { onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue'
 import Mixture from './Mixture.vue';
 import DeviceList from './DeviceList.vue';
 import BedLayout from './BedLayout.vue';
 import SampleChannels from './SampleChannels.vue';
-import { samples, sample_status, device_defs, device_layouts } from '../store';
+import { samples, sample_status, device_defs, device_layouts, waste_layout } from '../store';
 import EditWellContents from './EditWellContents.vue';
 import MaterialManager from './MaterialManager.vue';
 
@@ -54,6 +53,10 @@ function openMixture() {
       <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#Materials" type="button" role="tab"
         aria-controls="Materials" aria-selected="false">Materials</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="waste-tab" data-bs-toggle="tab" data-bs-target="#Waste" type="button" role="tab"
+        aria-controls="Waste" aria-selected="false">Waste</button>
+    </li>
   </ul>
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
     <div class="tab-pane" id="Devices" role="tabpanel" aria-labelledby="home-tab">
@@ -72,14 +75,14 @@ function openMixture() {
 
       <div class="flex-grow-1">
         <ul class="nav nav-tabs" id="layout-tabs" role="tablist">
-          <li v-for="(layout, device_name, index) in device_layouts" :key="device_name" class="nav-item" role="presentation">
+          <li v-for="(layout, device_name, index) of device_layouts" :key="device_name" class="nav-item" role="presentation">
             <button v-if="(layout.layout !== null)" class="nav-link" :id="device_name.replaceAll(' ', '') + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + device_name.replaceAll(' ', '') + '-div'" type="button" role="tab"
         :aria-controls="device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ device_name }}</button>
           </li>
         </ul>
-        <div class="tab-content d-flex flex-fill" style="height:100%; width:100%" id="layoutTabContent">
-          <div v-for="(layout, device_name, index) in device_layouts" :key="device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
-            <BedLayout v-if="(layout.layout !== null)" :device_name="device_name"/>
+        <div class="tab-content d-flex flex-fill" style="height:90%; width:90%" id="layoutTabContent">
+          <div v-for="(layout, device_name, index) of device_layouts" :key="device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
+            <BedLayout v-if="(layout.layout !== null)" :device_name="device_name" :layout="layout"/>
           </div>        
         </div>
       </div>
@@ -89,6 +92,11 @@ function openMixture() {
     <div class="tab-pane d-flex flex-grow-1" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>
+    <div class="tab-pane d-flex flex-grow-1" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
+      <div class="bedlayout">
+        <BedLayout v-if="(waste_layout?.layout !== null)" device_name="Waste System" :layout="waste_layout"/>
+      </div>
+    </div>    
 
   </div>
   <EditWellContents/>
@@ -101,8 +109,8 @@ function openMixture() {
 }
 
 .bedlayout {
-  height: 90%;
-  width: 90%;
+  height: 100%;
+  width: 100%;
 }
 
 .list-move,
