@@ -91,13 +91,13 @@ function openMixture() {
       <div class="flex-grow-1">
         <ul class="nav nav-tabs" id="layout-tabs" role="tablist">
           <li v-for="(layout, device_name, index) in device_layouts" :key="device_name" class="nav-item" role="presentation">
-            <button class="nav-link" :id="device_name.replaceAll(' ', '') + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + device_name.replaceAll(' ', '') + '-div'" type="button" role="tab"
+            <button v-if="(layout.layout !== null)" class="nav-link" :id="device_name.replaceAll(' ', '') + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + device_name.replaceAll(' ', '') + '-div'" type="button" role="tab"
         :aria-controls="device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ device_name }}</button>
           </li>
         </ul>
         <div class="tab-content d-flex flex-fill" style="height:100%; width:100%" id="layoutTabContent">
           <div v-for="(layout, device_name, index) in device_layouts" :key="device_name" class="bedlayout" :class="{ active: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
-            <BedLayout :device_name="device_name"/>
+            <BedLayout v-if="(layout.layout !== null)" :device_name="device_name"/>
           </div>        
         </div>
       </div>
