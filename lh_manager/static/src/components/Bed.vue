@@ -137,7 +137,7 @@ onMounted(() => {
         <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
       </rect>
       <path class="fill-fraction" :d="fill_path(col, row)"></path>
-      <text class="vial-label" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
+      <text v-if="(props.rack.columns * props.rack.rows > 1)" class="vial-label" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
         {{ row * props.rack.columns + col + 1 }}</text>
     </g>
   </g>
