@@ -96,7 +96,7 @@ function openMixture() {
           </li>
         </ul>
         <div class="tab-content d-flex flex-fill" style="height:100%; width:100%" id="layoutTabContent">
-          <div v-for="(layout, device_name, index) in device_layouts" :key="device_name" class="bedlayout" :class="{ active: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
+          <div v-for="(layout, device_name, index) in device_layouts" :key="device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
             <BedLayout v-if="(layout.layout !== null)" :device_name="device_name"/>
           </div>        
         </div>

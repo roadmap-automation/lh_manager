@@ -154,7 +154,7 @@ rect {
 
 .title {
   fill: white;
-  font: normal 30px sans-serif;
+  font: normal 2vmin sans-serif;
   text-anchor: middle;
 }
 
@@ -167,7 +167,7 @@ rect {
 }
 
 .vial-label {
-  font: normal 20px sans-serif;
+  font: normal 2vmin sans-serif;
   pointer-events: none;
   dominant-baseline: central;
   fill: darkgreen;
