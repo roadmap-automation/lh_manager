@@ -119,8 +119,8 @@ function openMixture() {
 }
 
 .bedlayout {
-  height: 100%;
-  width: 100%;
+  height: 90%;
+  width: 90%;
 }
 
 .list-move,
