@@ -2,7 +2,7 @@
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
 import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, } from '../store';
 import json_pointer from 'json-pointer';
-import type { MethodType } from '../store';
+import type { MethodType, Solvent, Solute } from '../store';
 
 const props = defineProps<{
   sample_id: string,
@@ -18,14 +18,26 @@ function send_changes(param) {
 }
 
 const source_components = computed(() => {
-  let sc = {};
+  // compile all components
+  const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
+  const solutes = {} as {[name: string]: (Solute & { zone: string })[]};
   for (const device_name in device_layouts.value) {
-    const layout = device_layouts.value[device_name]
-    sc = {...sc, ...layout.source_components};
-  }
-  console.log({source_components: sc})
-  return sc;
-  });
+    const sc = device_layouts.value[device_name].source_components
+    for (const s in sc.solvents) {
+      if (!(s in solvents)) {
+        solvents[s] = [];
+      }
+      solvents[s].push(...sc.solvents[s]);
+    }
+    for (const s in sc.solutes) {
+      if (!(s in solutes)) {
+        solutes[s] = [];
+      }
+      solutes[s].push(...sc.solutes[s]);
+    }
+  };
+  return { solvents, solutes };
+});
 
 function get_parameters(method: MethodType) {
   const { method_name } = method;
