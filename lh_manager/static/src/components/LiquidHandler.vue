@@ -43,20 +43,12 @@ function openMixture() {
 <template>
   <ul class="nav nav-tabs" id="myTab" role="tablist">
     <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="layout-tab" data-bs-toggle="tab" data-bs-target="#Layout" type="button"
+        role="tab" aria-controls="Layout" aria-selected="true">Main</button>
+    </li>
+    <li class="nav-item" role="presentation">
       <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#Devices" type="button" role="tab"
         aria-controls="Devices" aria-selected="false">Devices</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="home-tab" data-bs-toggle="tab" data-bs-target="#NICE" type="button" role="tab"
-        aria-controls="NICE" aria-selected="false">NICE</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#GilsonLH" type="button" role="tab"
-        aria-controls="GilsonLH" aria-selected="false">Gilson LH</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="layout-tab" data-bs-toggle="tab" data-bs-target="#Layout" type="button"
-        role="tab" aria-controls="Layout" aria-selected="true">Layout</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#Materials" type="button" role="tab"
@@ -66,16 +58,6 @@ function openMixture() {
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
     <div class="tab-pane" id="Devices" role="tabpanel" aria-labelledby="home-tab">
       <DeviceList :devices="device_defs"></DeviceList>
-    </div>
-    <div class="tab-pane" id="NICE" role="tabpanel" aria-labelledby="home-tab">NICE things</div>
-    <div class="tab-pane" id="GilsonLH" role="tabpanel" aria-labelledby="profile-tab">
-      <h1>Liquid Handler things</h1>
-      <!-- Button trigger modal -->
-      <button type="button" class="btn btn-primary" @click="openMixture">
-        Launch demo modal
-      </button>
-      <Mixture @close="mixtureIsOpen = false" :show="mixtureIsOpen" :chemical_components="chemical_components" />
-
     </div>
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
       role="tabpanel" aria-labelledby="layout-tab">
