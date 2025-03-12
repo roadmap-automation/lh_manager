@@ -9,7 +9,7 @@ from .events import trigger_waste_update
 
 from . import blueprint
 
-@blueprint.route('/Waste/GetLayout/', methods=['GET'])
+@blueprint.route('/Waste/GUI/GetLayout', methods=['GET'])
 def GetWasteLayout() -> Response:
     """Gets list of waste bottles"""
 
@@ -38,7 +38,7 @@ def EmptyWaste() -> Response:
 
     return make_response(waste_layout.carboy.model_dump(), 200)
 
-@blueprint.route('/Waste/GetWells/', methods=['GET'])
+@blueprint.route('/Waste/GUI/GetWells', methods=['GET'])
 def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
     """ Gets a list of all filled wells """
     wells: List[Well]
@@ -54,7 +54,7 @@ def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
         wd['zone'] = wd['rack_id']
     return make_response(wells_dict, 200)
 
-@blueprint.route('/Waste/UpdateWell/', methods=['POST'])
+@blueprint.route('/Waste/GUI/UpdateWell', methods=['POST'])
 @trigger_waste_update
 def UpdateWell() -> Response:
     """ Replaces any existing well definition weith the same rack_id, well_number
@@ -66,7 +66,7 @@ def UpdateWell() -> Response:
     waste_layout.update_well(well)
     return make_response(well.model_dump(), 200)
 
-@blueprint.route('/Waste/RemoveWellDefinition/', methods=['POST'])
+@blueprint.route('/Waste/GUI/RemoveWellDefinition', methods=['POST'])
 @trigger_waste_update
 def RemoveWellDefinition() -> Response:
     """ Replaces any existing well definition weith the same rack_id, well_number

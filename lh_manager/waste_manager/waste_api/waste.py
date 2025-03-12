@@ -3,8 +3,10 @@ import json
 import os
 import sqlite3
 
+from typing import Literal
 from uuid import uuid4
 
+from ...liquid_handler.devices import device_manager, DeviceBase
 from ...liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
 from ...app_config import config
 from ..wastedata import WasteItem
@@ -12,6 +14,19 @@ from ..wastedata import WasteItem
 WASTE_LOG = config.log_path / 'waste.json'
 WASTE_HISTORY = config.log_path / 'waste.sqlite'
 WASTE_RACK = 'waste'
+
+class WasteDevice(DeviceBase):
+    """Waste device
+    """
+
+    device_name: Literal['Waste System'] = 'Waste System'
+    device_type: Literal['waste'] = 'waste'
+    multichannel: bool = False
+    allow_sample_mixing: bool = True
+    address: str = '/Waste'
+
+waste_device = WasteDevice()
+device_manager.register(waste_device)
 
 class WasteLayout(LHBedLayout):
     """Specialized layout class for waste handling. Has a single carboy well
@@ -62,8 +77,8 @@ def load_waste():
                         rows=1,
                         max_volume=10e3,
                         wells=[],
-                        height=100,
-                        width=100,
+                        height=300,
+                        width=300,
                         x_translate=0,
                         y_translate=0,
                         shape='rect')

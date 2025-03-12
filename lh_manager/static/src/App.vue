@@ -38,10 +38,11 @@ socket.on('update_sample_status', () => {
   refreshSampleStatus();
 })
 
-//socket.on('update_layout', () => {
+socket.on('update_waste', () => {
 //  console.log('Got base refresh')
 //  refreshDeviceLayouts()
-//})
+  refreshWells('Waste System')
+})
 
 socket.on('update_materials', () => {
   refreshMaterials();
