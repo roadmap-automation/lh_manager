@@ -357,6 +357,7 @@ def InitializeDevices() -> Response:
 
     return redirect('/autocontrol/InitializeDevices/', 307)
 
+@gui_blueprint.route('/GUI/GetLayout', methods=['GET'])
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:
     """Gets list of sample names, IDs, and status"""
@@ -395,6 +396,7 @@ def GetComponents() -> Response:
 
     return make_response({'solvents': solvents, 'solutes': solutes}, 200)
 
+@gui_blueprint.route('/GUI/GetWells', methods=['GET'])
 @gui_blueprint.route('/GUI/GetWells/', methods=['GET'])
 def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
     """ Gets a list of all filled wells """
@@ -412,6 +414,7 @@ def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
         wd['zone'] = zone
     return make_response(wells_dict, 200)
 
+@gui_blueprint.route('/GUI/UpdateWell', methods=['POST'])
 @gui_blueprint.route('/GUI/UpdateWell/', methods=['POST'])
 @trigger_layout_update
 def UpdateWell() -> Response:
@@ -424,6 +427,7 @@ def UpdateWell() -> Response:
     layout.update_well(well)
     return make_response(well.model_dump(), 200)
 
+@gui_blueprint.route('/GUI/RemoveWellDefinition', methods=['POST'])
 @gui_blueprint.route('/GUI/RemoveWellDefinition/', methods=['POST'])
 @trigger_layout_update
 def RemoveWellDefinition() -> Response:
