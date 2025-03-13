@@ -81,7 +81,8 @@ def load_waste():
                         width=300,
                         x_translate=0,
                         y_translate=0,
-                        shape='rect')
+                        shape='rect',
+                        editable=False)
 
         layout = WasteLayout(racks={WASTE_RACK: waste_rack})
         layout.empty_waste()

@@ -179,7 +179,8 @@ export interface Rack {
   width: number,
   x_translate: number,
   y_translate: number,
-  shape: string
+  shape: string,
+  editable: boolean
 }
 
 export interface DeviceLayout {

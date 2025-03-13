@@ -181,6 +181,7 @@ class Rack(BaseModel):
     x_translate: int
     y_translate: int
     shape: str = 'rect' # rect | circle
+    editable: bool = True
 
 class LHBedLayout(BaseModel):
     """Class representing a general LH bed layout"""
