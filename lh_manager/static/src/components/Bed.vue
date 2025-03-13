@@ -59,7 +59,11 @@ function edit_well(row: number, col: number) {
   const well_number = row * props.rack.columns + col + 1;
   const rack_id = props.rack_id;
   well_to_edit.value = {device: props.device_name, well: {well_number, rack_id}};
-  well_editor_active.value = true;
+
+  // only trigger editing modal if rack is editable
+  if (props.rack.editable) {
+    well_editor_active.value = true;
+  }
 }
 
 function highlight_class(col, row) {
@@ -76,6 +80,9 @@ function highlight_class(col, row) {
   if (well_number in filled_cells.value) {
     classList.push("partially-filled");
   }
+  //if (!props.rack.editable) {
+  //  classList.push("not-editable")
+  //}
   return classList.join(" ")
 }
 
@@ -122,7 +129,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <rect :width="props.rack.width" :height="props.rack.height"></rect>
+  <rect :width="props.rack.width" :height="props.rack.height" :class="{'not-editable': (!props.rack.editable)}"></rect>
   <g v-for="row of row_array" :index="row">
     <g v-for="col of col_array" :index="col" :class="highlight_class(col, row)" :n="row * props.rack.columns + col">
       <title>{{ row * props.rack.columns + col + 1 }}</title>
@@ -145,10 +152,14 @@ onMounted(() => {
 
 <style scoped>
 rect {
-  stroke-width: 1px;
+  stroke-width: 3px;
   stroke: black;
   clip-path: rect();
   fill: #a0a0a0;
+}
+
+.not-editable {
+  stroke-dasharray: 10, 10;
 }
 
 .title {
@@ -162,7 +173,7 @@ rect {
   fill: white;
   fill-opacity: 0.3;
   stroke: black;
-  stroke-width: 1px;
+  stroke-width: 2px;
 }
 
 .vial-label {

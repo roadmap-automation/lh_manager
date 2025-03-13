@@ -56,8 +56,10 @@ svg.inner {
 }
 
 svg.wrapper {
-  height: 100%;
-  width: 100%;
+  height: 95%;
+  width: 95%;
+  margin: 1%;
+  padding: 1%;
 }
 
 .vial-button {
