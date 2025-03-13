@@ -1,9 +1,9 @@
 """Waste Manager Endpoints"""
 from typing import List, Optional
-from flask import make_response, Response, request, Blueprint
+from flask import make_response, Response, request
 
 from ...liquid_handler.bedlayout import Well, WellLocation
-from .waste import waste_layout
+from .waste import waste_layout, WasteHistory
 from ..wastedata import WasteItem
 from .events import trigger_waste_update
 
@@ -77,3 +77,31 @@ def RemoveWellDefinition() -> Response:
     assert isinstance(data, dict)
     waste_layout.remove_well_definition(data["rack_id"], data["well_number"])
     return make_response({"well definition removed": data}, 200)
+
+@blueprint.route('/Waste/GUI/GetTimestampTable', methods=['GET'])
+def GetTimestampTable() -> Response:
+    """Gets list of waste bottles"""
+
+    with WasteHistory(waste_layout._database_path) as waste_history:
+        timestamp_table = waste_history.get_timestamp_table()
+
+    return make_response({'timestamp_table': timestamp_table}, 200)
+
+
+@blueprint.route('/Waste/GUI/GenerateWasteReport', methods=['POST'])
+def GetWasteReport() -> Response:
+    """Gets list of waste bottles"""
+
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+
+    with WasteHistory(waste_layout._database_path) as waste_history:
+        wasteitems = waste_history.get_waste_by_bottle_id(data['bottle_id'])
+
+    total_waste = WasteItem()
+    for item in wasteitems:
+        total_waste.mix_with(item.volume, item.composition)
+
+    # TODO: make a nicely formatted report
+
+    return make_response({'report': repr(total_waste.composition)}, 200)

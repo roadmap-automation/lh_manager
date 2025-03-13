@@ -189,10 +189,15 @@ export interface DeviceLayout {
   source_components: SourceComponents
 }
 
+export interface TimestampTable {
+  timestamp_table: string[][]
+}
+
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
 export const device_layouts = ref<Record<string, DeviceLayout>>({});
 export const waste_layout = ref<DeviceLayout>();
+export const waste_timestamp_table = ref<TimestampTable>();
 //export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
@@ -636,6 +641,7 @@ export async function refreshWaste() {
     console.log('Waste layout not found')
     waste_layout.value = undefined;
   }
+  await get_timestamp_table();
 };
 
 export async function empty_waste() {
@@ -658,6 +664,21 @@ export async function add_waste(volume: number, composition: {solvents: Solvent[
   return response_body;
 };
 
+export async function get_timestamp_table() {
+  const { timestamp_table } = await (await fetch("/Waste/GUI/GetTimestampTable")).json() as TimestampTable;
+  waste_timestamp_table.value = { timestamp_table };
+}
+
+export async function generate_waste_report(bottle_id: string) {
+  const update_result = await fetch("/Waste/GUI/GenerateWasteReport", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bottle_id })
+  });
+  const { report } = await update_result.json();
+  console.log({ report })
+  return report;
+}
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {
   const update_result = await fetch("/GUI/UpdateDevice/", {

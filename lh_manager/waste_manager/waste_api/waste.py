@@ -147,3 +147,48 @@ class WasteHistory:
         res = self.db.execute(f"SELECT waste FROM {self.table_name} WHERE bottle_id='{bottle_id}'")
         results = res.fetchall()
         return [WasteItem(**json.loads(res[0])) for res in results]
+    
+    def get_timestamp_range_by_bottle_id(self, bottle_id: str) -> list[WasteItem]:
+        """Queries database and returns the first and last timestamps based on bottle ID.
+
+        Args:
+            uuid (str): uuid
+
+        Returns:
+            datetime: timestamp of first entry
+            datetime: timestamp of last entry
+        """
+
+        res = self.db.execute(f"SELECT * FROM (SELECT timestamp FROM {self.table_name} WHERE bottle_id='{bottle_id}' ORDER BY timestamp ASC LIMIT 1) \
+                              UNION \
+                              SELECT * FROM (SELECT timestamp FROM {self.table_name} WHERE bottle_id='{bottle_id}' ORDER BY timestamp DESC LIMIT 1)")
+        results = res.fetchall()
+        return [res[0] for res in results]
+    
+    def get_timestamp_table(self, offset: int = 0, n_rows: int = 0) -> list[tuple[str, str, str]]:
+        """Yields a list of unique carboy IDs with first and last timestamps
+
+        Args:
+            offset (int): offset for finite number of rows
+            n_rows (int): number of rows. If zero, offset is ignored
+
+        Returns:
+            list[tuple[str, str, str]]: bottle ID, first timestamp, last timestamp
+        """
+
+        limit_text = f" LIMIT {n_rows} OFFSET {offset}" if n_rows else ""
+
+        res = self.db.execute(f"SELECT DISTINCT bottle_id FROM {self.table_name}{limit_text}")
+        bottle_ids = res.fetchall()
+        tbl = []
+        for bottle_id in bottle_ids:
+            ts = self.get_timestamp_range_by_bottle_id(bottle_id[0])
+            tbl.append((bottle_id[0], *ts))
+        
+        return tbl
+    
+if __name__ == '__main__':
+
+    with WasteHistory() as history:
+        print(history.get_timestamp_range_by_bottle_id('bdd59178-46ea-4e89-a9b9-a92313c52431'))
+        print(history.get_timestamp_table())
