@@ -15,7 +15,7 @@ def GetWasteLayout() -> Response:
 
     return make_response(waste_layout.model_dump(), 200)
 
-@blueprint.route('/Waste/AddWaste/', methods=['POST'])
+@blueprint.route('/Waste/AddWaste', methods=['POST'])
 @trigger_waste_update
 def AddWaste() -> Response:
     """Adds waste. Data format:
@@ -29,7 +29,8 @@ def AddWaste() -> Response:
     waste_layout.add_waste(waste_item)
     return make_response(waste_item.model_dump(), 200)
 
-@blueprint.route('/Waste/EmptyWaste/', methods=['POST'])
+@blueprint.route('/Waste/EmptyWaste', methods=['POST'])
+@trigger_waste_update
 def EmptyWaste() -> Response:
     """Empties waste (resets volume to zero)
     """

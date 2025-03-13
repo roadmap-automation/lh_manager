@@ -199,9 +199,11 @@ export const sample_status = ref<SampleStatusMap>({});
 //export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
 //export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
+export const add_waste_active = ref(false);
 export const well_to_edit = ref<{device: string, well: WellLocation}>();
 export const num_channels = ref<number>(1);
 export const materials = ref<Material[]>([]);
+export const current_composition = ref<{ solvents: Solvent[], solutes: Solute []}>({solvents: [], solutes: []});
 
 export type ModalData = {
   title: string,
@@ -635,6 +637,27 @@ export async function refreshWaste() {
     waste_layout.value = undefined;
   }
 };
+
+export async function empty_waste() {
+  const update_result = await fetch("/Waste/EmptyWaste", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+};
+
+export async function add_waste(volume: number, composition: {solvents: Solvent[], solutes: Solute[]}) {
+  const update_result = await fetch("/Waste/AddWaste", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ volume, composition })
+  });
+  const response_body = await update_result.json();
+  return response_body;
+};
+
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {
   const update_result = await fetch("/GUI/UpdateDevice/", {

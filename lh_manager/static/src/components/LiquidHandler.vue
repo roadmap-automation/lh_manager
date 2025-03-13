@@ -4,9 +4,10 @@ import Mixture from './Mixture.vue';
 import DeviceList from './DeviceList.vue';
 import BedLayout from './BedLayout.vue';
 import SampleChannels from './SampleChannels.vue';
-import { samples, sample_status, device_defs, device_layouts, waste_layout } from '../store';
+import { samples, sample_status, device_defs, device_layouts, waste_layout, empty_waste, add_waste_active } from '../store';
 import EditWellContents from './EditWellContents.vue';
 import MaterialManager from './MaterialManager.vue';
+import AddWaste from './AddWaste.vue';
 
 const props = defineProps({
   msg: String,
@@ -92,14 +93,36 @@ function openMixture() {
     <div class="tab-pane d-flex flex-grow-1" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>
-    <div class="tab-pane d-flex flex-grow-1" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
-      <div class="bedlayout">
-        <BedLayout v-if="(waste_layout?.layout !== null)" device_name="Waste System" :layout="waste_layout"/>
-      </div>
-    </div>    
+    <div class="tab-pane d-flex flex-grow-1 h-100" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
+       <div class="card m-3">
+          <div class="card-body">
+            <div class="col flex-column d-flex flex-fill">
+              <div class="m-0 row">
+                <h5 class="card-title">Waste Contents</h5>
+              </div>
 
-  </div>
+              <div class="m-3 row">
+                <div class="col col-sm-auto">
+                  <button type="button" class="m-3 btn btn-primary text-no-wrap" @click="add_waste_active=true">Add Waste</button>
+                </div>
+                <div class="col col-sm-auto">
+                  <button type="button" class="m-3 btn btn-primary btn-danger text-no-wrap" @click="empty_waste">Empty Waste</button>
+                </div>
+              </div>
+              <div class="m-3 row">
+                Carboy ID: {{ waste_layout?.wells[0].id }}
+              </div>
+              <div class="m-3 row vh-100">
+                <BedLayout class="vh-100" v-if="(waste_layout?.layout !== null)" device_name="Waste System" :layout="waste_layout"/>
+              </div>
+            </div>  
+          </div>
+        </div>
+       </div>
+      </div>
+
   <EditWellContents/>
+  <AddWaste/>
 
 </template>
 
