@@ -281,6 +281,8 @@ class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
+        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
@@ -290,7 +292,8 @@ class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
                 method_name='LoadLoopBubbleSensor' if self.Use_Bubble_Sensors else 'LoadLoop',
                 method_data=dict(pump_volume=self.Volume * 1000,
                                  excess_volume=self.Extra_Volume * 1000,
-                                 air_gap=self.Air_Gap * 1000)
+                                 air_gap=self.Air_Gap * 1000,
+                                 composition=source_well.composition)
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
