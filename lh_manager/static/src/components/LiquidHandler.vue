@@ -61,7 +61,7 @@ function openMixture() {
     </li>
   </ul>
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
-    <div class="tab-pane" id="Devices" role="tabpanel" aria-labelledby="home-tab">
+    <div class="tab-pane d-flex flex-column align-items-stretch overflow-auto" id="Devices" role="tabpanel" aria-labelledby="home-tab">
       <DeviceList :devices="device_defs"></DeviceList>
     </div>
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
