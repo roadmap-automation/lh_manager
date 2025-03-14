@@ -15,10 +15,10 @@ import { waste_timestamp_table, generate_waste_report, add_waste_active, waste_l
 
             <div class="m-3 row">
             <div class="col col-sm-auto">
-                <button type="button" class="m-3 btn btn-primary text-no-wrap" @click="add_waste_active=true">Add Waste</button>
+                <button type="button" class="m-3 btn btn-success text-no-wrap" @click="add_waste_active=true">Add Waste</button>
             </div>
             <div class="col col-sm-auto">
-                <button type="button" class="m-3 btn btn-primary btn-danger text-no-wrap" @click="empty_waste()">Empty Waste</button>
+                <button type="button" class="m-3 btn btn-danger text-no-wrap" @click="empty_waste()">Empty Waste</button>
             </div>
             </div>
             <div class="m-3 row">
@@ -51,7 +51,7 @@ import { waste_timestamp_table, generate_waste_report, add_waste_active, waste_l
                             <td>{{ carboy[0] }}</td>
                             <td>{{ carboy[1] }}</td>
                             <td>{{ carboy[2] }}</td>
-                            <td><button class="btn btn-outline-danger" @click="generate_waste_report(carboy[0])">Report</button></td>
+                            <td><button class="btn btn-outline-info" @click="generate_waste_report(carboy[0])">Report</button></td>
                             </tr>
                         </tbody>
                         </table>
