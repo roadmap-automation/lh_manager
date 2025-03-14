@@ -533,11 +533,13 @@ export async function explode_stage(sample_obj: Sample, stage: string): Promise<
 }
 
 export async function getDeviceLayout(base_address: string) {
-  const layout = await fetch(base_address + "/GUI/GetLayout")
-                            .then( response => {
-                            if (!response.ok) { return undefined }
-                            return response.json()})
-  //console.log({ layout });
+  const response = await fetch(base_address + "/GUI/GetLayout")
+                            .catch((err) => {
+                              console.log(err)
+                              return undefined;
+                            })
+  if ((response == undefined) || (!response.ok)) { return undefined }
+  const layout = await response.json();
   return { layout };
 }
 
