@@ -11,7 +11,7 @@ class DistributionSystemDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: Literal['Distribution System Device'] = 'Distribution System Device'
+    device_name: Literal['Distribution System'] = 'Distribution System'
     device_type: Literal['distribution'] = 'distribution'
     multichannel: bool = False
     allow_sample_mixing: bool = False
