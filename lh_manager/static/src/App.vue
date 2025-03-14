@@ -54,8 +54,6 @@ socket.on('update_devices', () => {
 });
 
 async function establish_socket_connections() {
-  await refreshDeviceLayouts();
-  console.log(device_defs.value)
   for (const device of Object.values(device_defs.value)) {
     console.log('Creating new socket for ' + device.device_name)
     const new_socket = io(device.address)
