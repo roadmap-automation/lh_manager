@@ -4,7 +4,7 @@ import Mixture from './Mixture.vue';
 import DeviceList from './DeviceList.vue';
 import BedLayout from './BedLayout.vue';
 import SampleChannels from './SampleChannels.vue';
-import { samples, sample_status, device_defs, device_layouts, waste_layout, empty_waste, add_waste_active } from '../store';
+import { device_defs, device_layouts } from '../store';
 import EditWellContents from './EditWellContents.vue';
 import MaterialManager from './MaterialManager.vue';
 import AddWaste from './AddWaste.vue';
@@ -18,26 +18,14 @@ const props = defineProps({
 
 const emit = defineEmits(['remove_sample', 'add_sample']);
 
-const active_sample = ref(0);
-
-const chemical_components = [
-  "D2O",
-  "H2O",
-  "Polymer goo"
-]
-
-const mixture_parts = [];
-
 onMounted(() => {
   console.log(props.sample_status);
 });
 
-const mixtureIsOpen = ref(false);
-
-function openMixture() {
-  mixtureIsOpen.value = true;
-}
-
+const filtered_layouts = computed(()=> {
+  const layouts = Object.entries(device_layouts.value).filter(([device_name, layout]) => (layout.layout !== null));
+  return layouts.map(([device_name, layout]) => {return { device_name, layout }});
+    });
 
 </script>
 
@@ -77,14 +65,14 @@ function openMixture() {
 
       <div class="flex-grow-1">
         <ul class="nav nav-tabs" id="layout-tabs" role="tablist">
-          <li v-for="(layout, device_name, index) of device_layouts" :key="device_name" class="nav-item" role="presentation">
-            <button v-if="(layout.layout !== null)" class="nav-link" :id="device_name.replaceAll(' ', '') + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + device_name.replaceAll(' ', '') + '-div'" type="button" role="tab"
-        :aria-controls="device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ device_name }}</button>
+          <li v-for="(layout, index) in filtered_layouts" :key="layout.device_name" class="nav-item" role="presentation">
+            <button class="nav-link" :id="layout.device_name.replaceAll(' ', '') + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + layout.device_name.replaceAll(' ', '') + '-div'" type="button" role="tab"
+        :aria-controls="layout.device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ layout.device_name }}</button>
           </li>
         </ul>
         <div class="tab-content d-flex flex-fill" style="height:90%; width:90%" id="layoutTabContent">
-          <div v-for="(layout, device_name, index) of device_layouts" :key="device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="device_name.replaceAll(' ', '') + '-div'">
-            <BedLayout v-if="(layout.layout !== null)" :device_name="device_name" :layout="layout"/>
+          <div v-for="(layout, index) in filtered_layouts" :key="layout.device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="layout.device_name.replaceAll(' ', '') + '-div'">
+            <BedLayout :device_name="layout.device_name" :layout="layout.layout"/>
           </div>        
         </div>
       </div>
