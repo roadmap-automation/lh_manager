@@ -11,7 +11,7 @@ const step = ref(1);
 const chosenMaterial = ref<string | null>(null);
 const soluteUnits = [...soluteMassUnits, ...soluteVolumeUnits];
 
-const generate_new_material = () => ({ name: "", full_name: "", iupac_name: "", molecular_weight: null, type: null });
+const generate_new_material = () => ({ name: "", full_name: "", iupac_name: "", molecular_weight: null, concentration_units: null, density: null, type: null });
 const new_material = ref<Partial<Material>>(generate_new_material());
 
 const UP_ARROW = "▲";
@@ -148,6 +148,17 @@ function edit_material(material: Material) {
             <label for="floatingInputMW">Molec. Weight</label>
           </div>
           <div class="form-floating">
+            <select class="form-select" v-model="new_material.concentration_units" title="choose type" :disabled="new_material.type == 'solvent'">
+              <option value="null"></option>
+              <option v-for="units in soluteUnits" :key="units" :value="units">{{ units }}</option>
+            </select>
+            <label for="floatingInputUnits">Conc. units</label>
+          </div>          
+          <div class="form-floating">
+            <input type="number" class="form-control" v-model="new_material.density" id="floatingInputMW" :disabled="new_material.type !== 'solvent'">
+            <label for="floatingInputDensity">Density (g/cm<sup>3</sup>)</label>
+          </div>          
+          <div class="form-floating">
             <select class="form-select" v-model="new_material.type" title="choose type">
               <option value="null"></option>
               <option v-for="type in materialType" :key="type" :value="type">{{ type }}</option>
@@ -169,6 +180,8 @@ function edit_material(material: Material) {
               <th scope="col" @click="toggleSorting('full_name')">Full name{{ calculateIcon('full_name') }}</th>
               <th scope="col" @click="toggleSorting('iupac_name')">IUPAC name{{ calculateIcon('iupac_name') }}</th>
               <th scope="col" @click="toggleSorting('molecular_weight')">Molecular Weight{{ calculateIcon('molecular_weight') }}</th>
+              <th scope="col">Conc. units</th>
+              <th scope="col">Density (g/cm<sup>3</sup>)</th>
               <th scope="col" @click="toggleSorting('type')">Type{{ calculateIcon('type') }}</th>
               <th scope="col" title="delete"></th>
             </tr>
@@ -185,6 +198,8 @@ function edit_material(material: Material) {
               <td>{{ material.full_name }}</td>
               <td>{{ material.iupac_name }}</td>
               <td>{{ material.molecular_weight }}</td>
+              <td>{{ material.concentration_units }}</td>
+              <td>{{ material.density }}</td>
               <td>{{ material.type }}</td>
               <td><button class="btn btn-outline-danger" @click="check_delete(material)">Delete</button></td>
             </tr>

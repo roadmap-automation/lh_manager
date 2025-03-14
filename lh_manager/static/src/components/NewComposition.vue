@@ -21,7 +21,7 @@ const filtered_solute_materials = computed(() => {
 
 const filtered_solvent_materials = computed(() => {
   return materials.value.filter((m) => {
-    console.log(m.name, m);
+    //console.log(m.name, m);
     return ( (m.type === 'solvent' || m.type === null) && (solvent_search_regexp.value?.test(m.name) ?? true))
   });
 });

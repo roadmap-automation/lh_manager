@@ -167,7 +167,7 @@ export interface Material {
   metadata: object | null,
   type: MaterialType | null,
   density: number | null,
-  solute_concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
+  concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
 }
 
 export interface Rack {
@@ -537,7 +537,7 @@ export async function getDeviceLayout(base_address: string) {
                             .then( response => {
                             if (!response.ok) { return undefined }
                             return response.json()})
-  console.log({ layout });
+  //console.log({ layout });
   return { layout };
 }
 
