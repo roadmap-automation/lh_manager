@@ -15,7 +15,7 @@ class DistributionSystemDevice(DeviceBase):
     device_type: Literal['distribution'] = 'distribution'
     multichannel: bool = False
     allow_sample_mixing: bool = False
-    address: str = 'http://localhost:5003/distribution_system'
+    address: str = 'http://localhost:5003/distribution_system/'
 
     class Job(JobBase):
         pass

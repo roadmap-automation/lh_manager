@@ -40,7 +40,7 @@ function clone(obj) {
     <div class="col d-flex flex-wrap">
       <div class="card" v-for="(device, device_name) of props.devices" :key="device_name">
         <div class="card-body p-2 border bg-light">
-          <h5 class="card-title">{{ device_name }}</h5>
+          <a class="h5 card-title" :href="device.address" target="_blank">{{ device_name }}</a>
           <!-- <h6 class="card-title">{{ device.device_type }}</h6> -->
           <table class="table m-2">
             <tr v-for="field of get_parameters(device)" :key="field.name">
