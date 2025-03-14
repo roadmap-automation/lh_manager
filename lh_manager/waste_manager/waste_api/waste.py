@@ -98,7 +98,7 @@ class WasteHistory:
         CREATE TABLE IF NOT EXISTS {table_name}(
             bottle_id TEXT,
             waste JSON,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT (datetime(current_timestamp, 'localtime'))
         );"""
     
     def __init__(self, database_path: str = WASTE_HISTORY) -> None:
