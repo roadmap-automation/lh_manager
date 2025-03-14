@@ -423,7 +423,7 @@ export function pick_handler(well_location: WellLocation) {
 
 export async function update_well_contents(base_address: string, well: Well) {
   console.log("updating well: ", well, JSON.stringify(well));
-  const update_result = await fetch(base_address + "/GUI/UpdateWell", {
+  const update_result = await fetch(clean_url(base_address + "/GUI/UpdateWell"), {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -433,7 +433,7 @@ export async function update_well_contents(base_address: string, well: Well) {
 }
 
 export async function remove_well_definition(base_address, well: Well) {
-  const update_result = await fetch(base_address + "/GUI/RemoveWellDefinition", {
+  const update_result = await fetch(clean_url(base_address + "/GUI/RemoveWellDefinition"), {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -533,7 +533,7 @@ export async function explode_stage(sample_obj: Sample, stage: string): Promise<
 }
 
 export async function getDeviceLayout(base_address: string) {
-  const response = await fetch(base_address + "/GUI/GetLayout")
+  const response = await fetch(clean_url(base_address + "/GUI/GetLayout"))
                             .catch((err) => {
                               console.log(err)
                               return undefined;
@@ -551,7 +551,7 @@ function dedupe<T>(arr: T[]): T[] {
 }
 
 export async function getDeviceWells(base_address: string) {
-  const wells = await fetch(base_address + "/GUI/GetWells").then( response => {
+  const wells = await fetch(clean_url(base_address + "/GUI/GetWells")).then( response => {
                         if (!response.ok) { return [] }
                         return response.json()}) as WellWithZone[];
   const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
@@ -752,6 +752,10 @@ export async function delete_material(material: Material) {
   });
   const response_body = await update_result.json();
   return response_body;
+}
+
+function clean_url(url: string) {
+  return url.replace(/(https?:\/\/)|(\/)+/g, "$1$2");
 }
 
 export const source_well = ref<WellLocation | null>(null);
