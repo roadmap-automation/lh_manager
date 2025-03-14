@@ -60,6 +60,11 @@ async function establish_socket_connections() {
     console.log('Creating new socket for ' + device.device_name)
     const new_socket = io(device.address)
 
+    new_socket.on('connect', () => {
+      console.log('Connected to ' + device.device_name);
+      refreshWells(device.device_name);
+    })
+
     new_socket.on('update_layout', () => {
       console.log('Got update layout from ' + device.device_name)
       refreshWells(device.device_name);
