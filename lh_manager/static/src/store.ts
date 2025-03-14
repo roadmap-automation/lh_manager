@@ -679,7 +679,7 @@ export async function generate_waste_report(bottle_id: string) {
   });
   const { report } = await update_result.json();
   console.log({ report })
-  return report;
+  return { report };
 }
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {

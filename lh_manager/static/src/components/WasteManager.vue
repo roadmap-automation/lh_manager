@@ -3,6 +3,19 @@ import { ref, computed } from 'vue';
 import BedLayout from './BedLayout.vue';
 import { waste_timestamp_table, generate_waste_report, add_waste_active, waste_layout, empty_waste } from '../store';
 
+const download_url = ref<string>('');
+
+async function download_report(bottle_id: string) {
+    //https://stackoverflow.com/questions/53772331/vue-html-js-how-to-download-a-file-to-browser-using-the-download-tag
+    const report = await generate_waste_report(bottle_id);
+    const blob = new Blob([report.report], {type: 'application/text'})
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'waste_report_' + bottle_id + '.txt'
+    link.click()
+    URL.revokeObjectURL(link.href)
+}
+
 </script>
 
 <template>
@@ -51,7 +64,7 @@ import { waste_timestamp_table, generate_waste_report, add_waste_active, waste_l
                             <td>{{ carboy[0] }}</td>
                             <td>{{ carboy[1] }}</td>
                             <td>{{ carboy[2] }}</td>
-                            <td><button class="btn btn-outline-info" @click="generate_waste_report(carboy[0])">Report</button></td>
+                            <td><button class="btn btn-outline-info" @click="download_report(carboy[0])">Report</button></td>
                             </tr>
                         </tbody>
                         </table>
