@@ -118,7 +118,7 @@ export interface SampleStatusMap {
   }
 }
 
-export type Solute = {name: string, concentration: number, units: SoluteMassUnits | SoluteVolumeUnits};
+export type Solute = {name: string, concentration: number, molecular_weight?: number, units: SoluteMassUnits | SoluteVolumeUnits};
 export type Solvent = {name: string, fraction: number};
 
 
@@ -142,7 +142,7 @@ interface SourceComponents {
 export const materialType = ["solvent", "solute", "lipid", "protein"] as const;
 export type MaterialType = typeof materialType[number];
 export const soluteMassUnits = ["mg/mL", "mg/L"] as const;
-export const soluteVolumeUnits = ["M", "mM", "nM"] as const;
+export const soluteVolumeUnits = ["M", "mM", "uM", "nM"] as const;
 export type SoluteMassUnits = typeof soluteMassUnits[number];
 export type SoluteVolumeUnits = typeof soluteVolumeUnits[number];
 

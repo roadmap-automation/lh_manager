@@ -89,12 +89,13 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
   console.log(component_type, first_available);
   if (first_available !== undefined) {
     const [name, values] = first_available;
-    const new_component: {name: string, fraction?: number, concentration?: number, units?: string} = { name };
+    const new_component: {name: string, fraction?: number, concentration?: number, molecular_weight?: number, units?: string} = { name };
     if (component_type === 'solvents') {
       new_component.fraction = values[0].fraction ?? 0;
     }
     else {
       new_component.concentration = values[0].concentration ?? 0;
+      new_component.molecular_weight = values[0].molecular_weight ?? null;
       new_component.units = values[0].units ?? 'M';
     }
     console.log({param});
@@ -119,9 +120,10 @@ function filter_components(component_key: 'solutes' | 'solvents') {
 }
 
 function change_solute(solute, param) {
-  const { units, concentration } = source_components.value.solutes[solute.name][0];
+  const { units, concentration, molecular_weight } = source_components.value.solutes[solute.name][0];
   solute.units = units;
   solute.concentration = concentration;
+  solute.molecular_weight = molecular_weight;
   send_changes(param);
 }
 
