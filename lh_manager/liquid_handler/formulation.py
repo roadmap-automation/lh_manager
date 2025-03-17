@@ -52,7 +52,7 @@ class Formulation(MethodContainer):
         """
 
         # 1. Create target vector from target composition.
-        target_names, target_vector = self.make_target_vector()
+        target_names, target_vector, target_concentrations_with_units = self.make_target_vector()
         print(f'target names: {target_names}')
         print(f'target vector: {target_vector}')
 
@@ -74,7 +74,7 @@ class Formulation(MethodContainer):
         success = False
         while not success:
             print(f'Source wells: {source_wells}')
-            source_matrix, source_wells = self.make_source_matrix(target_names, source_wells)
+            source_matrix, source_wells = self.make_source_matrix(target_names, source_wells, target_concentrations_with_units)
 
             print(f'Source matrix: {source_matrix}')
 
@@ -162,7 +162,7 @@ class Formulation(MethodContainer):
 
         return methods
     
-    def make_source_matrix(self, source_names: List[str], wells: List[Well]) -> Tuple[List[list], List[Well]]:
+    def make_source_matrix(self, source_names: List[str], wells: List[Well], concentrations_with_units: dict[str, dict[str, float | str]]) -> Tuple[List[list], List[Well], dict[str, str]]:
         """Makes matrix of source wells that contain desired components
 
         Args:
@@ -170,7 +170,7 @@ class Formulation(MethodContainer):
             wells (List[Well]): list of wells to consider
 
         Returns:
-            Tuple[List[list], List[Well]]: Source matrix and list of wells corresponding to each
+            Tuple[List[list], List[Well], dict[str, str]]: Source matrix, list of wells, and unit dictionary corresponding to each
                 column of the source matrix.
         """
 
@@ -180,15 +180,15 @@ class Formulation(MethodContainer):
 
             composition = well.composition
             solvent_names, solvent_fractions = composition.get_solvent_fractions()
-            solute_names, solute_concentrations = composition.get_solute_concentrations()
+            solute_names = composition.get_solute_names()
 
-            # look for possible contributions
+            # look for possible contributions, make sure units are the same as the target composition
             col = []
             for name in source_names:
                 if name in solvent_names:
                     col.append(solvent_fractions[solvent_names.index(name)])
                 elif name in solute_names:
-                    col.append(solute_concentrations[solute_names.index(name)])
+                    col.append(composition.solutes[solute_names.index(name)].convert_units(concentrations_with_units[name]['units']))
                 else:
                     col.append(0)
             
@@ -215,9 +215,11 @@ class Formulation(MethodContainer):
         """
 
         solvent_names, solvent_fractions = self.target_composition.get_solvent_fractions()
-        solute_names, solute_concentrations = self.target_composition.get_solute_concentrations()
+        solute_names, solute_concentrations, solute_units = self.target_composition.get_solute_concentrations()
 
-        return solvent_names + solute_names, solvent_fractions + solute_concentrations
+        concentrations_with_units = {name : unit for (name, unit) in zip(solute_names, solute_units)}
+
+        return solvent_names + solute_names, solvent_fractions + solute_concentrations, concentrations_with_units
 
     def select_wells(self, wells: List[Well], target_names: List[str]) -> Tuple[List[Well], List[str]]:
         """Selects wells based on whether they have the appropriate components
