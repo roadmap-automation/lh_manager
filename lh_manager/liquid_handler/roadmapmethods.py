@@ -180,7 +180,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                                       well_number=buffer_mixing_well.well_number,
                                                       expected_composition=buffer_mixing_well.composition)
 
-        inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
+        inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
                                                          Volume=self.Buffer_Injection_Volume,
                                                          Injection_Flow_Rate=exchange_flow_rate,
                                                          Is_Organic=False,
