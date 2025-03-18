@@ -394,9 +394,9 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        self.Source = layout.infer_location(self.Source)
-        if self.Source.well_number is not None:
-            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+        inferred_source = layout.infer_location(self.Source)
+        if inferred_source.well_number is not None:
+            source_well, _ = layout.get_well_and_rack(inferred_source.rack_id, inferred_source.well_number)
             composition = repr(source_well.composition)
         else:
             composition = self.Source.expected_composition
@@ -459,7 +459,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
 
         inject_loop = ROADMAP_InjectLooptoQCMD(Volume=self.Volume,
                                  Flow_Rate=self.Injection_Flow_Rate,
-                                 contents=repr(composition))
+                                 contents=composition)
         
         methods += inject_loop.get_methods(layout)
 
@@ -655,7 +655,7 @@ class ROADMAP_QCMD_RinseLoopInjectandMeasure(MethodContainer):
 
         inject_loop = ROADMAP_InjectLooptoQCMD(Volume=self.Volume,
                                  Flow_Rate=self.Injection_Flow_Rate,
-                                 contents=repr(composition))
+                                 contents=composition)
         
         methods += inject_loop.get_methods(layout)
 

@@ -1,10 +1,10 @@
-from .bedlayout import LHBedLayout
+from .bedlayout import LHBedLayout, Composition
 from .methods import BaseMethod, MethodType, register
 from .devices import DeviceBase, device_manager
 from .job import JobBase
 
 from dataclasses import field
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Literal, ClassVar
 
 class QCMDMeasurementDevice(DeviceBase):
@@ -85,7 +85,7 @@ class QCMDSleep(BaseQCMDMethod):
 @register
 class QCMDAcceptTransfer(BaseQCMDMethod):
     """Register a solution in the QCMD instrument"""
-    contents: str = ''
+    contents: Composition = Field(default_factory=Composition)
     display_name: Literal['QCMD Accept Transfer'] = 'QCMD Accept Transfer'
     method_name: Literal['QCMDAcceptTransfer'] = 'QCMDAcceptTransfer'
 
