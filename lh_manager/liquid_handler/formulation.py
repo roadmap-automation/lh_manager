@@ -52,7 +52,7 @@ class Formulation(MethodContainer):
         """
 
         # 1. Create target vector from target composition.
-        target_names, target_vector, target_concentrations_with_units = self.make_target_vector()
+        target_names, target_vector, target_units = self.make_target_vector()
         print(f'target names: {target_names}')
         print(f'target vector: {target_vector}')
 
@@ -74,7 +74,7 @@ class Formulation(MethodContainer):
         success = False
         while not success:
             print(f'Source wells: {source_wells}')
-            source_matrix, source_wells = self.make_source_matrix(target_names, source_wells, target_concentrations_with_units)
+            source_matrix, source_wells = self.make_source_matrix(target_names, source_wells, target_units)
 
             print(f'Source matrix: {source_matrix}')
 
@@ -114,7 +114,7 @@ class Formulation(MethodContainer):
         volumes, wells, success = self.formulate(layout)
 
         if success:
-            mix_well = Well('', 0, Composition(), 0)
+            mix_well = Well(rack_id='', volume=0, composition=Composition(), well_number=0)
             for volume, well in zip(volumes, wells):
                 mix_well.mix_with(volume, well.composition)
 
@@ -136,12 +136,12 @@ class Formulation(MethodContainer):
             sort_index = np.argsort(volumes)[::-1]
             sorted_volumes = [volumes[si] for si in sort_index]
             #sort_index = [volumes.index(sv) for sv in sorted_volumes]
-            sorted_wells = [wells[si] for si in sort_index]
+            sorted_wells: list[Well] = [wells[si] for si in sort_index]
 
             # Add transfer methods
             for volume, well in zip(sorted_volumes, sorted_wells):
                 new_transfer = copy(self.transfer_template)
-                new_transfer.Source = WellLocation(well.rack_id, well.well_number)
+                new_transfer.Source = WellLocation(rack_id=well.rack_id, well_number=well.well_number)
                 new_transfer.Target = self.Target
                 new_transfer.Volume = volume
                 methods.append(new_transfer)
@@ -162,7 +162,7 @@ class Formulation(MethodContainer):
 
         return methods
     
-    def make_source_matrix(self, source_names: List[str], wells: List[Well], concentrations_with_units: dict[str, dict[str, float | str]]) -> Tuple[List[list], List[Well], dict[str, str]]:
+    def make_source_matrix(self, source_names: List[str], wells: List[Well], source_units: dict[str, str]) -> Tuple[List[list], List[Well], dict[str, str]]:
         """Makes matrix of source wells that contain desired components
 
         Args:
@@ -188,7 +188,7 @@ class Formulation(MethodContainer):
                 if name in solvent_names:
                     col.append(solvent_fractions[solvent_names.index(name)])
                 elif name in solute_names:
-                    col.append(composition.solutes[solute_names.index(name)].convert_units(concentrations_with_units[name]['units']))
+                    col.append(composition.solutes[solute_names.index(name)].convert_units(source_units[name]))
                 else:
                     col.append(0)
             
@@ -294,10 +294,7 @@ class SoluteFormulation(Formulation):
         volumes, wells, success = super().formulate(layout)
 
         try:
-            diluent_well = next(well
-                                for well in self.get_all_wells(layout)
-                                    if all(well.composition.has_component(cmp) == self.diluent.has_component(cmp)
-                                        for cmp in (self.diluent.get_solute_names() + self.diluent.get_solvent_names() + well.composition.get_solvent_names() + well.composition.get_solute_names())))
+            diluent_well = next(well for well in self.get_all_wells(layout) if well.composition == self.diluent)
         except StopIteration:
             print(f'Diluent ({self.diluent}) not available on bed')
             return [], [], False
