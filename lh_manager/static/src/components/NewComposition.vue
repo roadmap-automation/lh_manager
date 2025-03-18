@@ -26,7 +26,7 @@ const filtered_solvent_materials = computed(() => {
   });
 });
 
-const generate_solute = () => ({ name: filtered_solute_materials.value[0]?.name ?? "", concentration: 0, units: "M" }) as Solute;
+const generate_solute = () => ({ name: filtered_solute_materials.value[0]?.name ?? "", molecular_weight: filtered_solute_materials.value[0]?.molecular_weight ?? null, concentration: 0, units: "M" }) as Solute;
 const new_solute = ref(generate_solute());
 const generate_solvent = () => ({ name: filtered_solvent_materials.value[0]?.name ?? "", fraction: 0 }) as Solvent;
 const new_solvent = ref(generate_solvent());
@@ -45,8 +45,15 @@ async function do_solute_search() {
   solute_search_regexp.value = new RegExp(solute_search_pattern.value ?? '.', 'i');
   await nextTick();
   if (filtered_solute_materials.value.length > 0) {
+    //console.log({filtered_solute_materials})
     new_solute.value.name = filtered_solute_materials.value[0].name;
+    new_solute.value.molecular_weight = filtered_solute_materials.value[0].molecular_weight;
   }
+}
+
+async function select_solute_search() {
+  solute_search_pattern.value = new_solute.value.name;
+  do_solute_search();
 }
 
 function add_solvent() {
@@ -54,6 +61,12 @@ function add_solvent() {
   new_solvent.value = generate_solvent();
   solvent_search_pattern.value = null;
 }
+
+async function select_solvent_search() {
+  solvent_search_pattern.value = new_solvent.value.name;
+  do_solvent_search();
+}
+
 
 async function do_solvent_search() {
   solvent_search_regexp.value = new RegExp(solvent_search_pattern.value ?? '.', 'i');
@@ -70,7 +83,7 @@ async function do_solvent_search() {
         <div>
         <div class="input-group">
             <span class="input-group-text">Solutes: </span>
-            <select class="form-select" v-model="new_solute.name">
+            <select class="form-select" v-model="new_solute.name" @change="select_solute_search">
             <option v-for="material in filtered_solute_materials" :key="material.name" :value="material.name">{{ material.name }}</option>
             </select>
             <input class="form-input" v-model="solute_search_pattern" @input="do_solute_search" placeholder="search" />
@@ -82,7 +95,7 @@ async function do_solvent_search() {
         <label>concentration
             <input class="number px-1 py-0" v-model="solute.concentration" />
         </label>
-        <select v-model="solute.units">
+        <select v-model="solute.units" @change="select_solvent_search">
             <option v-for="unit in soluteUnits" :key="unit" :value="unit">{{ unit }}</option>
         </select>
         <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"

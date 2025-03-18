@@ -118,7 +118,7 @@ export interface SampleStatusMap {
   }
 }
 
-export type Solute = {name: string, concentration: number, molecular_weight?: number, units: SoluteMassUnits | SoluteVolumeUnits};
+export type Solute = {name: string, concentration: number, molecular_weight: number, units: SoluteMassUnits | SoluteVolumeUnits};
 export type Solvent = {name: string, fraction: number};
 
 
