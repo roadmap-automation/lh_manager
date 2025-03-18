@@ -119,14 +119,21 @@ class Composition(BaseModel):
         if not isinstance(value, Composition):
             return NotImplemented
         
+        # check solvents. assumes no duplicates
         solvents_same = False
-        solutes_same = False
         sum_fractions = sum(s.fraction for s in self.solvents)
         solvents = set((s.name, s.fraction / sum_fractions) for s in self.solvents)
         value_sum_fractions = sum(s.fraction for s in value.solvents)
         value_solvents = set((s.name, s.fraction / value_sum_fractions) for s in value.solvents)
         solvents_same = (set(solvents) == set(value_solvents))
-        solutes_same = (set(self.solutes) == set(value.solutes))
+
+        # check solutes. assumes no duplicates
+        solutes_same = False
+        self_solute_names = [s.name for s in self.solutes]
+        value_solute_names = [s.name for s in value.solutes]
+        if set(self_solute_names) == set(value_solute_names):
+            if all(s == value.solutes[value_solute_names.index(s.name)] for s in self.solutes):
+                solutes_same = True
 
         return solvents_same & solutes_same
 
@@ -337,7 +344,7 @@ class LHBedLayout(BaseModel):
                             if (w.volume == 0) & (w.id is None)),
                         None)
         if next_empty is not None:
-            return WellLocation(rack_id, next_empty.well_number)
+            return WellLocation(rack_id=rack_id, well_number=next_empty.well_number)
 
     def infer_location(self, well: WellLocation) -> WellLocation | None:
         """Finds the next empty and fills in the inferred well location by ID or by next empty.
