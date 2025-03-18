@@ -124,7 +124,8 @@ class LHMethodCluster(BaseLHMethod):
         
         return [{lhdevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
-                                             method=m.model_dump())
+                                             method_name=m.method_name,
+                                             method_data=m.model_dump(exclude=EXCLUDE_FIELDS))
                                         for m in self.methods]}]
 
 class SetWellID(BaseMethod):
