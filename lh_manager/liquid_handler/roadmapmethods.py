@@ -358,6 +358,8 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                              
             BaseInjectionSystemMethod.sub_method(
                 method_name='DirectInjectPrime',
                 method_data=dict(pump_volume=self.Volume * 1000,
