@@ -342,9 +342,7 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
 
-        return [BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
-                                                  method_data={}).to_dict() |  
-                self.lh_method(
+        return [self.lh_method(
                     SAMPLENAME=sample_name,
                     SAMPLEDESCRIPTION=sample_description,
                     METHODNAME=self.method_name,
@@ -637,19 +635,19 @@ class ROADMAP_QCMD_RinseLoopInjectandMeasure(MethodContainer):
         if self.Use_Bubble_Sensors:
             load_loop = RinseLoadLoopBubbleSensor(Rinse_Composition=composition,
                                 Volume=self.Volume,
-                                Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
-                                Flow_Rate=2.0,
+                                Aspirate_Flow_Rate=(3.0 if self.Is_Organic else 6.0),
+                                Flow_Rate=3.0,
                                 Rinse_Volume=0.5,
                                 Extra_Volume=self.Extra_Volume,
-                                Air_Gap=0.1)
+                                Air_Gap=0.2)
         else:
             load_loop = RinseLoadLoop(Rinse_Composition=composition,
                                 Volume=self.Volume,
-                                Aspirate_Flow_Rate=(1.0 if self.Is_Organic else 2.5),
-                                Flow_Rate=2.0,
+                                Aspirate_Flow_Rate=(3.0 if self.Is_Organic else 6.0),
+                                Flow_Rate=3.0,
                                 Rinse_Volume=0.5,
                                 Extra_Volume=self.Extra_Volume,
-                                Air_Gap=0.1)
+                                Air_Gap=0.2)
         
         methods += load_loop.get_methods(layout)
 
