@@ -13,7 +13,7 @@ from . import lh_blueprint
 
 # TODO: only if lh_api is integrated with gui_api
 from ..gui_api.events import trigger_layout_update
-lh_interface.results_callbacks.append(trigger_layout_update)
+#lh_interface.results_callbacks.append(trigger_layout_update)   # this doesn't work because trigger_layout_update is a wrapper
 
 def trigger_job_update(f):
     """Decorator that announces that layout has changed"""
@@ -46,6 +46,7 @@ def broadcast_job_validation(job: LHJob, result: ValidationStatus) -> None:
                    'result': result},
                   include_self=True)
 
+@trigger_layout_update
 def broadcast_job_result(job: LHJob, method_number: int, method_name: str, result: ResultStatus) -> None:
     """Sends result signal
 
