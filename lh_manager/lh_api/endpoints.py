@@ -11,6 +11,10 @@ from ..waste_manager.waste_api.events import trigger_waste_update
 from ..sio import socketio
 from . import lh_blueprint
 
+# TODO: only if lh_api is integrated with gui_api
+from ..gui_api.events import trigger_layout_update
+lh_interface.results_callbacks.append(trigger_layout_update)
+
 def broadcast_job_activation(job: LHJob) -> None:
     """Sends activation signal
 
@@ -66,6 +70,14 @@ def GetJob(job_id: str) -> Response:
         return make_response({'success': job.model_dump()}, 200)
     else:
         return make_response({'error': f'job {job_id} does not exist'}, 400)
+
+@lh_blueprint.route('/LH/GetActiveJob/', methods=['GET'])
+def GetActiveJob() -> Response:
+    """Gets active job"""
+
+    job = lh_interface.get_active_job()
+
+    return make_response({'active_job': job.model_dump() if job is not None else None}, 200)
 
 @lh_blueprint.route('/LH/SubmitJob/', methods=['POST'])
 def SubmitJob() -> Response:
