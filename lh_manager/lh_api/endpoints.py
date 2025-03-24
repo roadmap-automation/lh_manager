@@ -11,6 +11,19 @@ from ..waste_manager.waste_api.events import trigger_waste_update
 from ..sio import socketio
 from . import lh_blueprint
 
+# TODO: only if lh_api is integrated with gui_api
+from ..gui_api.events import trigger_layout_update
+lh_interface.results_callbacks.append(trigger_layout_update)
+
+def trigger_job_update(f):
+    """Decorator that announces that layout has changed"""
+    def wrap(*args, **kwargs):
+        ret_val = f(*args, **kwargs)
+        socketio.emit('update_job', {'msg': 'update_job'}, include_self=True)
+        return ret_val
+    wrap.__name__ = f.__name__
+    return wrap
+
 def broadcast_job_activation(job: LHJob) -> None:
     """Sends activation signal
 
@@ -67,7 +80,16 @@ def GetJob(job_id: str) -> Response:
     else:
         return make_response({'error': f'job {job_id} does not exist'}, 400)
 
+@lh_blueprint.route('/LH/GetActiveJob/', methods=['GET'])
+def GetActiveJob() -> Response:
+    """Gets active job"""
+
+    job = lh_interface.get_active_job()
+
+    return make_response({'active_job': job.model_dump() if job is not None else None}, 200)
+
 @lh_blueprint.route('/LH/SubmitJob/', methods=['POST'])
+@trigger_job_update
 def SubmitJob() -> Response:
     """Submits LHJob to server. Data format should just be a single
         serialized LHJob object"""
@@ -148,6 +170,7 @@ def PutSampleListValidation(sample_list_id):
     return make_response({sample_list_id: job.get_validation_status(), 'error': error}, 200)
 
 @lh_blueprint.route('/LH/PutSampleData/', methods=['POST'])
+@trigger_job_update
 @trigger_waste_update
 def PutSampleData():
     data = request.get_json(force=True)
@@ -206,6 +229,7 @@ def ResetErrorState() -> Response:
     return make_response({'success': 'error state reset'}, 200)
 
 @lh_blueprint.route('/LH/ResubmitActiveJob/', methods=['POST'])
+@trigger_job_update
 def ResubmitActiveJob() -> Response:
     """Updates the active job with a +1 LH_ID to ensure it will run again
     """

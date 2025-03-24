@@ -67,6 +67,21 @@ class BaseMethod(BaseModel):
         """Renders the lh_method class to a Gilson LH-compatible format"""
         
         return [{}]
+    
+class UnknownMethod(BaseMethod):
+    """Special method for holding an unknown data type (cannot be deserialized, previous schema version, etc.)
+    """
+    method_name: Literal['Unknown'] = 'Unknown'
+    display_name: Literal['Unknown'] = 'Unknown'
+    method_data: dict = Field(default_factory={})
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        """Returns empty list for unknown methods"""
+        
+        return []
 
 class MethodContainer(BaseMethod):
     """Special method that generates a list of basic methods when rendered"""
