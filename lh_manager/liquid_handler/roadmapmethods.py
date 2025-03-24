@@ -60,14 +60,14 @@ class InjectOrganicsWithRinse(InjectWithRinse):
 @register
 class ROADMAP_QCMD_MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
-    Bilayer_Composition: Composition = Field(default_factory=Composition)
     Bilayer_Solvent: Composition = Field(default_factory=Composition)
-    Lipid_Injection_Volume: float = 0.0
-    Buffer_Composition: Composition = Field(default_factory=Composition)
-    Buffer_Injection_Volume: float = 0.0
-    Extra_Volume: float = 0.1
     Rinse_Volume: float = 2.0
+    Extra_Volume: float = 0.1
     Flow_Rate: float = 2.0
+    Bilayer_Composition: Composition = Field(default_factory=Composition)
+    Lipid_Injection_Volume: float = 1.0
+    Buffer_Composition: Composition = Field(default_factory=Composition)
+    Buffer_Injection_Volume: float = 2.0
     Exchange_Flow_Rate: float = 0.1
     Equilibration_Time: float = 1.0
     Measurement_Time: float = 2.0
@@ -397,7 +397,7 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
         inferred_source = layout.infer_location(self.Source)
         if inferred_source.well_number is not None:
             source_well, _ = layout.get_well_and_rack(inferred_source.rack_id, inferred_source.well_number)
-            composition = repr(source_well.composition)
+            composition = source_well.composition
         else:
             composition = self.Source.expected_composition
                     
@@ -525,7 +525,7 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
                              Injection_Flow_Rate=self.Injection_Flow_Rate,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
-                             Air_Gap=0.1,
+                             Air_Gap=0.15,
                              Use_Liquid_Level_Detection=(False if self.Is_Organic else True),
                              Use_Bubble_Sensors=self.Use_Bubble_Sensors
                              )
@@ -575,7 +575,7 @@ class ROADMAP_RinseDirectInjecttoQCMD(BaseInjectionSystemMethod):
     Injection_Flow_Rate: float = 1 # mL/min
     Rinse_Volume: float = 0.5 # ml
     Use_Bubble_Sensors: bool = True
-    display_name: Literal['ROADMAP Direct Inject to QCMD from Rinse'] = 'Direct Inject from Rinse'
+    display_name: Literal['ROADMAP Direct Inject to QCMD from Rinse'] = 'ROADMAP Direct Inject to QCMD from Rinse'
     method_name: Literal['ROADMAP_RinseDirectInjecttoQCMD'] = 'ROADMAP_RinseDirectInjecttoQCMD'
     method_type: Literal[MethodType.INJECT] = MethodType.INJECT
 
