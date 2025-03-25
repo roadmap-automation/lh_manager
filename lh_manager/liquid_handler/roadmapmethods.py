@@ -61,12 +61,14 @@ class InjectOrganicsWithRinse(InjectWithRinse):
 class ROADMAP_QCMD_MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Bilayer_Solvent: Composition = Field(default_factory=Composition)
+    Use_Rinse_System_for_Solvent: bool = True
     Rinse_Volume: float = 2.0
     Extra_Volume: float = 0.1
     Flow_Rate: float = 2.0
     Bilayer_Composition: Composition = Field(default_factory=Composition)
     Lipid_Injection_Volume: float = 1.0
     Buffer_Composition: Composition = Field(default_factory=Composition)
+    Use_Rinse_System_for_Buffer: bool = True
     Buffer_Injection_Volume: float = 2.0
     Exchange_Flow_Rate: float = 0.1
     Equilibration_Time: float = 1.0
@@ -98,22 +100,38 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         """
 
         # ==== Solvent rinse ====
-        required_volume = minimum_volume + extra_volume + rinse_volume
-        lipid_prep_well, error = find_well_and_volume(self.Bilayer_Solvent, required_volume, layout.get_all_wells())
-        if lipid_prep_well is None:
-            print('Error: insufficient or nonexistent bilayer solvent. Aborting.')
-            return []
 
-        inject_rinse = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=lipid_prep_well.composition,
-                                                         Volume=rinse_volume,
-                                                         Injection_Flow_Rate=injection_flow_rate,
-                                                         Extra_Volume=extra_volume,
-                                                         Is_Organic=True,
-                                                         Use_Bubble_Sensors=True,
-                                                         Equilibration_Time=equilibration_time,
-                                                         Measurement_Time=measurement_time)
+        if self.Use_Rinse_System_for_Solvent:
 
-        methods += inject_rinse.get_methods_from_well(lipid_prep_well, lipid_prep_well.composition, layout)
+            inject_rinse = ROADMAP_QCMD_RinseLoopInjectandMeasure(Target_Composition=self.Bilayer_Solvent,
+                                                                Volume=rinse_volume,
+                                                                Injection_Flow_Rate=injection_flow_rate,
+                                                                Extra_Volume=extra_volume,
+                                                                Is_Organic=True,
+                                                                Use_Bubble_Sensors=True,
+                                                                Equilibration_Time=equilibration_time,
+                                                                Measurement_Time=measurement_time)
+            
+            methods += inject_rinse.get_methods(layout)
+
+        else:
+
+            required_volume = minimum_volume + extra_volume + rinse_volume
+            lipid_prep_well, error = find_well_and_volume(self.Bilayer_Solvent, required_volume, layout.get_all_wells())
+            if lipid_prep_well is None:
+                print('Error: insufficient or nonexistent bilayer solvent. Aborting.')
+                return []
+
+            inject_rinse = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=lipid_prep_well.composition,
+                                                            Volume=rinse_volume,
+                                                            Injection_Flow_Rate=injection_flow_rate,
+                                                            Extra_Volume=extra_volume,
+                                                            Is_Organic=True,
+                                                            Use_Bubble_Sensors=True,
+                                                            Equilibration_Time=equilibration_time,
+                                                            Measurement_Time=measurement_time)
+
+            methods += inject_rinse.get_methods_from_well(lipid_prep_well, lipid_prep_well.composition, layout)
 
         # ==== Lipids in solvent ====
         required_volume = minimum_volume + extra_volume + self.Lipid_Injection_Volume
@@ -145,7 +163,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                              Injection_Flow_Rate=injection_flow_rate,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
-                             Air_Gap=0.1,
+                             Air_Gap=0.15,
                              Use_Liquid_Level_Detection=False,
                              Use_Bubble_Sensors=True
                              )
@@ -159,36 +177,48 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         methods += measure.get_methods(layout)
 
         # ==== Buffer ====
-        required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
-        buffer_mixing_well, error = find_well_and_volume(self.Buffer_Composition, required_volume, layout.get_all_wells())
-        if buffer_mixing_well is None:
-            buffer_mixing_well = InferredWellLocation(rack_id='Mix')
-
-            buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
-                                            target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
-                                            Target=buffer_mixing_well,
-                                            exact_match=True,
-                                            transfer_template=TransferWithRinse(),
-                                            mix_template=MixWithRinse())
+        if self.Use_Rinse_System_for_Buffer:
+            inject_buffer = ROADMAP_QCMD_RinseLoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
+                                                            Volume=self.Buffer_Injection_Volume,
+                                                            Injection_Flow_Rate=exchange_flow_rate,
+                                                            Is_Organic=False,
+                                                            Use_Bubble_Sensors=True,
+                                                            Equilibration_Time=equilibration_time,
+                                                            Measurement_Time=measurement_time)
             
-            buffer_mixing_well.expected_composition = buffer_formulation.get_expected_composition(layout)
+            methods += inject_buffer.get_methods(layout)
 
-            methods += [LHMethodCluster(method_type=MethodType.PREPARE,
-                                        methods=buffer_formulation.get_methods(layout))]
-        else:
-            buffer_mixing_well = InferredWellLocation(rack_id=buffer_mixing_well.rack_id,
-                                                      well_number=buffer_mixing_well.well_number,
-                                                      expected_composition=buffer_mixing_well.composition)
+        else:        
+            required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
+            buffer_mixing_well, error = find_well_and_volume(self.Buffer_Composition, required_volume, layout.get_all_wells())
+            if buffer_mixing_well is None:
+                buffer_mixing_well = InferredWellLocation(rack_id='Mix')
 
-        inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
-                                                         Volume=self.Buffer_Injection_Volume,
-                                                         Injection_Flow_Rate=exchange_flow_rate,
-                                                         Is_Organic=False,
-                                                         Use_Bubble_Sensors=True,
-                                                         Equilibration_Time=equilibration_time,
-                                                         Measurement_Time=measurement_time)
-        
-        methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
+                buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
+                                                target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
+                                                Target=buffer_mixing_well,
+                                                exact_match=True,
+                                                transfer_template=TransferWithRinse(),
+                                                mix_template=MixWithRinse())
+                
+                buffer_mixing_well.expected_composition = buffer_formulation.get_expected_composition(layout)
+
+                methods += [LHMethodCluster(method_type=MethodType.PREPARE,
+                                            methods=buffer_formulation.get_methods(layout))]
+            else:
+                buffer_mixing_well = InferredWellLocation(rack_id=buffer_mixing_well.rack_id,
+                                                        well_number=buffer_mixing_well.well_number,
+                                                        expected_composition=buffer_mixing_well.composition)
+
+            inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
+                                                            Volume=self.Buffer_Injection_Volume,
+                                                            Injection_Flow_Rate=exchange_flow_rate,
+                                                            Is_Organic=False,
+                                                            Use_Bubble_Sensors=True,
+                                                            Equilibration_Time=equilibration_time,
+                                                            Measurement_Time=measurement_time)
+            
+            methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
 
         return methods
 
@@ -451,7 +481,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
                              Flow_Rate=2.0,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
-                             Air_Gap=0.1,
+                             Air_Gap=0.15,
                              Use_Bubble_Sensors=self.Use_Bubble_Sensors,
                              Use_Liquid_Level_Detection=(False if self.Is_Organic else True))
         
