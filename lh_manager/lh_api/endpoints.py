@@ -238,3 +238,13 @@ def ResubmitActiveJob() -> Response:
     lh_interface._active_job.LH_id += 1
 
     return make_response({'success': f'LH_id incremented to {lh_interface._active_job.LH_id}'}, 200)
+
+@lh_blueprint.route('/LH/Deactivate/', methods=['POST'])
+@trigger_job_update
+def Deactivate() -> Response:
+    """Updates the active job with a +1 LH_ID to ensure it will run again
+    """
+
+    lh_interface.deactivate()
+
+    return make_response({'success': 'deactivated'}, 200)
