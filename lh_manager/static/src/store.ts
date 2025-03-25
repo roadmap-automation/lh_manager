@@ -102,7 +102,8 @@ export interface Sample {
   current_contents: string,
 }
 
-export type StatusType = 'pending' | 'active' | 'completed' | 'inactive' | 'partially complete' | 'cancelled' | 'error' | 'unknown';
+export type StatusType = 'up' | 'busy' | 'down' | 'error';
+export type DeviceStatusType = 'pending' | 'active' | 'completed' | 'inactive' | 'partially complete' | 'cancelled' | 'error' | 'unknown';
 
 export interface SampleStatus {
   status?: StatusType,
@@ -757,6 +758,45 @@ export async function delete_material(material: Material) {
 function clean_url(url: string) {
   return url.replace(/(https?:\/\/)|(\/)+/g, "$1$2");
 }
+
+export async function refreshLHStatus() {
+  const { active_job, status } = await (await fetch("/LH/GetState/")).json();
+  active_lh_job.value = active_job;
+  lh_status.value = status;
+}
+
+export async function clear_lh_job() {
+  const update_result = await fetch("/LH/Deactivate/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function resubmit_lh_job() {
+  const update_result = await fetch("/LH/ResubmitActiveJob/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function clear_lh_error() {
+  const update_result = await fetch("/LH/ResetErrorState/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export const active_lh_job = ref<object | null>(null);
+export const lh_status = ref<StatusType | null>(null);
 
 export const source_well = ref<WellLocation | null>(null);
 export const target_well = ref<WellLocation | null>(null);
