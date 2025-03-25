@@ -15,15 +15,16 @@ from . import lh_blueprint
 from ..gui_api.events import trigger_layout_update
 #lh_interface.results_callbacks.append(trigger_layout_update)   # this doesn't work because trigger_layout_update is a wrapper
 
-def trigger_job_update(f):
-    """Decorator that announces that layout has changed"""
+def trigger_update(f):
+    """Decorator that announces that active job has changed"""
     def wrap(*args, **kwargs):
         ret_val = f(*args, **kwargs)
-        socketio.emit('update_job', {'msg': 'update_job'}, include_self=True)
+        socketio.emit('update_lh_job', {'msg': 'update_lh_job'}, include_self=True)
         return ret_val
     wrap.__name__ = f.__name__
     return wrap
 
+@trigger_update
 def broadcast_job_activation(job: LHJob) -> None:
     """Sends activation signal
 
@@ -46,6 +47,7 @@ def broadcast_job_validation(job: LHJob, result: ValidationStatus) -> None:
                    'result': result},
                   include_self=True)
 
+@trigger_update
 @trigger_layout_update
 def broadcast_job_result(job: LHJob, method_number: int, method_name: str, result: ResultStatus) -> None:
     """Sends result signal
@@ -90,7 +92,7 @@ def GetActiveJob() -> Response:
     return make_response({'active_job': job.model_dump() if job is not None else None}, 200)
 
 @lh_blueprint.route('/LH/SubmitJob/', methods=['POST'])
-@trigger_job_update
+@trigger_update
 def SubmitJob() -> Response:
     """Submits LHJob to server. Data format should just be a single
         serialized LHJob object"""
@@ -171,7 +173,7 @@ def PutSampleListValidation(sample_list_id):
     return make_response({sample_list_id: job.get_validation_status(), 'error': error}, 200)
 
 @lh_blueprint.route('/LH/PutSampleData/', methods=['POST'])
-@trigger_job_update
+@trigger_update
 @trigger_waste_update
 def PutSampleData():
     data = request.get_json(force=True)
@@ -209,6 +211,7 @@ def PutSampleData():
     return make_response({'data': data}, 200)
 
 @lh_blueprint.route('/LH/ReportError/', methods=['POST'])
+@trigger_update
 def ReportError():
     data = request.get_json(force=True)
     assert isinstance(data, dict)
@@ -221,6 +224,7 @@ def ReportError():
     return make_response({'data': data}, 200)
 
 @lh_blueprint.route('/LH/ResetErrorState/', methods=['POST'])
+@trigger_update
 def ResetErrorState() -> Response:
     """Clears error state of LH interface
     """
@@ -230,7 +234,7 @@ def ResetErrorState() -> Response:
     return make_response({'success': 'error state reset'}, 200)
 
 @lh_blueprint.route('/LH/ResubmitActiveJob/', methods=['POST'])
-@trigger_job_update
+@trigger_update
 def ResubmitActiveJob() -> Response:
     """Updates the active job with a +1 LH_ID to ensure it will run again
     """
@@ -240,7 +244,7 @@ def ResubmitActiveJob() -> Response:
     return make_response({'success': f'LH_id incremented to {lh_interface._active_job.LH_id}'}, 200)
 
 @lh_blueprint.route('/LH/Deactivate/', methods=['POST'])
-@trigger_job_update
+@trigger_update
 def Deactivate() -> Response:
     """Updates the active job with a +1 LH_ID to ensure it will run again
     """
@@ -248,3 +252,11 @@ def Deactivate() -> Response:
     lh_interface.deactivate()
 
     return make_response({'success': 'deactivated'}, 200)
+
+@lh_blueprint.route('/LH/GetState/', methods=['GET'])
+def GetState() -> Response:
+    """Gets full interface status
+    """
+
+    return make_response({'active_job': lh_interface._active_job.model_dump() if lh_interface._active_job is not None else None,
+                          'status': lh_interface.get_status()}, 200)
