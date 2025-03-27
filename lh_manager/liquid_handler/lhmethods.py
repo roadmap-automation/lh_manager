@@ -156,17 +156,21 @@ class InjectMethod(BaseLHMethod):
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         return repr(source_well.composition)
 
+    @property
+    def sample_volume(self):
+        return self.Volume
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
 
-        if self.Volume > source_well.volume:
+        if self.sample_volume > source_well.volume:
             return MethodError(name=self.display_name,
-                                      error=f"Injection of volume {self.Volume} requested but well {source_well.well_number} in {source_well.rack_id} rack contains only {source_well.volume}"
+                                      error=f"Injection of volume {self.sample_volume} requested but well {source_well.well_number} in {source_well.rack_id} rack contains only {source_well.volume}"
                                       )
 
-        source_well.volume -= self.Volume
+        source_well.volume -= self.sample_volume
 
 
 class MixMethod(BaseLHMethod):
@@ -183,15 +187,22 @@ class MixMethod(BaseLHMethod):
         target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
         return repr(target_well.composition)
 
+    @property
+    def extra_volume(self):
+        return 0.0
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
 
-        if self.Volume > target_well.volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Mix with volume {self.Volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
-                                      )
+        required_volume = self.Volume + self.extra_volume
 
+        if required_volume > target_well.volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Mix with volume {required_volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
+                                      )
+        
+        target_well.volume -= self.extra_volume
 
 class TransferMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
@@ -208,18 +219,22 @@ class TransferMethod(BaseLHMethod):
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         return repr(source_well.composition)
 
+    @property
+    def transfer_volume(self):
+        return self.Volume
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         target_well, target_rack = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
 
-        if self.Volume > source_well.volume:
+        if self.transfer_volume > source_well.volume:
             return MethodError(name=self.display_name,
                                       error=f"Well {source_well.well_number} in {source_well.rack_id} \
-                                      rack contains {source_well.volume} but needs {self.Volume}")
+                                      rack contains {source_well.volume} but needs {self.transfer_volume}")
 
-        source_well.volume -= self.Volume
+        source_well.volume -= self.transfer_volume
 
         if (target_well.volume + self.Volume) > target_rack.max_volume:
             return MethodError(name=self.display_name,
@@ -286,6 +301,10 @@ class TransferWithRinse(TransferMethod):
             Target_Zone=target_zone,
             Target_Well=target_well
         ).to_dict()]
+
+    @property
+    def transfer_volume(self):
+        return self.Volume + self.Extra_Volume
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate
@@ -355,6 +374,10 @@ class MixWithRinse(MixMethod):
             Target_Zone=target_zone,
             Target_Well=target_well
         ).to_dict()]
+
+    @property
+    def extra_volume(self):
+        return self.Extra_Volume
 
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
@@ -432,6 +455,10 @@ class InjectWithRinse(InjectMethod):
             Air_Gap=f'{self.Air_Gap}',
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}'
         ).to_dict()]
+
+    @property
+    def sample_volume(self):
+        return self.Volume + self.Extra_Volume
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
@@ -602,6 +629,10 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
 
         return new_waste
 
+    @property
+    def sample_volume(self):
+        return self.Volume + self.Extra_Volume
+
 @register
 class ROADMAP_QCMD_DirectInject(InjectMethod):
     """Direct Inject with rinse"""
@@ -670,3 +701,7 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
         new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=WATER)
 
         return new_waste
+
+    @property
+    def sample_volume(self):
+        return self.Volume + self.Extra_Volume
