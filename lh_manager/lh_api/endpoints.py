@@ -202,7 +202,6 @@ def PutSampleData():
         error = f'Error in results. Full message: ' + repr(data)
         print(error)
         lh_interface.has_error = True
-        lh_interface.deactivate()
     elif job.get_result_status() == ResultStatus.SUCCESS:
         job.execute_methods(layout)
         for m in job.LH_methods:

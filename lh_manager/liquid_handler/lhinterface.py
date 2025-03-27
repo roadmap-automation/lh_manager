@@ -141,6 +141,7 @@ class LHJob(JobBase):
         """
 
         samplelist = copy.copy(self.LH_method_data)
+        samplelist['id'] = str(self.LH_id)
         if listonly:
             samplelist['columns'] = None
 
