@@ -34,7 +34,7 @@ def InitializeDevices() -> Response:
 
     return make_response({'result': 'success'}, 200)
 
-@autocontrol_blueprint.route('/autocontrol/GetTaskResult/', methods=['GET'])
+@autocontrol_blueprint.route('/autocontrol/GetTaskResult', methods=['GET'])
 def GetTaskResult() -> Response:
     """Redirects task result requests to autocontrol server
     """
@@ -42,13 +42,15 @@ def GetTaskResult() -> Response:
     data: dict = request.get_json(force=True)
 
     task_id = data.get('task_id', None)
+    subtask_id = data.get('subtask_id', None)
 
     if task_id is not None:
-        return redirect(AUTOCONTROL_URL + f'/get_task_status/{task_id}')
-    else:
-        return make_response({'error': 'task_id required'})
+        if subtask_id is not None:
+            return redirect(AUTOCONTROL_URL + f'/get_subtask_results/{task_id}/{subtask_id}')
+        return make_response({'error': 'subtask_id required'})
+    return make_response({'error': 'task_id required'})
 
-@autocontrol_blueprint.route('/autocontrol/GetTaskStatus/', methods=['GET'])
+@autocontrol_blueprint.route('/autocontrol/GetTaskStatus', methods=['GET'])
 def GetTaskStatus() -> Response:
     """Redirects task result requests to autocontrol server
     """
