@@ -3,6 +3,7 @@ from typing import List, Optional
 from flask import make_response, Response, request
 
 from ...liquid_handler.bedlayout import Well, WellLocation
+from ...material_db.db import Material, MaterialDB
 from .waste import waste_layout, WasteHistory
 from ..wastedata import WasteItem
 from .events import trigger_waste_update
@@ -97,11 +98,41 @@ def GetWasteReport() -> Response:
 
     with WasteHistory(waste_layout._database_path) as waste_history:
         wasteitems = waste_history.get_waste_by_bottle_id(data['bottle_id'])
+        timestamp_table = waste_history.get_timestamp_table()
 
     total_waste = WasteItem()
     for item in wasteitems:
         total_waste.mix_with(item.volume, item.composition)
 
-    # TODO: make a nicely formatted report
+    # nicely formatted report. Converts solutes into g/mL
+    first_time, last_time = next((b[1], b[2]) for b in timestamp_table if b[0] == data['bottle_id'])
+    bottle_id = data['bottle_id']
+    report = f'Carboy ID: {bottle_id}\nFirst entry: {first_time}\nLast entry: {last_time}\n'
+    report += 'Percent\tChemical name\n'
 
-    return make_response({'report': repr(total_waste.composition)}, 200)
+    with MaterialDB() as db:
+        components = []
+        component_fractions = []
+        for solvent in total_waste.composition.solvents:
+            full_name = db.get_material_by_name(solvent.name).full_name
+            components.append(full_name)
+            component_fractions.append(solvent.fraction)
+
+        for solute in total_waste.composition.solutes:
+            full_name = db.get_material_by_name(solute.name).full_name
+            components.append(full_name)
+            # convert to g/mL units (assume density of 1)
+            component_fractions.append(solute.convert_units('mg/mL') * 1e-3)
+
+
+    # normalize all fractions and convert to percent
+    sum_cf = sum(component_fractions)
+    component_fractions = [cf / sum_cf * 100 for cf in component_fractions]
+
+    # sort and generate report
+    component_fractions, components = zip(*sorted(zip(component_fractions, components)))
+    for cf, c in zip(component_fractions[::-1], components[::-1]):
+        cf_text = f'{cf: 0.0f}' if cf > 1 else '<1'
+        report += f'{cf_text}\t{c}\n'
+
+    return make_response({'report': report}, 200)
