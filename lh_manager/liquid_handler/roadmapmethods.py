@@ -149,8 +149,8 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
             
             lipid_mixing_well.expected_composition = bilayer_formulation.get_expected_composition(layout)
 
-            methods += [LHMethodCluster(method_type=MethodType.PREPARE,
-                                        methods=bilayer_formulation.get_methods(layout))]
+            methods += bilayer_formulation.get_methods(layout)
+            
         else:
             lipid_mixing_well = WellLocation(rack_id=lipid_mixing_well.rack_id,
                                              well_number=lipid_mixing_well.well_number,
@@ -424,14 +424,15 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        inferred_source = layout.infer_location(self.Source)
-        if inferred_source.well_number is not None:
+        if self.Source.expected_composition is not None:
+            composition = self.Source.expected_composition
+        else:
+            inferred_source = layout.infer_location(self.Source)
+            print('Source', self.Source.model_dump())
             print('Inferred source', inferred_source.model_dump())
             source_well, _ = layout.get_well_and_rack(inferred_source.rack_id, inferred_source.well_number)
             print('Source well', source_well.model_dump())
             composition = source_well.composition
-        else:
-            composition = self.Source.expected_composition
                     
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
@@ -584,7 +585,7 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
         # select well with sufficient volume
         target_well, error = find_well_and_volume(self.Target_Composition, required_volume, layout.get_all_wells())
         if error is not None:
-            print(f'Warning in {self.method_name}' + error + ', aborting')
+            print(f'Warning in {self.method_name}: ' + error + ', aborting')
             return []
         else:
             print(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
