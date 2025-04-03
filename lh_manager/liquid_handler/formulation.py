@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import nnls
 from pydantic import Field, validator, SerializeAsAny
 
-from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
+from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse, LHMethodCluster
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation, empty
 from .layoutmap import Zone, LayoutWell2ZoneWell
@@ -31,6 +31,8 @@ class Formulation(MethodContainer):
                 is achieved. Defaults to True."""
     transfer_template: SerializeAsAny[TransferMethod] = Field(default_factory=TransferWithRinse)
     mix_template: SerializeAsAny[MixMethod] = Field(default_factory=MixWithRinse)
+
+    _formulation_results: Tuple[List[float], List[Well], bool] | None = None
 
     @validator('mix_template', 'transfer_template', pre=True)
     def validate_templates(cls, v):
@@ -62,13 +64,14 @@ class Formulation(MethodContainer):
 
         if not len(source_wells):
             print('Cannot create formulation: no acceptable solutions available')
-            return [], [], False
+            self._formulation_results = [], [], False
         
         # 3. Check that all components of target are present in layout
         for target_name in target_names:
             if target_name not in source_components:
                 print(f'Cannot make formulation: {target_name} is missing')
-                return [], [], False
+                self._formulation_results = [], [], False
+                return self._formulation_results
 
         # 4. Attempt to solve
         success = False
@@ -102,7 +105,24 @@ class Formulation(MethodContainer):
         # 4. Find all unique solutions an use a priority to find the best one (fewest operations, least time, etc.)
         source_wells = [well for well, vol in zip(source_wells, sol) if vol > ZERO_VOLUME_TOLERANCE]
 
-        return (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
+        self._formulation_results = (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
+
+        return self._formulation_results
+
+    def get_formulation_results(self, layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
+        """Get cached formulation results, or recalculate
+
+        Args:
+            layout (LHBedLayout): LH bed layout
+
+        Returns:
+            Tuple[List[float], List[Well], bool]: see formulate()
+        """
+
+        if self._formulation_results is None:
+            self._formulation_results = self.formulate(layout)
+
+        return self._formulation_results
 
     def get_expected_composition(self, layout: LHBedLayout) -> Composition:
         """Calculates the expected composition from the formulation
@@ -111,7 +131,7 @@ class Formulation(MethodContainer):
             Composition: expected composition
         """
 
-        volumes, wells, success = self.formulate(layout)
+        volumes, wells, success = self.get_formulation_results(layout)
 
         if success:
             mix_well = Well(rack_id='', volume=0, composition=Composition(), well_number=0)
@@ -123,15 +143,37 @@ class Formulation(MethodContainer):
         else:
             return Composition()
 
+    def get_target_well(self, layout: LHBedLayout) -> WellLocation:
+        """Gets the target well. If the formulation already exists
+            in the layout with sufficient volume, use that as the target well;
+            otherwise use self.Target
+
+
+        Args:
+            layout (LHBedLayout): current LH bed layout
+
+        Returns:
+            WellLocation: target well location
+        """
+        volumes, wells, success = self.get_formulation_results(layout)
+
+        if success:
+            if len(volumes) > 1:
+                return self.Target
+            else:
+                return WellLocation(rack_id=wells[0].rack_id,
+                                    well_number=wells[0].well_number,
+                                    expected_composition=self.target_composition)
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
-        """Overwrites base class method to dynamically create list of methods
+        """Overwrites base class method to dynamically create list of methods.
+            Returns empty list if the formulation already exists.
         """
 
         methods = []
-        volumes, wells, success = self.formulate(layout)
+        volumes, wells, success = self.get_formulation_results(layout)
 
-        if success:
+        if success & (len(volumes) > 1):
             # sort by volume (largest first)
             sort_index = np.argsort(volumes)[::-1]
             sorted_volumes = [volumes[si] for si in sort_index]
@@ -160,7 +202,7 @@ class Formulation(MethodContainer):
                 new_mix.Volume = mix_volume
                 methods.append(new_mix)
 
-        return methods
+        return [] if not len(methods) else [LHMethodCluster(methods=methods)]
     
     def make_source_matrix(self, source_names: List[str], wells: List[Well], source_units: dict[str, str]) -> Tuple[List[list], List[Well], dict[str, str]]:
         """Makes matrix of source wells that contain desired components
