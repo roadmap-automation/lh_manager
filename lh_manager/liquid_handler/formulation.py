@@ -173,7 +173,7 @@ class Formulation(MethodContainer):
         methods = []
         volumes, wells, success = self.get_formulation_results(layout)
 
-        if success & (len(volumes) > 1):
+        if success:
             # sort by volume (largest first)
             sort_index = np.argsort(volumes)[::-1]
             sorted_volumes = [volumes[si] for si in sort_index]
