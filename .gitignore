@@ -4,3 +4,6 @@ dist
 .vscode
 package-lock.json
 **persistent_state/*.*
+build/*
+*egg-info
+persistent_state/*
