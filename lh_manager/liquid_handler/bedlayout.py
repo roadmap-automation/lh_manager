@@ -122,20 +122,24 @@ class Composition(BaseModel):
         # check solvents. assumes no duplicates
         solvents_same = False
         sum_fractions = sum(s.fraction for s in self.solvents)
-        solvents = set((s.name, s.fraction / sum_fractions) for s in self.solvents)
+        solvents = set((s.name, s.fraction / sum_fractions) for s in self.solvents if s.fraction > 0)
         value_sum_fractions = sum(s.fraction for s in value.solvents)
-        value_solvents = set((s.name, s.fraction / value_sum_fractions) for s in value.solvents)
+        value_solvents = set((s.name, s.fraction / value_sum_fractions) for s in value.solvents if s.fraction > 0)
         solvents_same = (set(solvents) == set(value_solvents))
 
         # check solutes. assumes no duplicates
         solutes_same = False
-        self_solute_names = [s.name for s in self.solutes]
-        value_solute_names = [s.name for s in value.solutes]
+        self_solute_names = [s.name for s in self.solutes if s.concentration > 0]
+        value_solute_names = [s.name for s in value.solutes if s.concentration > 0]
         if set(self_solute_names) == set(value_solute_names):
             if all(s == value.solutes[value_solute_names.index(s.name)] for s in self.solutes):
                 solutes_same = True
 
         return solvents_same & solutes_same
+
+    @property
+    def is_empty(self):
+        return (len(self.solutes) == 0) & (len(self.solvents) == 0)
 
     @classmethod
     def from_list(cls, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
