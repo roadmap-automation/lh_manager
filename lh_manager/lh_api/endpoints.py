@@ -259,3 +259,13 @@ def GetState() -> Response:
 
     return make_response({'active_job': lh_interface._active_job.model_dump() if lh_interface._active_job is not None else None,
                           'status': lh_interface.get_status()}, 200)
+
+@lh_blueprint.route('/LH/PauseResume/', methods=['POST'])
+@trigger_update
+def PauseResume() -> Response:
+    """Toggles between paused and active"""
+
+    lh_interface.running = not lh_interface.running
+
+    return make_response({'status': lh_interface.get_status()}, 200)
+

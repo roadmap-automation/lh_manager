@@ -795,6 +795,16 @@ export async function clear_lh_error() {
   return response_body;
 }
 
+export async function lh_pauseresume() {
+  const update_result = await fetch("/LH/PauseResume/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
 export const active_lh_job = ref<object | null>(null);
 export const lh_status = ref<StatusType | null>(null);
 

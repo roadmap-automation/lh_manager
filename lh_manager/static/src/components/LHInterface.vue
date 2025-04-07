@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toRaw } from 'vue';
-import { active_lh_job, lh_status, clear_lh_error, clear_lh_job, resubmit_lh_job } from '../store';
+import { active_lh_job, lh_status, clear_lh_error, clear_lh_job, resubmit_lh_job, lh_pauseresume } from '../store';
 
 </script>
 
@@ -13,7 +13,13 @@ import { active_lh_job, lh_status, clear_lh_error, clear_lh_job, resubmit_lh_job
         <div class="p-2 row card">
             <div class="col card-body">
                 <div class="row card-header alert" :class="{'alert-danger': lh_status=='error', 'alert-success': lh_status=='up', 'alert-warning': lh_status=='down', 'alert-info': lh_status=='busy'}">
-                    <h6>Status: {{ lh_status }}</h6>
+                    <div class="col-auto">
+                        <h6>Status: {{ lh_status }}</h6>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn m-8" :class="{'btn-outline-danger': lh_status!='down', 'btn-outline-success': lh_status=='down'}" @click="lh_pauseresume">{{ (lh_status=='down') ? "Resume" : "Pause" }}</button>
+                    </div>
+
                 </div>
                 <div v-if="lh_status=='error'" class="row">
                     <div class="p-2 col-auto">
