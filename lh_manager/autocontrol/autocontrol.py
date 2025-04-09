@@ -289,15 +289,21 @@ def synchronize_status(poll_delay: int = 5):
             return 'not connected'
 
         if response.ok:
-            if response.json()['queue'] == 'history':
+            try:
+                response_json: dict = response.json()
+            except json.JSONDecodeError:
+                return 'json decode error, ignoring'
+
+            if response_json['queue'] == 'history':
                 return 'complete'
-            elif response.json()['queue'] == 'active':
+            elif response_json['queue'] == 'active':
                 return 'active'
-            elif response.json()['queue'] == 'scheduled':
+            elif response_json['queue'] == 'scheduled':
                 return 'pending'
         else:
             if 'No task found' in response.text:
                 return 'task not found'
+
             print(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
         
         return 'uncaught error'
@@ -348,8 +354,8 @@ def synchronize_status(poll_delay: int = 5):
                     mark_status(task_id, SampleStatus.ACTIVE)
                 elif result == 'task not found':
                     # Remove item without updating parent
-                    print(f'Warning: id {task_id} not found, marking complete anyway')
-                    mark_status(task_id, SampleStatus.UNKNOWN)
+                    print(f'Warning: id {task_id} not found, marking as cancelled')
+                    mark_status(task_id, SampleStatus.CANCELLED)
 
         time.sleep(poll_delay)
 
