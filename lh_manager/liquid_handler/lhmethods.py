@@ -1,11 +1,11 @@
 from .bedlayout import LHBedLayout, WellLocation, Well
 from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .methods import BaseMethod, MethodType, register, MethodsType
+from .methods import BaseMethod, MethodType, register, MethodsType, method_manager, UnknownMethod
 from .devices import DeviceBase, device_manager
 from ..waste_manager.wastedata import WasteItem, WATER
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator, ValidationError
 
 from dataclasses import field
 from typing import List, Literal, ClassVar
@@ -110,8 +110,27 @@ class LHMethodCluster(BaseLHMethod):
 
     method_name: Literal['LHMethodCluster'] = 'LHMethodCluster'
     display_name: Literal['LHMethodCluster'] = 'LHMethodCluster'
-    method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
-    methods: List[MethodsType] = field(default_factory=list)
+    method_type: MethodType = MethodType.PREPARE
+    methods: list = field(default_factory=list)
+
+    @validator('methods')
+    def validate_methods(cls, v):
+
+        if not isinstance(v, list):
+            raise ValueError(f"{v} must be a list")
+
+        for i, iv in enumerate(v):
+            if isinstance(iv, dict):
+                try:
+                    v[i] = method_manager.get_method_by_name(iv['method_name']).model_validate(iv)
+                except ValidationError:
+                    print(f'Attempted to process unknown method with data {iv}')
+                    v[i] = UnknownMethod(method_data=iv)
+            else:
+                if not (isinstance(iv, BaseMethod)):
+                    raise ValueError(f"{iv} must be derived from BaseMethod")
+
+        return v
 
     def explode(self, layout: LHBedLayout):
         methods = []
