@@ -312,28 +312,31 @@ def synchronize_status(poll_delay: int = 5):
     def mark_status(id: str, status: SampleStatus) -> None:
         parent_item = active_tasks.active.pop(id)
         _, sample = samples.getSampleById(parent_item.id)
-        active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
-        for m in active_methods:
-            if m.status != SampleStatus.COMPLETED:
-                for t in m.tasks:
-                    # coerce to str because t.id can be UUID
-                    if str(t.id) == id:
-                        t.status = status
-            
-                if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
-                    m.status = SampleStatus.COMPLETED
-                elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
-                    m.status = SampleStatus.ACTIVE
-                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
-                    m.status = SampleStatus.ERROR
-                else:
-                    m.status = SampleStatus.PENDING
 
-        if (status not in COMPLETED_STATUS):
-            # put it back if not marking complete
-            active_tasks.active.update({id: parent_item})
+        # check that sample still exists (not yet archived)
+        if sample is not None:
+            active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
+            for m in active_methods:
+                if m.status != SampleStatus.COMPLETED:
+                    for t in m.tasks:
+                        # coerce to str because t.id can be UUID
+                        if str(t.id) == id:
+                            t.status = status
+                
+                    if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
+                        m.status = SampleStatus.COMPLETED
+                    elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
+                        m.status = SampleStatus.ACTIVE
+                    elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                        m.status = SampleStatus.ERROR
+                    else:
+                        m.status = SampleStatus.PENDING
 
-            #sample.stages[parent_item.stage].update_status()
+            if (status not in COMPLETED_STATUS):
+                # put it back if not marking complete
+                active_tasks.active.update({id: parent_item})
+
+                #sample.stages[parent_item.stage].update_status()
 
         # NOTE: this is now done at the LHInterface level. However, GUI is only updated here.
         # if sample stage is complete, execute all methods
