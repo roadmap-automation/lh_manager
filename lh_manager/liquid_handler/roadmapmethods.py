@@ -82,8 +82,11 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
 
         methods = []
         minimum_volume = 0.2
-        
         mix_extra_volume = 0.1
+
+        default_equilibration_time = 1
+        default_measurement_time = 1
+
         extra_volume = self.Extra_Volume
         rinse_volume = self.Rinse_Volume
         injection_flow_rate=self.Flow_Rate
@@ -109,8 +112,8 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                                                 Extra_Volume=extra_volume,
                                                                 Is_Organic=True,
                                                                 Use_Bubble_Sensors=True,
-                                                                Equilibration_Time=equilibration_time,
-                                                                Measurement_Time=measurement_time)
+                                                                Equilibration_Time=default_equilibration_time,
+                                                                Measurement_Time=default_measurement_time)
             
             methods += inject_rinse.get_methods(layout)
 
@@ -128,8 +131,8 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                                             Extra_Volume=extra_volume,
                                                             Is_Organic=True,
                                                             Use_Bubble_Sensors=True,
-                                                            Equilibration_Time=equilibration_time,
-                                                            Measurement_Time=measurement_time)
+                                                            Equilibration_Time=default_equilibration_time,
+                                                            Measurement_Time=default_measurement_time)
 
             methods += inject_rinse.get_methods_from_well(lipid_prep_well, lipid_prep_well.composition, layout)
 
@@ -149,7 +152,8 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
             
             lipid_mixing_well.expected_composition = bilayer_formulation.get_expected_composition(layout)
 
-            methods += bilayer_formulation.get_methods(layout)
+            # insert formulation first
+            methods = bilayer_formulation.get_methods(layout) + methods
             
         else:
             lipid_mixing_well = WellLocation(rack_id=lipid_mixing_well.rack_id,
@@ -170,12 +174,13 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         
         methods += direct_inject.get_methods(layout)
 
-        measure = QCMDRecordTag(record_time=self.Measurement_Time * 60,
-                                sleep_time=self.Equilibration_Time * 60,
+        measure = QCMDRecordTag(record_time=default_measurement_time * 60,
+                                sleep_time=default_equilibration_time * 60,
                                 tag_name=repr(lipid_mixing_well.expected_composition))
         
         methods += measure.get_methods(layout)
 
+        buffer_methods = []
         # ==== Buffer ====
         if self.Use_Rinse_System_for_Buffer:
             inject_buffer = ROADMAP_QCMD_RinseLoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
@@ -186,7 +191,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                                             Equilibration_Time=equilibration_time,
                                                             Measurement_Time=measurement_time)
             
-            methods += inject_buffer.get_methods(layout)
+            buffer_methods += inject_buffer.get_methods(layout)
 
         else:        
             required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
@@ -203,8 +208,9 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                 
                 buffer_mixing_well.expected_composition = buffer_formulation.get_expected_composition(layout)
 
-                methods += [LHMethodCluster(method_type=MethodType.PREPARE,
-                                            methods=buffer_formulation.get_methods(layout))]
+                # insert formulation methods at the beginning of the buffer methods
+                buffer_methods = buffer_formulation.get_methods(layout) + buffer_methods
+
             else:
                 buffer_mixing_well = InferredWellLocation(rack_id=buffer_mixing_well.rack_id,
                                                         well_number=buffer_mixing_well.well_number,
@@ -218,7 +224,9 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                                             Equilibration_Time=equilibration_time,
                                                             Measurement_Time=measurement_time)
             
-            methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
+            buffer_methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
+
+        methods += buffer_methods
 
         return methods
 
