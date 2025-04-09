@@ -111,18 +111,24 @@ def GetWasteReport() -> Response:
     report += 'Percent\tChemical name\n'
 
     with MaterialDB() as db:
-        components = []
-        component_fractions = []
+        components = ['protein']
+        component_fractions = [0]
         for solvent in total_waste.composition.solvents:
             full_name = db.get_material_by_name(solvent.name).full_name
             components.append(full_name)
             component_fractions.append(solvent.fraction)
 
         for solute in total_waste.composition.solutes:
-            full_name = db.get_material_by_name(solute.name).full_name
-            components.append(full_name)
-            # convert to g/mL units (assume density of 1)
-            component_fractions.append(solute.convert_units('mg/mL') * 1e-3)
+            material = db.get_material_by_name(solute.name)
+            amount = solute.convert_units('mg/mL') * 1e-3
+            if material.type == 'protein':
+                # convert to g/mL units (assume density of 1)
+                component_fractions[components.index('protein')] += amount
+           
+            else:
+                components.append(material.full_name)
+                # convert to g/mL units (assume density of 1)
+                component_fractions.append(amount)
 
 
     # normalize all fractions and convert to percent
