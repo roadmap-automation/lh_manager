@@ -335,22 +335,23 @@ class SoluteFormulation(Formulation):
 
         volumes, wells, success = super().formulate(layout)
 
-        try:
-            diluent_well = next(well for well in self.get_all_wells(layout) if well.composition == self.diluent)
-        except StopIteration:
+        diluent_well = next((well for well in self.get_all_wells(layout) if well.composition == self.diluent), None)
+        
+        if diluent_well is None:        
             print(f'Diluent ({self.diluent}) not available on bed')
             return [], [], False
-
         
         diluent_volume = self.target_volume - sum(volumes)
 
-        if diluent_volume < 0:
-            print(f'Diluent volume less than zero; should never happen')
-            return [], [], False
-        
+        # if no diluent required, do nothing
         if not np.isclose(diluent_volume, 0.0, atol=1e-9):
             volumes += [diluent_volume]
             wells += [diluent_well]
+
+            # only check for this if diluent volume is not close to zero
+            if diluent_volume < 0:
+                print(f'Diluent volume less than zero; should never happen')
+                return [], [], False
 
         return volumes, wells, True
 
