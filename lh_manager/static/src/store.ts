@@ -755,6 +755,16 @@ export async function delete_material(material: Material) {
   return response_body;
 }
 
+export async function material_from_sequence(name: string, sequence: string) {
+  const update_result = await fetch("/Materials/MaterialFromSequence/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, sequence })
+  });
+  const { material } = await update_result.json();
+  return material as Material;
+}
+
 function clean_url(url: string) {
   return url.replace(/(https?:\/\/)|(\/)+/g, "$1$2");
 }

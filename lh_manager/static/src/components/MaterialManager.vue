@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import BedLayout from './BedLayout.vue';
 
-import { materials, materialType, soluteMassUnits, soluteVolumeUnits, add_material, delete_material } from '../store';
+import { materials, materialType, soluteMassUnits, soluteVolumeUnits, add_material, delete_material, material_from_sequence } from '../store';
 import type { Material, MaterialType } from '../store';
 
 type sortOrder = "name" | "full_name" | "iupac_name" | "molecular_weight" | "type";
@@ -17,6 +17,7 @@ const new_material = ref<Partial<Material>>(generate_new_material());
 const UP_ARROW = "▲";
 const DOWN_ARROW = "▼";
 
+const active_sequence = ref<string>("");
 const active_search_pattern = ref<string | null>(null);
 const active_search_regexp = ref<RegExp | null>(null);
 
@@ -101,6 +102,13 @@ async function pubchem_search() {
   }
 }
 
+async function fetch_material_from_sequence() {
+  const material = await material_from_sequence(new_material.value.name ? new_material.value.name : "", active_sequence.value)
+  if (material) {
+    new_material.value = material
+  }
+}
+
 async function submit_add() {
   await add_material(new_material.value);
   new_material.value = generate_new_material();
@@ -167,6 +175,9 @@ function edit_material(material: Material) {
           </div>
           <button class="btn btn-outline-secondary" type="button" @click="submit_add">{{ materials.some((m) => m.name === new_material.name) ? 'Save' : 'Add' }}</button>
           <button class="btn btn-outline-secondary" type="button" @click="clear">Clear</button>
+        </div>
+        <div v-if="new_material.type == 'protein'" class="input-group mb-3">
+          <input type="text" class="form-control" placeholder="Create material from amino acid sequence" v-model="active_sequence" @keydown.enter="fetch_material_from_sequence" @blur="fetch_material_from_sequence">
         </div>
         <div class="input-group mb-3">
           <input type="text" class="form-control" placeholder="Search for material" v-model="active_search_pattern"
