@@ -138,7 +138,7 @@ def GetWasteReport() -> Response:
     # sort and generate report
     component_fractions, components = zip(*sorted(zip(component_fractions, components)))
     for cf, c in zip(component_fractions[::-1], components[::-1]):
-        cf_text = f'{cf: 0.0f}' if cf > 1 else '<1'
+        cf_text = f'{cf: 0.1f}' if cf >= 0.1 else '<0.1'
         report += f'{cf_text}\t{c}\n'
 
     return make_response({'report': report}, 200)
