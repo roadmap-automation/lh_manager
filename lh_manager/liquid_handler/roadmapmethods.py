@@ -407,9 +407,13 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
     
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Volume
+        return super().execute(layout)
+
     def waste(self, layout: LHBedLayout) -> WasteItem:
 
-        return WasteItem(volume=self.Volume, composition=WATER)
+        return WasteItem(volume=self.Volume, composition=layout.carrier_well.composition)
 
 @register
 class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemMethod, BaseQCMDMethod):

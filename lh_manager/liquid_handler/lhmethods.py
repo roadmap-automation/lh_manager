@@ -327,7 +327,11 @@ class TransferWithRinse(TransferMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate
-    
+
+    def execute(self, layout):
+        layout.carrier_well.volume -= (self.Outside_Rinse_Volume + self.Inside_Rinse_Volume)
+        return super().execute(layout)
+
     def waste(self, layout: LHBedLayout) -> WasteItem:
         inferred_source_well = layout.infer_location(self.Source)
         if inferred_source_well.well_number is not None:
@@ -338,7 +342,7 @@ class TransferWithRinse(TransferMethod):
 
         new_waste = WasteItem()
         new_waste.mix_with(volume=self.Extra_Volume, composition=source_composition)
-        new_waste.mix_with(volume=self.Outside_Rinse_Volume + self.Inside_Rinse_Volume, composition=WATER)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + self.Inside_Rinse_Volume, composition=layout.carrier_well.composition)
 
         return new_waste
 
@@ -408,7 +412,7 @@ class MixWithRinse(MixMethod):
                                       )
 
         target_well.volume -= self.Extra_Volume
-
+        layout.carrier_well.volume -= (self.Outside_Rinse_Volume + self.Inside_Rinse_Volume)
     
     def waste(self, layout: LHBedLayout) -> WasteItem:
         inferred_target_well = layout.infer_location(self.Target)
@@ -420,7 +424,7 @@ class MixWithRinse(MixMethod):
 
         new_waste = WasteItem()
         new_waste.mix_with(volume=self.Extra_Volume, composition=target_composition)
-        new_waste.mix_with(volume=self.Outside_Rinse_Volume + self.Inside_Rinse_Volume, composition=WATER)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + self.Inside_Rinse_Volume, composition=layout.carrier_well.composition)
 
         return new_waste
 
@@ -482,6 +486,10 @@ class InjectWithRinse(InjectMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
 
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
+        return super().execute(layout)
+
     def waste(self, layout: LHBedLayout) -> WasteItem:
         inferred_source_well = layout.infer_location(self.Source)
         if inferred_source_well.well_number is not None:
@@ -492,7 +500,7 @@ class InjectWithRinse(InjectMethod):
 
         new_waste = WasteItem()
         new_waste.mix_with(volume=self.Volume + self.Extra_Volume, composition=source_composition)
-        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=WATER)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=layout.carrier_well.composition)
 
         return new_waste
 
@@ -521,34 +529,6 @@ class Sleep(BaseLHMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return float(self.Time)
-
-
-@register
-class Sleep2(BaseLHMethod):
-    """Sleep"""
-
-    Time2: float = 1.0
-    display_name: Literal['Sleep2'] = 'Sleep2'
-    method_name: Literal['NCNR_Sleep2'] = 'NCNR_Sleep2'
-
-    class lh_method(BaseLHMethod.lh_method):
-        Time2: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
-
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Time2=f'{self.Time2}'
-        ).to_dict()]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return float(self.Time2)
-
 
 @register
 class Prime(BaseLHMethod):
@@ -580,8 +560,12 @@ class Prime(BaseLHMethod):
         flow_rate = 10.0 # mL/min
         return 2 * float(self.Repeats) * float(self.Volume) / flow_rate
     
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Volume * self.Repeats
+        return super().execute(layout)
+
     def waste(self, layout: LHBedLayout) -> WasteItem:
-        return WasteItem(volume=self.Volume * self.Repeats, composition=WATER)
+        return WasteItem(volume=self.Volume * self.Repeats, composition=layout.carrier_well.composition)
 
 @register
 class ROADMAP_QCMD_LoadLoop(InjectMethod):
@@ -634,6 +618,10 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
 
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
+        return super().execute(layout)
+
     def waste(self, layout: LHBedLayout) -> WasteItem:
         inferred_source_well = layout.infer_location(self.Source)
         if inferred_source_well.well_number is not None:
@@ -644,7 +632,7 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
 
         new_waste = WasteItem()
         new_waste.mix_with(volume=self.Volume + self.Extra_Volume, composition=source_composition)
-        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=WATER)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=layout.carrier_well.composition)
 
         return new_waste
 
@@ -706,7 +694,11 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate
-    
+
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
+        return super().execute(layout)
+
     def waste(self, layout: LHBedLayout) -> WasteItem:
         inferred_source_well = layout.infer_location(self.Source)
         if inferred_source_well.well_number is not None:
@@ -717,7 +709,7 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
 
         new_waste = WasteItem()
         new_waste.mix_with(volume=self.Volume + self.Extra_Volume, composition=source_composition)
-        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=WATER)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=layout.carrier_well.composition)
 
         return new_waste
 

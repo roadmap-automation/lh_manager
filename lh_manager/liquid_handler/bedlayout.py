@@ -413,6 +413,12 @@ class LHBedLayout(BaseModel):
             if existing_well.well_number == well_number:
                 wells.pop(i)
         return wells
+    
+    @property
+    def carrier_well(self):
+        if 'Carrier' in self.racks:
+            carrier_well, _ = self.get_well_and_rack('Carrier', 1)
+            return carrier_well
 
 d2o = Solvent(name='D2O', fraction=1.0)
 kcl0 = Solute(name='KCl', molecular_weight=74.55, concentration=0.1, units='M')
