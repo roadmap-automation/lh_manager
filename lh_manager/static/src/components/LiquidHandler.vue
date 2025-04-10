@@ -87,7 +87,7 @@ const filtered_layouts = computed(()=> {
     <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="LHInterface" role="tabpanel" aria-labelledby="lh-tab">
       <LHInterface />
     </div>    
-    <div class="tab-pane d-flex flex-grow-1" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>
     <div class="tab-pane d-flex flex-grow-1 h-100" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
