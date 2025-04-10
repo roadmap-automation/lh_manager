@@ -7,6 +7,7 @@ parser.add_argument('--noload_layout', action='store_true')
 parser.add_argument('--channels', type=int, default=2)
 
 LOG_PATH = Path(__file__).parent.parent / 'persistent_state'
+NOTIFICATION_SETTINGS = LOG_PATH / 'notification_settings.json'
 LAYOUT_LOG = LOG_PATH / 'layout.json'
 SAMPLES_LOG = LOG_PATH / 'samples.json'
 DEVICES_LOG = LOG_PATH / 'devices.json'
@@ -19,6 +20,7 @@ class Config:
     samples_path: str = SAMPLES_LOG
     devices_path: str = DEVICES_LOG
     history_path: str = HISTORY_LOG
+    notify_path: str = NOTIFICATION_SETTINGS
 
     stage_names: list[str] = ['prep', 'inject']
 

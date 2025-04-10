@@ -1,6 +1,8 @@
 """Gilson Trilution LH 4.0 Endpoints
 
     Designed to operate as an independent web interface; does not depend on sample list state"""
+import traceback
+
 from flask import make_response, Response, request
 
 from ..liquid_handler.job import ResultStatus, ValidationStatus
@@ -200,10 +202,12 @@ def PutSampleData():
     error = None
     if job.get_result_status() == ResultStatus.FAIL:
         error = f'Error in results. Full message: ' + repr(data)
-        print(error)
-        lh_interface.has_error = True
+        lh_interface.throw_error(error)
     elif job.get_result_status() == ResultStatus.SUCCESS:
-        job.execute_methods(layout)
+        try:
+            job.execute_methods(layout)
+        except:
+            lh_interface.throw_error(traceback.format_exc())
         for m in job.LH_methods:
             waste_layout.add_waste(m.waste(layout))
 
@@ -216,9 +220,7 @@ def ReportError():
     assert isinstance(data, dict)
 
     error = f'Error in results. Full message: ' + repr(data)
-    print(error)
-
-    lh_interface.has_error = True
+    lh_interface.throw_error(error)
 
     return make_response({'data': data}, 200)
 
