@@ -350,7 +350,7 @@ def synchronize_status(poll_delay: int = 5):
         with active_tasks.lock:
             for task_id in copy.copy(list(active_tasks.active.keys())):
                 result = check_status_completion(task_id)
-                print(task_id, result)
+                #print(task_id, result)
                 if result == 'complete':
                     mark_status(task_id, SampleStatus.COMPLETED)
                 elif result == 'active':
