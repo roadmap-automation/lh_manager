@@ -110,7 +110,7 @@ class MethodContainer(BaseMethod):
                 return MethodError(f'{self.display_name}.{error.name}', error.error)
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return sum(m.estimated_time() for m in self.get_methods(layout))
+        return sum(m.estimated_time(layout) for m in self.get_methods(layout))
     
     def render_method(self,
                          sample_name: str,

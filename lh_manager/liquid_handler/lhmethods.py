@@ -85,7 +85,8 @@ class BaseLHMethod(BaseMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         """Estimated time for method in default time units"""
-        return 0.0
+        # empirical base time for a method
+        return 7.0 / 60.0
     
     def render_method(self,
                          sample_name: str,
@@ -146,6 +147,12 @@ class LHMethodCluster(BaseLHMethod):
                                              method_name=m.method_name,
                                              method_data=m.model_dump(exclude=EXCLUDE_FIELDS))
                                         for m in self.methods]}]
+    
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return sum(m.estimated_time(layout) for m in self.methods)
+    
+    def get_methods(self, layout: LHBedLayout) -> list[MethodsType]:
+        return self.methods
 
 class SetWellID(BaseMethod):
     """Sets an Inferred Well Location ID for future use
@@ -326,7 +333,9 @@ class TransferWithRinse(TransferMethod):
         return self.Volume + self.Extra_Volume
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical
+        return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
 
     def execute(self, layout):
         layout.carrier_well.volume -= (self.Outside_Rinse_Volume + self.Inside_Rinse_Volume)
@@ -429,7 +438,9 @@ class MixWithRinse(MixMethod):
         return new_waste
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate)
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate) + self.Air_Gap / 0.3 + base_time + rinse_time
 
 
 @register
@@ -484,7 +495,9 @@ class InjectWithRinse(InjectMethod):
         return self.Volume + self.Extra_Volume
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
 
     def execute(self, layout):
         layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
@@ -528,7 +541,8 @@ class Sleep(BaseLHMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return float(self.Time)
+        base_time = super().estimated_time(layout)
+        return float(self.Time) + base_time
 
 @register
 class Prime(BaseLHMethod):
@@ -557,8 +571,9 @@ class Prime(BaseLHMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
+        base_time = super().estimated_time(layout)
         flow_rate = 10.0 # mL/min
-        return 2 * float(self.Repeats) * float(self.Volume) / flow_rate
+        return 2 * float(self.Repeats) * float(self.Volume) / flow_rate + base_time
     
     def execute(self, layout):
         layout.carrier_well.volume -= self.Volume * self.Repeats
@@ -616,7 +631,9 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
 
     def execute(self, layout):
         layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
@@ -693,7 +710,9 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
 
     def execute(self, layout):
         layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
