@@ -90,20 +90,19 @@ class Composition(BaseModel):
     def __repr__(self) -> str:
         """Custom representation of composition for metadata"""
 
+        solvent_text = ''
         if len(self.solvents) > 1:
             sorted_solvents = sorted(self.solvents, key=lambda s: s.fraction, reverse=True)
             solvent_ratios = ':'.join(f'{s.fraction * 100:0.0f}' for s in sorted_solvents)
             solvent_names = ':'.join(s.name for s in sorted_solvents)
-            res = solvent_ratios + ' ' + solvent_names
+            solvent_text = solvent_ratios + ' ' + solvent_names
         elif len(self.solvents) == 1:
-            res = self.solvents[0].name
-        else:
-            res = ''
+            solvent_text = self.solvents[0].name
 
-        for solute in self.solutes:
-            res += f' + {solute.concentration:.4g} {solute.units} {solute.name}'
+        solute_text = ' + '.join(f'{solute.concentration:.4g} {solute.units} {solute.name}' for solute in self.solutes)
+        separator_text = ' + ' if (len(solvent_text) & len(solute_text)) else ''
 
-        return res
+        return solvent_text + separator_text + solute_text
 
     def _normalize_solvent_fractions(self):
         """conditions class to normalize solvent fractions"""
