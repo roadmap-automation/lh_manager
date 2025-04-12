@@ -350,7 +350,7 @@ class SoluteFormulation(Formulation):
         diluent_volume = self.target_volume - sum(volumes)
 
         # if no diluent required, do nothing
-        if not np.isclose(diluent_volume, 0.0, atol=1e-9):
+        if not np.isclose(diluent_volume, 0.0, atol=ZERO_VOLUME_TOLERANCE):
             volumes += [diluent_volume]
             wells += [diluent_well]
 
