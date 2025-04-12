@@ -100,7 +100,7 @@ class Composition(BaseModel):
             solvent_text = self.solvents[0].name
 
         solute_text = ' + '.join(f'{solute.concentration:.4g} {solute.units} {solute.name}' for solute in self.solutes)
-        separator_text = ' + ' if (len(solvent_text) & len(solute_text)) else ''
+        separator_text = ' + ' if (bool(len(solvent_text)) & bool(len(solute_text))) else ''
 
         return solvent_text + separator_text + solute_text
 
