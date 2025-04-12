@@ -11,7 +11,7 @@ from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import example_sample_list
 from .methods import MethodContainer, MethodsType, register, method_manager
 
-ZERO_VOLUME_TOLERANCE = 1e-8
+ZERO_VOLUME_TOLERANCE = 1e-3
 
 @register
 class Formulation(MethodContainer):
@@ -103,9 +103,15 @@ class Formulation(MethodContainer):
                     success = False
 
         # 4. Find all unique solutions an use a priority to find the best one (fewest operations, least time, etc.)
-        source_wells = [well for well, vol in zip(source_wells, sol) if vol > ZERO_VOLUME_TOLERANCE]
+        volumes = []
+        result_wells = []
+        for well, vol in zip(source_wells, sol):
+            if vol * self.target_volume > ZERO_VOLUME_TOLERANCE:
+                volumes.append(vol * self.target_volume)
+                result_wells.append(well)
 
-        self._formulation_results = (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
+        self._formulation_results = volumes, result_wells, success
+        print(self._formulation_results)
 
         return self._formulation_results
 
