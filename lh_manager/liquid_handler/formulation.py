@@ -97,8 +97,8 @@ class Formulation(MethodContainer):
             required_volumes = sol * self.target_volume
 
             for well, source_well_volume, required_volume in zip(source_wells, source_well_volumes, required_volumes):
-                if required_volume > source_well_volume:
-                    print(f'Well {well} has volume {source_well_volume}, needs volume {required_volume}, removing it')
+                if (required_volume + layout.racks[well.rack_id].min_volume) > source_well_volume :
+                    print(f'Well {well} has volume {source_well_volume}, needs volume {required_volume} plus minimum volume {layout.racks[well.rack_id].min_volume}, removing it')
                     source_wells.pop(source_wells.index(well))
                     success = False
 

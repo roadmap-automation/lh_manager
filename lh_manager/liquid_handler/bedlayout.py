@@ -301,6 +301,7 @@ class Rack(BaseModel):
     columns: int
     rows: int
     max_volume: float
+    min_volume: float = 0.0
     wells: list[Well]
     style: str = 'grid' # grid | staggered
     height: int
