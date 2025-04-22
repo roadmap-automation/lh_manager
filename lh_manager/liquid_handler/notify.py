@@ -28,8 +28,14 @@ class EmailNotifier:
         except smtplib.SMTPException:
             print(f"Error: unable to connect to {self.config.host}:{self.config.port}")
 
+    def disconnect(self):
+        if self._smtp is not None:
+            self._smtp.close()
+            self._connected = False
+
     def notify(self, subject: str, msg: str):
         #print(self._connected, len(self.config.receivers), self.config.receivers)
+        self.connect()
         if self._connected & (len(self.config.receivers) > 0):
             receiver_text = '; '.join(f'{k} <{v}>' for k, v in self.config.receivers.items())
             
@@ -39,6 +45,8 @@ class EmailNotifier:
                 print(f'Sent message {message}')
             except smtplib.SMTPException:
                 print(f"Error: unable to send email")
+            finally:
+                self.disconnect()
     
     def load_config(self, fn: pathlib.Path):
 
