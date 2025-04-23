@@ -424,8 +424,10 @@ def UpdateRack() -> Response:
     data: dict = request.get_json(force=True)
     assert isinstance(data, dict)
     rack_id = data.get('rack_id')
-    layout.racks[rack_id] = Rack.model_validate(data.get('rack'))
-    return make_response(layout.racks[rack_id].model_dump(), 200)
+    new_rack = Rack.model_validate(data.get('rack'))
+    new_rack.wells = layout.racks[rack_id].wells
+    layout.racks[rack_id] = new_rack
+    return make_response(new_rack.model_dump(), 200)
 
 @gui_blueprint.route('/GUI/UpdateWell', methods=['POST'])
 @gui_blueprint.route('/GUI/UpdateWell/', methods=['POST'])
