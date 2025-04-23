@@ -175,6 +175,7 @@ export interface Rack {
   rows: number,
   columns: number,
   style: 'grid' | 'staggered',
+  min_volume: number,
   max_volume: number,
   height: number,
   width: number,
@@ -210,6 +211,9 @@ export const well_to_edit = ref<{device: string, well: WellLocation}>();
 export const num_channels = ref<number>(1);
 export const materials = ref<Material[]>([]);
 export const current_composition = ref<{ solvents: Solvent[], solutes: Solute []}>({solvents: [], solutes: []});
+
+export const rack_editor_active = ref(false);
+export const rack_to_edit = ref<{device: string, rack_id: string, rack: Rack}>();
 
 export type ModalData = {
   title: string,
@@ -422,6 +426,17 @@ export function pick_handler(well_location: WellLocation) {
   console.warn("no active well field to set");
 }
 
+export async function update_rack(base_address: string, rack_id: string, rack: Rack) {
+  console.log("updating rack: ", rack_id, JSON.stringify(rack));
+  const update_result = await fetch(clean_url(base_address + "/GUI/UpdateRack"), {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rack_id, rack })
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
 export async function update_well_contents(base_address: string, well: Well) {
   console.log("updating well: ", well, JSON.stringify(well));
   const update_result = await fetch(clean_url(base_address + "/GUI/UpdateWell"), {
@@ -580,9 +595,11 @@ export async function getDeviceWells(base_address: string) {
 
 export async function refreshWells(device_name: string) {
   const new_wells = await getDeviceWells(device_defs.value[device_name].address);
+  const new_layout = await getDeviceLayout(device_defs.value[device_name].address);
   const current_layout = device_layouts.value[device_name];
   current_layout.wells = new_wells.wells;
   current_layout.source_components = new_wells.source_components;
+  current_layout.layout = new_layout?.layout;
   device_layouts.value = { ...device_layouts.value, ...{[device_name]: current_layout}};
 }
 

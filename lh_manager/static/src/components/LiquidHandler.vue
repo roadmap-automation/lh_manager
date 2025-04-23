@@ -10,6 +10,7 @@ import MaterialManager from './MaterialManager.vue';
 import AddWaste from './AddWaste.vue';
 import WasteManager from './WasteManager.vue';
 import LHInterface from './LHInterface.vue';
+import EditRackSettings from './EditRackSettings.vue';
 
 const props = defineProps({
   msg: String,
@@ -96,6 +97,7 @@ const filtered_layouts = computed(()=> {
     </div>
 
   <EditWellContents/>
+  <EditRackSettings/>
   <AddWaste/>
 
 </template>
