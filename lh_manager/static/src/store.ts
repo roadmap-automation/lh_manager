@@ -215,6 +215,8 @@ export const current_composition = ref<{ solvents: Solvent[], solutes: Solute []
 export const rack_editor_active = ref(false);
 export const rack_to_edit = ref<{device: string, rack_id: string, rack: Rack}>();
 
+export const batch_editor_active = ref(false);
+
 export type ModalData = {
   title: string,
   sample_id: string,

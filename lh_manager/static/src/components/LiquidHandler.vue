@@ -11,6 +11,7 @@ import AddWaste from './AddWaste.vue';
 import WasteManager from './WasteManager.vue';
 import LHInterface from './LHInterface.vue';
 import EditRackSettings from './EditRackSettings.vue';
+import BatchWellEditor from './BatchWellEditor.vue';
 
 const props = defineProps({
   msg: String,
@@ -98,6 +99,7 @@ const filtered_layouts = computed(()=> {
 
   <EditWellContents/>
   <EditRackSettings/>
+  <BatchWellEditor/>
   <AddWaste/>
 
 </template>
