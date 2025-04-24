@@ -2,7 +2,7 @@
 from typing import List, Optional
 from flask import make_response, Response, request
 
-from ...liquid_handler.bedlayout import Well, WellLocation
+from ...liquid_handler.bedlayout import Well, WellLocation, Rack
 from ...material_db.db import Material, MaterialDB
 from .waste import waste_layout, WasteHistory
 from ..wastedata import WasteItem
@@ -88,6 +88,20 @@ def GetTimestampTable() -> Response:
 
     return make_response({'timestamp_table': timestamp_table}, 200)
 
+@blueprint.route('/Waste/GUI/UpdateRack', methods=['POST'])
+@blueprint.route('/Waste/GUI/UpdateRack/', methods=['POST'])
+@trigger_waste_update
+def UpdateRack() -> Response:
+    """ Replaces any existing well definition weith the same rack_id, well_number
+    (or creates a new well definition if none already exists) """
+
+    data: dict = request.get_json(force=True)
+    assert isinstance(data, dict)
+    rack_id = data.get('rack_id')
+    new_rack = Rack.model_validate(data.get('rack'))
+    new_rack.wells = waste_layout.racks[rack_id].wells
+    waste_layout.racks[rack_id] = new_rack
+    return make_response(new_rack.model_dump(), 200)
 
 @blueprint.route('/Waste/GUI/GenerateWasteReport', methods=['POST'])
 def GetWasteReport() -> Response:
