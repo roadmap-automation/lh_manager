@@ -87,6 +87,9 @@ function highlight_class(col, row) {
   if (props.rack_id === source?.rack_id && well_number === source?.well_number) {
     classList.push("Source");
   }
+  //if (well_number in reserved_cells.value) {
+  //  classList.push("vial-reserved")
+  //}  
   if (well_number in filled_cells.value) {
     classList.push("partially-filled");
   }
@@ -98,6 +101,12 @@ function highlight_class(col, row) {
 
 const filled_cells = computed(() => {
   const local_wells = props.wells.filter((w) => (w.rack_id === props.rack_id));
+  const local_wells_lookup = Object.fromEntries(local_wells.map((w) => [w.well_number, w]));
+  return local_wells_lookup;
+});
+
+const reserved_cells = computed(() => {
+  const local_wells = props.wells.filter((w) => (w.id !== null) && (w.rack_id === props.rack_id));
   const local_wells_lookup = Object.fromEntries(local_wells.map((w) => [w.well_number, w]));
   return local_wells_lookup;
 });
@@ -153,7 +162,7 @@ onMounted(() => {
         <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
       </rect>
       <path class="fill-fraction" :d="fill_path(col, row)"></path>
-      <text v-if="(props.rack.columns * props.rack.rows > 1)" class="vial-label" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
+      <text v-if="(props.rack.columns * props.rack.rows > 1)" class="vial-label" :class="(row * props.rack.columns + col + 1) in reserved_cells ? 'vial-reserved' : 'vial-notreserved'" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
         {{ row * props.rack.columns + col + 1 }}</text>
     </g>
   </g>
@@ -184,6 +193,14 @@ rect {
   text-anchor: middle;
 }
 
+.vial-reserved {
+  fill: lightcoral;
+}
+
+.vial-notreserved {
+  fill: darkgreen;
+}
+
 .vial-button {
   cursor: pointer;
   fill: white;
@@ -196,7 +213,6 @@ rect {
   font: normal 2vmin sans-serif;
   pointer-events: none;
   dominant-baseline: central;
-  fill: darkgreen;
 }
 
 .Source circle, .Source rect {
