@@ -1,40 +1,144 @@
 """Class definitions for bed layout, wells, and compositions"""
+from copy import deepcopy
 from uuid import uuid4
-from dataclasses import field
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Tuple, List
+
+# ======= Unit conversions ===========
+MASS_UNITS = ['mg/mL', 'mg/L', 'ug/mL']
+VOLUME_UNITS = ['M', 'mM', 'uM', 'nM']
+
+# factor to convert units to M
+volume_conversion = {'M': 1,
+                   'mM': 1e-3,
+                   'uM': 1e-6,
+                   'nM': 1e-9}
+
+# factor to convert units to mg/mL
+mass_conversion = {'mg/mL': 1,
+                   'mg/L': 1e-3,
+                   'ug/mL': 1e3}
+
+def volumeunits2massunits(c: float, mw: float):
+    """Convert M to mg/mL"""
+    return c * mw
+
+def massunits2volumeunits(c: float, mw: float):
+    """Convert mg/mL to M"""
+    return c / mw
+
+def is_close(a, b, tol=1e-10):
+    return (abs(a - b) < tol)
 
 class Solvent(BaseModel):
     name: str = ''
     fraction: float = 0.0
 
+    def __eq__(self, value):
+        if not isinstance(value, Solvent):
+            return NotImplemented
+        return (self.name == value.name) & (is_close(self.fraction, value.fraction))
+    
 class Solute(BaseModel):
     name: str = ''
     concentration: float = 0.0
-    units: str = 'M' # not currently used
+    molecular_weight: float | None = None
+    units: str = 'M'
+
+    def convert_units(self, ref_units: str = 'M'):
+        """Returns concentration value in reference units
+
+        Args:
+            ref_units (str, optional): reference units. Defaults to M.
+
+        Returns:
+            float: concentration in reference units
+        """
+        if self.units == ref_units:
+            return self.concentration
+        elif (self.units in MASS_UNITS) & (ref_units in MASS_UNITS):
+            ref_conversion = mass_conversion[ref_units]
+            value_conversion = mass_conversion[self.units]
+            return self.concentration * value_conversion / ref_conversion
+        elif (self.units in MASS_UNITS) & (ref_units in VOLUME_UNITS):
+            return self.concentration * mass_conversion[self.units] /  self.molecular_weight / volume_conversion[ref_units]
+        elif (self.units in VOLUME_UNITS) & (ref_units in MASS_UNITS):
+            return self.concentration * volume_conversion[self.units] * self.molecular_weight / mass_conversion[ref_units]
+        elif (self.units in VOLUME_UNITS) & (ref_units in VOLUME_UNITS):
+            ref_conversion = volume_conversion[ref_units]
+            value_conversion = volume_conversion[self.units]
+            return self.concentration * value_conversion / ref_conversion
+        elif (self.units not in (VOLUME_UNITS + MASS_UNITS)):
+            raise ValueError(f'Unknown units {self.units}')
+        elif (ref_units not in (VOLUME_UNITS + MASS_UNITS)):
+            raise ValueError(f'Unknown units {ref_units}')
+
+    def __eq__(self, value):
+        if not isinstance(value, Solute):
+            return NotImplemented
+
+        # NOTE: compares name and converted concentration. There is an edge case where molecular weights
+        # are different and this leads to an incorrect equality; but it is better to allow molecular weights
+        # to occasionally be None
+        return (self.name == value.name) & (is_close(self.concentration, value.convert_units(self.units)))
 
 class Composition(BaseModel):
     """Class representing a solution composition"""
-    solvents: list[Solvent] = field(default_factory=list)
-    solutes: list[Solute] = field(default_factory=list)
+    solvents: list[Solvent] = Field(default_factory=list)
+    solutes: list[Solute] = Field(default_factory=list)
 
     def __repr__(self) -> str:
         """Custom representation of composition for metadata"""
 
+        solvent_text = ''
         if len(self.solvents) > 1:
             sorted_solvents = sorted(self.solvents, key=lambda s: s.fraction, reverse=True)
             solvent_ratios = ':'.join(f'{s.fraction * 100:0.0f}' for s in sorted_solvents)
             solvent_names = ':'.join(s.name for s in sorted_solvents)
-            res = solvent_ratios + ' ' + solvent_names
+            solvent_text = solvent_ratios + ' ' + solvent_names
         elif len(self.solvents) == 1:
-            res = self.solvents[0].name
-        else:
-            res = ''
+            solvent_text = self.solvents[0].name
 
-        for solute in self.solutes:
-            res += f' + {solute.concentration:.4g} {solute.units} {solute.name}'
+        solute_text = ' + '.join(f'{solute.concentration:.4g} {solute.units} {solute.name}' for solute in self.solutes)
+        separator_text = ' + ' if ((len(solvent_text) > 0) & (len(solute_text) > 0)) else ''
 
-        return res
+        return solvent_text + separator_text + solute_text
+
+    def _normalize_solvent_fractions(self):
+        """conditions class to normalize solvent fractions"""
+
+        sum_solvents = sum(solvent.fraction for solvent in self.solvents)
+        for solvent in self.solvents:
+            solvent.fraction /= sum_solvents
+
+        return self.solvents
+
+
+    def __eq__(self, value) -> bool:
+        if not isinstance(value, Composition):
+            return NotImplemented
+        
+        # check solvents. assumes no duplicates
+        solvents_same = False
+        sum_fractions = sum(s.fraction for s in self.solvents)
+        solvents = set((s.name, s.fraction / sum_fractions) for s in self.solvents if s.fraction > 0)
+        value_sum_fractions = sum(s.fraction for s in value.solvents)
+        value_solvents = set((s.name, s.fraction / value_sum_fractions) for s in value.solvents if s.fraction > 0)
+        solvents_same = (set(solvents) == set(value_solvents))
+
+        # check solutes. assumes no duplicates
+        solutes_same = False
+        self_solute_names = [s.name for s in self.solutes if s.concentration > 0]
+        value_solute_names = [s.name for s in value.solutes if s.concentration > 0]
+        if set(self_solute_names) == set(value_solute_names):
+            if all(s == value.solutes[value_solute_names.index(s.name)] for s in self.solutes):
+                solutes_same = True
+
+        return solvents_same & solutes_same
+
+    @property
+    def is_empty(self):
+        return (len(self.solutes) == 0) & (len(self.solvents) == 0)
 
     @classmethod
     def from_list(cls, solvent_names: list[str], solvent_fractions: list[float], solute_names: list[str], solute_concentrations: list[float]) -> None:
@@ -57,14 +161,15 @@ class Composition(BaseModel):
 
         fractions = [solvent.fraction for solvent in self.solvents]
 
-        return self.get_solvent_names(), fractions
+        return self.get_solvent_names(), [f / sum(fractions) for f in fractions]
 
-    def get_solute_concentrations(self) -> Tuple[list[str], list[float]]:
-        """Returns lists of solute names and concentrations"""
+    def get_solute_concentrations(self, ref_unit: str = 'M') -> Tuple[list[str], list[float]]:
+        """Returns lists of solute names and concentrations, converting to a given reference unit"""
 
         concentrations = [solute.concentration for solute in self.solutes]
+        units = [solute.units for solute in self.solutes]
 
-        return self.get_solute_names(), concentrations
+        return self.get_solute_names(), concentrations, units
 
     def has_component(self, name: str) -> float | None:
         """Checks if component exists and if so returns the concentration (for solutes) or 
@@ -118,7 +223,52 @@ class InferredWellLocation(WellLocation):
         if self.id is None:
             self.id = str(uuid4())
 
-class Well(BaseModel):
+class Solution(BaseModel):
+    """Class representing a volume and composition of material"""
+
+    composition: Composition = Field(default_factory=Composition)
+    volume: float = 0.0
+
+    def mix_with(self, volume: float, composition: Composition) -> None:
+        """Update volume and composition from mixing with new solution. Priority in unit conversions is given to the existing composition"""
+
+        solvents1, fractions1 = self.composition.get_solvent_fractions()
+        solutes1 = self.composition.get_solute_names()
+
+        solvents2, fractions2 = composition.get_solvent_fractions()
+        solutes2 = composition.get_solute_names()
+
+        new_solvents, new_fractions, new_volume = combine_components(solvents1, fractions1, self.volume,
+                                                         solvents2, fractions2, volume)
+        
+        # handle solutes differently because units can be different
+        new_solutes: list[Solute] = []
+        for solute_name, solute in zip(solutes1, self.composition.solutes):
+            if solute_name not in solutes2:
+                new_solute = deepcopy(solute)
+                new_solute.concentration *= self.volume / new_volume
+            else:
+                solute2 = composition.solutes[solutes2.index(solute_name)]
+                new_concentration = (solute.concentration * self.volume + solute2.convert_units(solute.units) * volume) / new_volume
+                new_solute = Solute(name=solute_name,
+                                    concentration=new_concentration,
+                                    molecular_weight=solute.molecular_weight,
+                                    units=solute.units)
+                
+            new_solutes.append(new_solute)
+        
+        for solute_name, solute in zip(solutes2, composition.solutes):
+            # check if this solute is already processed
+            if solute_name not in solutes1:
+                new_solute = deepcopy(solute)
+                new_solute.concentration *= volume / new_volume
+                new_solutes.append(new_solute)
+
+        self.volume = new_volume
+        self.composition = Composition(solutes=new_solutes,
+                                       solvents=[Solvent(name=name, fraction=fraction) for name, fraction in zip(new_solvents, new_fractions)])
+
+class Well(Solution):
     """Class representing the contents of a single well
     
         rack_id (str): String description of rack where well is located
@@ -130,28 +280,7 @@ class Well(BaseModel):
 
     rack_id: str
     well_number: int
-    composition: Composition
-    volume: float | None
     id: str | None = None
-
-    def mix_with(self, volume: float, composition: Composition) -> None:
-        """Update volume and composition from mixing with new solution"""
-
-        solvents1, fractions1 = self.composition.get_solvent_fractions()
-        solutes1, concentrations1 = self.composition.get_solute_concentrations()
-
-        solvents2, fractions2 = composition.get_solvent_fractions()
-        solutes2, concentrations2 = composition.get_solute_concentrations()
-
-        new_solvents, new_fractions, new_volume = combine_components(solvents1, fractions1, self.volume,
-                                                         solvents2, fractions2, volume)
-
-        new_solutes, new_concentrations, _ = combine_components(solutes1, concentrations1, self.volume,
-                                                             solutes2, concentrations2, volume)
-
-        self.volume = new_volume
-        self.composition = Composition.from_list(new_solvents, new_fractions, new_solutes, new_concentrations)
-
 
 def find_composition(composition: Composition, wells: List[Well]) -> List[Well]:
     """Finds wells containing the desired composition
@@ -172,12 +301,19 @@ class Rack(BaseModel):
     columns: int
     rows: int
     max_volume: float
+    min_volume: float = 0.0
     wells: list[Well]
     style: str = 'grid' # grid | staggered
+    height: int
+    width: int
+    x_translate: int
+    y_translate: int
+    shape: str = 'rect' # rect | circle
+    editable: bool = True
 
 class LHBedLayout(BaseModel):
     """Class representing a general LH bed layout"""
-    racks: dict[str, Rack] = field(default_factory=dict)
+    racks: dict[str, Rack] = Field(default_factory=dict)
 
     def add_rack_from_dict(self, name, d: dict):
         """ Add a rack from dictionary definition (i.e. config file)"""
@@ -212,7 +348,7 @@ class LHBedLayout(BaseModel):
                             if (w.volume == 0) & (w.id is None)),
                         None)
         if next_empty is not None:
-            return WellLocation(rack_id, next_empty.well_number)
+            return WellLocation(rack_id=rack_id, well_number=next_empty.well_number)
 
     def infer_location(self, well: WellLocation) -> WellLocation | None:
         """Finds the next empty and fills in the inferred well location by ID or by next empty.
@@ -277,14 +413,21 @@ class LHBedLayout(BaseModel):
             if existing_well.well_number == well_number:
                 wells.pop(i)
         return wells
+    
+    @property
+    def carrier_well(self):
+        if 'Carrier' in self.racks:
+            carrier_well, _ = self.get_well_and_rack('Carrier', 1)
+            return carrier_well
 
 d2o = Solvent(name='D2O', fraction=1.0)
-kcl0 = Solute(name='KCl', fraction=0.1)
-kcl1 = Solute(name='KCl', fraction=1.0)
+kcl0 = Solute(name='KCl', molecular_weight=74.55, concentration=0.1, units='M')
+nacl0 = Solute(name='NaCl', molecular_weight=58.44, concentration=0.1, units='mg/mL')
+kcl1 = Solute(name='KCl', molecular_weight=74.55, concentration=1.0, units='mg/L')
 h2o = Solvent(name='H2O', fraction=1.0)
 peptide = Solute(name='peptide', fraction=1e-3)
 
-dbuffer = Composition(solvents=[d2o], solutes=[kcl0])
+dbuffer = Composition(solvents=[d2o], solutes=[kcl0, nacl0])
 hbuffer = Composition(solvents=[h2o], solutes=[kcl1])
 water = Composition(solvents=[h2o])
 dwater = Composition(solvents=[d2o])
@@ -305,5 +448,11 @@ example_wells: List[Well] = [Well(rack_id='Stock', well_number=1, composition=dw
 #                 Well('Samples', 1, peptide_solution, 2),
 #                 Well('Samples', 2, dpeptide_solution, 2),
                  Well(rack_id='Solvent', well_number=2, composition=dbuffer, volume=200)]
+
+if __name__ == '__main__':
+    mix_well = Well(rack_id='Mix', well_number=2, composition=dbuffer, volume=4.0)
+    mix_well.mix_with(2, hbuffer)
+    print(mix_well.composition)
+    print(kcl1.convert_units('nM'))
 
 

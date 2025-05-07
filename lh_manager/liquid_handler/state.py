@@ -9,6 +9,7 @@ from .layoutmap import racks
 from .bedlayout import LHBedLayout, example_wells
 from .items import Item
 from .devices import device_manager
+from .notify import notifier
 from ..app_config import parser, config
 
 LOG_PATH, LAYOUT_LOG, SAMPLES_LOG, DEVICES_LOG = config.log_path, config.layout_path, config.samples_path, config.devices_path
@@ -54,6 +55,9 @@ def save_devices():
 
 print('loading state!')
 layout, samples = load_state()
+
+notifier.load_config(config.notify_path)
+notifier.connect()
 
 if samples is None:
 

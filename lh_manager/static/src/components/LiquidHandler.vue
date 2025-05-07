@@ -1,13 +1,17 @@
 <script setup>
-import { ref } from 'vue'
-import { onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue'
 import Mixture from './Mixture.vue';
 import DeviceList from './DeviceList.vue';
 import BedLayout from './BedLayout.vue';
 import SampleChannels from './SampleChannels.vue';
-import { samples, sample_status, wells, device_defs } from '../store';
+import { device_defs, device_layouts } from '../store';
 import EditWellContents from './EditWellContents.vue';
 import MaterialManager from './MaterialManager.vue';
+import AddWaste from './AddWaste.vue';
+import WasteManager from './WasteManager.vue';
+import LHInterface from './LHInterface.vue';
+import EditRackSettings from './EditRackSettings.vue';
+import BatchWellEditor from './BatchWellEditor.vue';
 
 const props = defineProps({
   msg: String,
@@ -17,65 +21,43 @@ const props = defineProps({
 
 const emit = defineEmits(['remove_sample', 'add_sample']);
 
-const active_sample = ref(0);
-
-const chemical_components = [
-  "D2O",
-  "H2O",
-  "Polymer goo"
-]
-
-const mixture_parts = [];
-
 onMounted(() => {
   console.log(props.sample_status);
 });
 
-const mixtureIsOpen = ref(false);
-
-function openMixture() {
-  mixtureIsOpen.value = true;
-}
-
+const filtered_layouts = computed(()=> {
+  const layouts = Object.entries(device_layouts.value).filter(([device_name, layout]) => (layout.layout !== null));
+  return layouts.map(([device_name, layout]) => {return { device_name, layout }});
+    });
 
 </script>
 
 <template>
   <ul class="nav nav-tabs" id="myTab" role="tablist">
     <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="layout-tab" data-bs-toggle="tab" data-bs-target="#Layout" type="button"
+        role="tab" aria-controls="Layout" aria-selected="true">Main</button>
+    </li>
+    <li class="nav-item" role="presentation">
       <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#Devices" type="button" role="tab"
         aria-controls="Devices" aria-selected="false">Devices</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="home-tab" data-bs-toggle="tab" data-bs-target="#NICE" type="button" role="tab"
-        aria-controls="NICE" aria-selected="false">NICE</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#GilsonLH" type="button" role="tab"
-        aria-controls="GilsonLH" aria-selected="false">Gilson LH</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="layout-tab" data-bs-toggle="tab" data-bs-target="#Layout" type="button"
-        role="tab" aria-controls="Layout" aria-selected="true">Layout</button>
+      <button class="nav-link" id="lh-tab" data-bs-toggle="tab" data-bs-target="#LHInterface" type="button" role="tab"
+        aria-controls="LHInterface" aria-selected="false">LH Controls</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#Materials" type="button" role="tab"
         aria-controls="Materials" aria-selected="false">Materials</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="waste-tab" data-bs-toggle="tab" data-bs-target="#Waste" type="button" role="tab"
+        aria-controls="Waste" aria-selected="false">Waste</button>
+    </li>
   </ul>
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
-    <div class="tab-pane" id="Devices" role="tabpanel" aria-labelledby="home-tab">
+    <div class="tab-pane d-flex flex-column align-items-stretch overflow-auto" id="Devices" role="tabpanel" aria-labelledby="home-tab">
       <DeviceList :devices="device_defs"></DeviceList>
-    </div>
-    <div class="tab-pane" id="NICE" role="tabpanel" aria-labelledby="home-tab">NICE things</div>
-    <div class="tab-pane" id="GilsonLH" role="tabpanel" aria-labelledby="profile-tab">
-      <h1>Liquid Handler things</h1>
-      <!-- Button trigger modal -->
-      <button type="button" class="btn btn-primary" @click="openMixture">
-        Launch demo modal
-      </button>
-      <Mixture @close="mixtureIsOpen = false" :show="mixtureIsOpen" :chemical_components="chemical_components" />
-
     </div>
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
       role="tabpanel" aria-labelledby="layout-tab">
@@ -89,21 +71,47 @@ function openMixture() {
       </div>
 
       <div class="flex-grow-1">
-        <BedLayout :wells="wells" />
+        <ul class="nav nav-tabs" id="layout-tabs" role="tablist">
+          <li v-for="(layout, index) in filtered_layouts" :key="layout.device_name" class="nav-item" role="presentation">
+            <button class="nav-link" :id="layout.device_name.replaceAll(' ', '') + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + layout.device_name.replaceAll(' ', '') + '-div'" type="button" role="tab"
+        :aria-controls="layout.device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ layout.device_name }}</button>
+          </li>
+        </ul>
+        <div class="tab-content d-flex flex-fill" style="height:90%; width:90%" id="layoutTabContent">
+          <div v-for="(layout, index) in filtered_layouts" :key="layout.device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="layout.device_name.replaceAll(' ', '') + '-div'">
+            <BedLayout :device_name="layout.device_name" :layout="layout.layout"/>
+          </div>        
+        </div>
       </div>
+
+
     </div>
-    <div class="tab-pane d-flex flex-grow-1" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="LHInterface" role="tabpanel" aria-labelledby="lh-tab">
+      <LHInterface />
+    </div>    
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>
+    <div class="tab-pane d-flex flex-grow-1 h-100" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
+      <WasteManager />
+    </div>
+    </div>
 
-  </div>
-  <EditWellContents :wells="wells" />
+  <EditWellContents/>
+  <EditRackSettings/>
+  <BatchWellEditor/>
+  <AddWaste/>
 
 </template>
 
 <style scoped>
 .flex-column {
   min-height: 0;
+}
+
+.bedlayout {
+  height: 100%;
+  width: 100%;
 }
 
 .list-move,

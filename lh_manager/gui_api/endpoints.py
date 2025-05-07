@@ -8,7 +8,7 @@ from ..liquid_handler.devices import device_manager
 from ..liquid_handler.state import samples, layout
 from ..liquid_handler.samplelist import Sample, SampleStatus, MethodList
 from ..liquid_handler.methods import method_manager
-from ..liquid_handler.bedlayout import Well, WellLocation
+from ..liquid_handler.bedlayout import Well, WellLocation, Rack
 from ..liquid_handler.layoutmap import Zone, LayoutWell2ZoneWell
 from ..liquid_handler.dryrun import DryRunQueue
 from ..liquid_handler.lhqueue import LHqueue, JobQueue, submit_handler, validate_format
@@ -357,6 +357,7 @@ def InitializeDevices() -> Response:
 
     return redirect('/autocontrol/InitializeDevices/', 307)
 
+@gui_blueprint.route('/GUI/GetLayout', methods=['GET'])
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:
     """Gets list of sample names, IDs, and status"""
@@ -395,6 +396,7 @@ def GetComponents() -> Response:
 
     return make_response({'solvents': solvents, 'solutes': solutes}, 200)
 
+@gui_blueprint.route('/GUI/GetWells', methods=['GET'])
 @gui_blueprint.route('/GUI/GetWells/', methods=['GET'])
 def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
     """ Gets a list of all filled wells """
@@ -412,6 +414,22 @@ def GetWells(well_locations: Optional[List[WellLocation]] = None) -> Response:
         wd['zone'] = zone
     return make_response(wells_dict, 200)
 
+@gui_blueprint.route('/GUI/UpdateRack', methods=['POST'])
+@gui_blueprint.route('/GUI/UpdateRack/', methods=['POST'])
+@trigger_layout_update
+def UpdateRack() -> Response:
+    """ Replaces any existing well definition weith the same rack_id, well_number
+    (or creates a new well definition if none already exists) """
+
+    data: dict = request.get_json(force=True)
+    assert isinstance(data, dict)
+    rack_id = data.get('rack_id')
+    new_rack = Rack.model_validate(data.get('rack'))
+    new_rack.wells = layout.racks[rack_id].wells
+    layout.racks[rack_id] = new_rack
+    return make_response(new_rack.model_dump(), 200)
+
+@gui_blueprint.route('/GUI/UpdateWell', methods=['POST'])
 @gui_blueprint.route('/GUI/UpdateWell/', methods=['POST'])
 @trigger_layout_update
 def UpdateWell() -> Response:
@@ -424,6 +442,7 @@ def UpdateWell() -> Response:
     layout.update_well(well)
     return make_response(well.model_dump(), 200)
 
+@gui_blueprint.route('/GUI/RemoveWellDefinition', methods=['POST'])
 @gui_blueprint.route('/GUI/RemoveWellDefinition/', methods=['POST'])
 @trigger_layout_update
 def RemoveWellDefinition() -> Response:

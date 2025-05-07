@@ -2,6 +2,7 @@ import os
 import copy
 import json
 import sqlite3
+import traceback
 
 from datetime import datetime
 from enum import Enum
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 
 from .job import JobBase, ResultStatus, ValidationStatus
 from .methods import method_manager
+from .notify import notifier
 from .lhmethods import BaseLHMethod
 from .bedlayout import LHBedLayout
 from ..app_config import config
@@ -141,6 +143,7 @@ class LHJob(JobBase):
         """
 
         samplelist = copy.copy(self.LH_method_data)
+        samplelist['id'] = str(self.LH_id)
         if listonly:
             samplelist['columns'] = None
 
@@ -154,9 +157,9 @@ class LHJob(JobBase):
         """
 
         for m in self.LH_methods:
-            print('Executing: ', m.model_dump())
+            #print('Executing: ', m.model_dump())
             result = m.execute(layout)
-            print('Result: ', m.model_dump())
+            #print('Result: ', m.model_dump())
 
 class LHJobHistory:
     table_name = 'lh_job_record'
@@ -248,6 +251,7 @@ class LHInterface:
         self.activation_callbacks: List[Callable] = []
         self.validation_callbacks: List[Callable] = []
         self.results_callbacks: List[Callable] = []
+        self.name = 'LHInterface'
 
     def update_history(self) -> None:
         """Updates the active job in history
@@ -316,6 +320,11 @@ class LHInterface:
         for callback in self.validation_callbacks:
             callback(job, *args, **kwargs)
 
+    def throw_error(self, msg: str):
+        self.has_error = True
+        print(f'Error in {self.name}\n' + msg)
+        notifier.notify(f'Error in {self.name}', msg)
+
     def activate_job(self, job: LHJob, layout: LHBedLayout, *args, **kwargs):
         """Activates an LHJob"""
 
@@ -334,7 +343,10 @@ class LHInterface:
         
         # assign new ID
         job.LH_id = max_LH_id + 1
-        job.generate_method_data(layout)
+        try:
+            job.generate_method_data(layout)
+        except:
+            self.throw_error(traceback.format_exc())
         
         # activate job
         self._active_job = job

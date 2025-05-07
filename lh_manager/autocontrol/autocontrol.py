@@ -289,15 +289,21 @@ def synchronize_status(poll_delay: int = 5):
             return 'not connected'
 
         if response.ok:
-            if response.json()['queue'] == 'history':
+            try:
+                response_json: dict = response.json()
+            except json.JSONDecodeError:
+                return 'json decode error, ignoring'
+
+            if response_json['queue'] == 'history':
                 return 'complete'
-            elif response.json()['queue'] == 'active':
+            elif response_json['queue'] == 'active':
                 return 'active'
-            elif response.json()['queue'] == 'scheduled':
+            elif response_json['queue'] == 'scheduled':
                 return 'pending'
         else:
             if 'No task found' in response.text:
                 return 'task not found'
+
             print(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
         
         return 'uncaught error'
@@ -306,28 +312,31 @@ def synchronize_status(poll_delay: int = 5):
     def mark_status(id: str, status: SampleStatus) -> None:
         parent_item = active_tasks.active.pop(id)
         _, sample = samples.getSampleById(parent_item.id)
-        active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
-        for m in active_methods:
-            if m.status != SampleStatus.COMPLETED:
-                for t in m.tasks:
-                    # coerce to str because t.id can be UUID
-                    if str(t.id) == id:
-                        t.status = status
-            
-                if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
-                    m.status = SampleStatus.COMPLETED
-                elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
-                    m.status = SampleStatus.ACTIVE
-                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
-                    m.status = SampleStatus.ERROR
-                else:
-                    m.status = SampleStatus.PENDING
 
-        if (status not in COMPLETED_STATUS):
-            # put it back if not marking complete
-            active_tasks.active.update({id: parent_item})
+        # check that sample still exists (not yet archived)
+        if sample is not None:
+            active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
+            for m in active_methods:
+                if m.status != SampleStatus.COMPLETED:
+                    for t in m.tasks:
+                        # coerce to str because t.id can be UUID
+                        if str(t.id) == id:
+                            t.status = status
+                
+                    if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
+                        m.status = SampleStatus.COMPLETED
+                    elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
+                        m.status = SampleStatus.ACTIVE
+                    elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                        m.status = SampleStatus.ERROR
+                    else:
+                        m.status = SampleStatus.PENDING
 
-            #sample.stages[parent_item.stage].update_status()
+            if (status not in COMPLETED_STATUS):
+                # put it back if not marking complete
+                active_tasks.active.update({id: parent_item})
+
+                #sample.stages[parent_item.stage].update_status()
 
         # NOTE: this is now done at the LHInterface level. However, GUI is only updated here.
         # if sample stage is complete, execute all methods
@@ -341,15 +350,15 @@ def synchronize_status(poll_delay: int = 5):
         with active_tasks.lock:
             for task_id in copy.copy(list(active_tasks.active.keys())):
                 result = check_status_completion(task_id)
-                print(task_id, result)
+                #print(task_id, result)
                 if result == 'complete':
                     mark_status(task_id, SampleStatus.COMPLETED)
                 elif result == 'active':
                     mark_status(task_id, SampleStatus.ACTIVE)
                 elif result == 'task not found':
                     # Remove item without updating parent
-                    print(f'Warning: id {task_id} not found, marking complete anyway')
-                    mark_status(task_id, SampleStatus.UNKNOWN)
+                    print(f'Warning: id {task_id} not found, marking as cancelled')
+                    mark_status(task_id, SampleStatus.CANCELLED)
 
         time.sleep(poll_delay)
 

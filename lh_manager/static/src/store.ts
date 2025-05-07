@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, toRaw } from 'vue';
+import { computed, nextTick, reactive, ref, shallowRef, toRaw } from 'vue';
 import json_pointer from 'json-pointer';
 import Modal from 'bootstrap/js/src/modal';
 import mitt from 'mitt';
@@ -15,7 +15,7 @@ export interface MethodDef {
 export interface WellLocation {
   rack_id: string,
   well_number: number,
-  id: string | null,
+  id?: string | null,
 }
 
 export type DeviceMethodType = {
@@ -102,7 +102,8 @@ export interface Sample {
   current_contents: string,
 }
 
-export type StatusType = 'pending' | 'active' | 'completed' | 'inactive' | 'partially complete' | 'cancelled' | 'error' | 'unknown';
+export type StatusType = 'up' | 'busy' | 'down' | 'error';
+export type DeviceStatusType = 'pending' | 'active' | 'completed' | 'inactive' | 'partially complete' | 'cancelled' | 'error' | 'unknown';
 
 export interface SampleStatus {
   status?: StatusType,
@@ -118,7 +119,7 @@ export interface SampleStatusMap {
   }
 }
 
-export type Solute = {name: string, concentration: number, units: SoluteMassUnits | SoluteVolumeUnits};
+export type Solute = {name: string, concentration: number, molecular_weight: number, units: SoluteMassUnits | SoluteVolumeUnits};
 export type Solvent = {name: string, fraction: number};
 
 
@@ -142,7 +143,7 @@ interface SourceComponents {
 export const materialType = ["solvent", "solute", "lipid", "protein"] as const;
 export type MaterialType = typeof materialType[number];
 export const soluteMassUnits = ["mg/mL", "mg/L"] as const;
-export const soluteVolumeUnits = ["M", "mM", "nM"] as const;
+export const soluteVolumeUnits = ["M", "mM", "uM", "nM"] as const;
 export type SoluteMassUnits = typeof soluteMassUnits[number];
 export type SoluteVolumeUnits = typeof soluteVolumeUnits[number];
 
@@ -167,20 +168,54 @@ export interface Material {
   metadata: object | null,
   type: MaterialType | null,
   density: number | null,
-  solute_concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
+  concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
+}
+
+export interface Rack {
+  rows: number,
+  columns: number,
+  style: 'grid' | 'staggered',
+  min_volume: number,
+  max_volume: number,
+  height: number,
+  width: number,
+  x_translate: number,
+  y_translate: number,
+  shape: string,
+  editable: boolean
+}
+
+export interface DeviceLayout {
+  layout: {racks: {[rack_id: string]: Rack} },
+  wells: Well[],
+  source_components: SourceComponents
+}
+
+export interface TimestampTable {
+  timestamp_table: string[][]
 }
 
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
-export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
+export const device_layouts = ref<Record<string, DeviceLayout>>({});
+export const waste_layout = ref<DeviceLayout>();
+export const waste_timestamp_table = ref<TimestampTable>();
+//export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
 export const sample_status = ref<SampleStatusMap>({});
-export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
-export const wells = ref<Well[]>([]);
+//export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
+//export const wells = ref<Well[]>([]);
 export const well_editor_active = ref(false);
-export const well_to_edit = ref<WellLocation>();
+export const add_waste_active = ref(false);
+export const well_to_edit = ref<{device: string, well: WellLocation}>();
 export const num_channels = ref<number>(1);
 export const materials = ref<Material[]>([]);
+export const current_composition = ref<{ solvents: Solvent[], solutes: Solute []}>({solvents: [], solutes: []});
+
+export const rack_editor_active = ref(false);
+export const rack_to_edit = ref<{device: string, rack_id: string, rack: Rack}>();
+
+export const batch_editor_active = ref(false);
 
 export type ModalData = {
   title: string,
@@ -393,9 +428,20 @@ export function pick_handler(well_location: WellLocation) {
   console.warn("no active well field to set");
 }
 
-export async function update_well_contents(well: Well) {
+export async function update_rack(base_address: string, rack_id: string, rack: Rack) {
+  console.log("updating rack: ", rack_id, JSON.stringify(rack));
+  const update_result = await fetch(clean_url(base_address + "/GUI/UpdateRack"), {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rack_id, rack })
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function update_well_contents(base_address: string, well: Well) {
   console.log("updating well: ", well, JSON.stringify(well));
-  const update_result = await fetch("/GUI/UpdateWell/", {
+  const update_result = await fetch(clean_url(base_address + "/GUI/UpdateWell"), {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -404,8 +450,8 @@ export async function update_well_contents(well: Well) {
   return response_body;
 }
 
-export async function remove_well_definition(well: Well) {
-  const update_result = await fetch("/GUI/RemoveWellDefinition/", {
+export async function remove_well_definition(base_address, well: Well) {
+  const update_result = await fetch(clean_url(base_address + "/GUI/RemoveWellDefinition"), {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(well)
@@ -504,10 +550,15 @@ export async function explode_stage(sample_obj: Sample, stage: string): Promise<
   return response_body;
 }
 
-export async function refreshLayout() {
-  const new_layout = await (await fetch("/GUI/GetLayout/")).json();
-  console.log({new_layout});
-  layout.value = new_layout;
+export async function getDeviceLayout(base_address: string) {
+  const response = await fetch(clean_url(base_address + "/GUI/GetLayout"))
+                            .catch((err) => {
+                              console.log(err)
+                              return undefined;
+                            })
+  if ((response == undefined) || (!response.ok)) { return undefined }
+  const layout = await response.json();
+  return { layout };
 }
 
 function dedupe<T>(arr: T[]): T[] {
@@ -517,28 +568,41 @@ function dedupe<T>(arr: T[]): T[] {
   return vals;
 }
 
-export async function refreshWells() {
-  const new_wells = await (await fetch("/GUI/GetWells/")).json() as WellWithZone[];
+export async function getDeviceWells(base_address: string) {
+  const wells = await fetch(clean_url(base_address + "/GUI/GetWells")).then( response => {
+                        if (!response.ok) { return [] }
+                        return response.json()}) as WellWithZone[];
   const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
   const solutes = {} as {[name: string]: (Solute & { zone: string })[]};
-  new_wells.forEach((well) => {
-    const { zone } = well;
-    well.composition.solvents.forEach((s) => {
-      if (!(s.name in solvents)) {
-        solvents[s.name] = [];
-      }
-      solvents[s.name].push({ ...s, zone });
+  if (wells !== null) {
+    wells.forEach((well) => {
+      const { zone } = well;
+      well.composition.solvents.forEach((s) => {
+        if (!(s.name in solvents)) {
+          solvents[s.name] = [];
+        }
+        solvents[s.name].push({ ...s, zone });
+      });
+      well.composition.solutes.forEach((s) => {
+        if (!(s.name in solutes)) {
+          solutes[s.name] = [];
+        }
+        solutes[s.name].push({ ...s, zone });
+      });
     });
-    well.composition.solutes.forEach((s) => {
-      if (!(s.name in solutes)) {
-        solutes[s.name] = [];
-      }
-      solutes[s.name].push({ ...s, zone });
-    });
-  });
-  source_components.value = { solvents, solutes };
-  wells.value = new_wells;
-  console.log({new_wells});
+  };
+  const source_components = { solvents, solutes };
+  return { source_components, wells }
+}
+
+export async function refreshWells(device_name: string) {
+  const new_wells = await getDeviceWells(device_defs.value[device_name].address);
+  const new_layout = await getDeviceLayout(device_defs.value[device_name].address);
+  const current_layout = device_layouts.value[device_name];
+  current_layout.wells = new_wells.wells;
+  current_layout.source_components = new_wells.source_components;
+  current_layout.layout = new_layout?.layout;
+  device_layouts.value = { ...device_layouts.value, ...{[device_name]: current_layout}};
 }
 
 export async function refreshSamples() {
@@ -572,6 +636,70 @@ export async function refreshDeviceDefs() {
   const { devices } = await (await fetch("/GUI/GetAllDevices/")).json() as {devices: Record<string, DeviceType>};
   device_defs.value = devices;
   console.log({devices});
+}
+
+export async function refreshDeviceLayouts() {
+  await refreshDeviceDefs();
+  await refreshWaste();
+  const layouts = {};
+  for (const device_name in device_defs.value) {
+    console.log('Updating ' + device_name);
+    const new_layout = await getDeviceLayout(device_defs.value[device_name].address);
+    if (new_layout !== undefined) {
+      const new_wells = await getDeviceWells(device_defs.value[device_name].address);
+      layouts[device_name] = { ...new_layout, ...new_wells };
+    }
+  }
+  device_layouts.value = layouts;
+}
+
+export async function refreshWaste() {
+  const new_layout = await getDeviceLayout("/Waste");
+  if (new_layout !== undefined) {
+    const new_wells = await getDeviceWells("/Waste");
+    waste_layout.value = { ...new_layout, ...new_wells };
+  }
+  else {
+    console.log('Waste layout not found')
+    waste_layout.value = undefined;
+  }
+  await get_timestamp_table();
+};
+
+export async function empty_waste() {
+  const update_result = await fetch("/Waste/EmptyWaste", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+};
+
+export async function add_waste(volume: number, composition: {solvents: Solvent[], solutes: Solute[]}) {
+  const update_result = await fetch("/Waste/AddWaste", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ volume, composition })
+  });
+  const response_body = await update_result.json();
+  return response_body;
+};
+
+export async function get_timestamp_table() {
+  const { timestamp_table } = await (await fetch("/Waste/GUI/GetTimestampTable")).json() as TimestampTable;
+  waste_timestamp_table.value = { timestamp_table };
+}
+
+export async function generate_waste_report(bottle_id: string) {
+  const update_result = await fetch("/Waste/GUI/GenerateWasteReport", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bottle_id })
+  });
+  const { report } = await update_result.json();
+  console.log({ report })
+  return { report };
 }
 
 export async function update_device(device_name: string, param_name: string, param_value: any) {
@@ -645,6 +773,69 @@ export async function delete_material(material: Material) {
   const response_body = await update_result.json();
   return response_body;
 }
+
+export async function material_from_sequence(name: string, sequence: string) {
+  const update_result = await fetch("/Materials/MaterialFromSequence/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, sequence })
+  });
+  const { material } = await update_result.json();
+  return material as Material;
+}
+
+function clean_url(url: string) {
+  return url.replace(/(https?:\/\/)|(\/)+/g, "$1$2");
+}
+
+export async function refreshLHStatus() {
+  const { active_job, status } = await (await fetch("/LH/GetState/")).json();
+  active_lh_job.value = active_job;
+  lh_status.value = status;
+}
+
+export async function clear_lh_job() {
+  const update_result = await fetch("/LH/Deactivate/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function resubmit_lh_job() {
+  const update_result = await fetch("/LH/ResubmitActiveJob/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function clear_lh_error() {
+  const update_result = await fetch("/LH/ResetErrorState/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export async function lh_pauseresume() {
+  const update_result = await fetch("/LH/PauseResume/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const response_body = await update_result.json();
+  return response_body;
+}
+
+export const active_lh_job = ref<object | null>(null);
+export const lh_status = ref<StatusType | null>(null);
 
 export const source_well = ref<WellLocation | null>(null);
 export const target_well = ref<WellLocation | null>(null);

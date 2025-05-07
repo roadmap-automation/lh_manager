@@ -4,7 +4,7 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref, onMounted } from 'vue';
 import { io } from 'socket.io-client';
-import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshLayout, refreshComponents, refreshWells, refreshMaterials, refreshDeviceDefs } from './store';
+import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, refreshLHStatus, device_defs } from './store';
 import type { MethodDef } from './store';
 
 const connected = ref(false);
@@ -15,13 +15,13 @@ const socket = io('', {
 socket.on('connect', () => {
   console.log("connected: ", socket.id);
   connected.value = true;
-  refreshLayout();
-  refreshWells();
   refreshSamples();
   refreshSampleStatus();
   refreshMethodDefs();
   refreshMaterials();
-  refreshDeviceDefs();
+  refreshLHStatus();
+  establish_socket_connections();
+  refreshWaste();
 });
 
 socket.on('disconnect', (payload) => {
@@ -39,9 +39,10 @@ socket.on('update_sample_status', () => {
   refreshSampleStatus();
 })
 
-socket.on('update_layout', () => {
-  refreshLayout();
-  refreshWells();
+socket.on('update_waste', () => {
+//  console.log('Got base refresh')
+//  refreshDeviceLayouts()
+  refreshWaste();
 })
 
 socket.on('update_materials', () => {
@@ -51,6 +52,28 @@ socket.on('update_materials', () => {
 socket.on('update_devices', () => {
   refreshDeviceDefs();
 });
+
+socket.on('update_lh_job', () => {
+  refreshLHStatus();
+});
+
+async function establish_socket_connections() {
+  await refreshDeviceLayouts();
+  for (const device of Object.values(device_defs.value)) {
+    console.log('Creating new socket for ' + device.device_name)
+    const new_socket = io(device.address)
+
+    new_socket.on('connect', () => {
+      console.log('Connected to ' + device.device_name);
+      refreshWells(device.device_name);
+    })
+
+    new_socket.on('update_layout', () => {
+      console.log('Got update layout from ' + device.device_name)
+      refreshWells(device.device_name);
+    })
+  }
+}
 
 </script>
 

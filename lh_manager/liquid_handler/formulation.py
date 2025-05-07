@@ -4,14 +4,14 @@ import numpy as np
 from scipy.optimize import nnls
 from pydantic import Field, validator, SerializeAsAny
 
-from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse
+from .lhmethods import MixMethod, MixWithRinse, TransferMethod, TransferWithRinse, LHMethodCluster
 
 from .bedlayout import Solute, Solvent, Composition, LHBedLayout, Well, WellLocation, empty
 from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import example_sample_list
 from .methods import MethodContainer, MethodsType, register, method_manager
 
-ZERO_VOLUME_TOLERANCE = 1e-8
+ZERO_VOLUME_TOLERANCE = 1e-3
 
 @register
 class Formulation(MethodContainer):
@@ -31,6 +31,8 @@ class Formulation(MethodContainer):
                 is achieved. Defaults to True."""
     transfer_template: SerializeAsAny[TransferMethod] = Field(default_factory=TransferWithRinse)
     mix_template: SerializeAsAny[MixMethod] = Field(default_factory=MixWithRinse)
+
+    _formulation_results: Tuple[List[float], List[Well], bool] | None = None
 
     @validator('mix_template', 'transfer_template', pre=True)
     def validate_templates(cls, v):
@@ -52,7 +54,7 @@ class Formulation(MethodContainer):
         """
 
         # 1. Create target vector from target composition.
-        target_names, target_vector = self.make_target_vector()
+        target_names, target_vector, target_units = self.make_target_vector()
         print(f'target names: {target_names}')
         print(f'target vector: {target_vector}')
 
@@ -62,19 +64,20 @@ class Formulation(MethodContainer):
 
         if not len(source_wells):
             print('Cannot create formulation: no acceptable solutions available')
-            return [], [], False
+            self._formulation_results = [], [], False
         
         # 3. Check that all components of target are present in layout
         for target_name in target_names:
             if target_name not in source_components:
                 print(f'Cannot make formulation: {target_name} is missing')
-                return [], [], False
+                self._formulation_results = [], [], False
+                return self._formulation_results
 
         # 4. Attempt to solve
         success = False
         while not success:
             print(f'Source wells: {source_wells}')
-            source_matrix, source_wells = self.make_source_matrix(target_names, source_wells)
+            source_matrix, source_wells = self.make_source_matrix(target_names, source_wells, target_units)
 
             print(f'Source matrix: {source_matrix}')
 
@@ -94,15 +97,38 @@ class Formulation(MethodContainer):
             required_volumes = sol * self.target_volume
 
             for well, source_well_volume, required_volume in zip(source_wells, source_well_volumes, required_volumes):
-                if required_volume > source_well_volume:
-                    print(f'Well {well} has volume {source_well_volume}, needs volume {required_volume}, removing it')
+                if (required_volume + layout.racks[well.rack_id].min_volume) > source_well_volume :
+                    print(f'Well {well} has volume {source_well_volume}, needs volume {required_volume} plus minimum volume {layout.racks[well.rack_id].min_volume}, removing it')
                     source_wells.pop(source_wells.index(well))
                     success = False
 
         # 4. Find all unique solutions an use a priority to find the best one (fewest operations, least time, etc.)
-        source_wells = [well for well, vol in zip(source_wells, sol) if vol > ZERO_VOLUME_TOLERANCE]
+        volumes = []
+        result_wells = []
+        for well, vol in zip(source_wells, sol):
+            if vol * self.target_volume > ZERO_VOLUME_TOLERANCE:
+                volumes.append(vol * self.target_volume)
+                result_wells.append(well)
 
-        return (sol[sol>ZERO_VOLUME_TOLERANCE] * self.target_volume).tolist(), source_wells, success
+        self._formulation_results = volumes, result_wells, success
+        print(self._formulation_results)
+
+        return self._formulation_results
+
+    def get_formulation_results(self, layout: LHBedLayout) -> Tuple[List[float], List[Well], bool]:
+        """Get cached formulation results, or recalculate
+
+        Args:
+            layout (LHBedLayout): LH bed layout
+
+        Returns:
+            Tuple[List[float], List[Well], bool]: see formulate()
+        """
+
+        if self._formulation_results is None:
+            self._formulation_results = self.formulate(layout)
+
+        return self._formulation_results
 
     def get_expected_composition(self, layout: LHBedLayout) -> Composition:
         """Calculates the expected composition from the formulation
@@ -111,10 +137,10 @@ class Formulation(MethodContainer):
             Composition: expected composition
         """
 
-        volumes, wells, success = self.formulate(layout)
+        volumes, wells, success = self.get_formulation_results(layout)
 
         if success:
-            mix_well = Well('', 0, Composition(), 0)
+            mix_well = Well(rack_id='', volume=0, composition=Composition(), well_number=0)
             for volume, well in zip(volumes, wells):
                 mix_well.mix_with(volume, well.composition)
 
@@ -123,25 +149,47 @@ class Formulation(MethodContainer):
         else:
             return Composition()
 
+    def get_target_well(self, layout: LHBedLayout) -> WellLocation:
+        """Gets the target well. If the formulation already exists
+            in the layout with sufficient volume, use that as the target well;
+            otherwise use self.Target
+
+
+        Args:
+            layout (LHBedLayout): current LH bed layout
+
+        Returns:
+            WellLocation: target well location
+        """
+        volumes, wells, success = self.get_formulation_results(layout)
+
+        if success:
+            if len(volumes) > 1:
+                return self.Target
+            else:
+                return WellLocation(rack_id=wells[0].rack_id,
+                                    well_number=wells[0].well_number,
+                                    expected_composition=self.target_composition)
 
     def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
-        """Overwrites base class method to dynamically create list of methods
+        """Overwrites base class method to dynamically create list of methods.
+            Returns empty list if the formulation already exists.
         """
 
         methods = []
-        volumes, wells, success = self.formulate(layout)
+        volumes, wells, success = self.get_formulation_results(layout)
 
         if success:
             # sort by volume (largest first)
             sort_index = np.argsort(volumes)[::-1]
             sorted_volumes = [volumes[si] for si in sort_index]
             #sort_index = [volumes.index(sv) for sv in sorted_volumes]
-            sorted_wells = [wells[si] for si in sort_index]
+            sorted_wells: list[Well] = [wells[si] for si in sort_index]
 
             # Add transfer methods
             for volume, well in zip(sorted_volumes, sorted_wells):
                 new_transfer = copy(self.transfer_template)
-                new_transfer.Source = WellLocation(well.rack_id, well.well_number)
+                new_transfer.Source = WellLocation(rack_id=well.rack_id, well_number=well.well_number)
                 new_transfer.Target = self.Target
                 new_transfer.Volume = volume
                 methods.append(new_transfer)
@@ -160,9 +208,9 @@ class Formulation(MethodContainer):
                 new_mix.Volume = mix_volume
                 methods.append(new_mix)
 
-        return methods
+        return [] if not len(methods) else [LHMethodCluster(methods=methods)]
     
-    def make_source_matrix(self, source_names: List[str], wells: List[Well]) -> Tuple[List[list], List[Well]]:
+    def make_source_matrix(self, source_names: List[str], wells: List[Well], source_units: dict[str, str]) -> Tuple[List[list], List[Well], dict[str, str]]:
         """Makes matrix of source wells that contain desired components
 
         Args:
@@ -170,7 +218,7 @@ class Formulation(MethodContainer):
             wells (List[Well]): list of wells to consider
 
         Returns:
-            Tuple[List[list], List[Well]]: Source matrix and list of wells corresponding to each
+            Tuple[List[list], List[Well], dict[str, str]]: Source matrix, list of wells, and unit dictionary corresponding to each
                 column of the source matrix.
         """
 
@@ -180,15 +228,15 @@ class Formulation(MethodContainer):
 
             composition = well.composition
             solvent_names, solvent_fractions = composition.get_solvent_fractions()
-            solute_names, solute_concentrations = composition.get_solute_concentrations()
+            solute_names = composition.get_solute_names()
 
-            # look for possible contributions
+            # look for possible contributions, make sure units are the same as the target composition
             col = []
             for name in source_names:
                 if name in solvent_names:
                     col.append(solvent_fractions[solvent_names.index(name)])
                 elif name in solute_names:
-                    col.append(solute_concentrations[solute_names.index(name)])
+                    col.append(composition.solutes[solute_names.index(name)].convert_units(source_units[name]))
                 else:
                     col.append(0)
             
@@ -215,9 +263,11 @@ class Formulation(MethodContainer):
         """
 
         solvent_names, solvent_fractions = self.target_composition.get_solvent_fractions()
-        solute_names, solute_concentrations = self.target_composition.get_solute_concentrations()
+        solute_names, solute_concentrations, solute_units = self.target_composition.get_solute_concentrations()
 
-        return solvent_names + solute_names, solvent_fractions + solute_concentrations
+        concentrations_with_units = {name : unit for (name, unit) in zip(solute_names, solute_units)}
+
+        return solvent_names + solute_names, solvent_fractions + solute_concentrations, concentrations_with_units
 
     def select_wells(self, wells: List[Well], target_names: List[str]) -> Tuple[List[Well], List[str]]:
         """Selects wells based on whether they have the appropriate components
@@ -291,25 +341,23 @@ class SoluteFormulation(Formulation):
 
         volumes, wells, success = super().formulate(layout)
 
-        try:
-            diluent_well = next(well
-                                for well in self.get_all_wells(layout)
-                                    if all(well.composition.has_component(cmp) == self.diluent.has_component(cmp)
-                                        for cmp in (self.diluent.get_solute_names() + self.diluent.get_solvent_names() + well.composition.get_solvent_names() + well.composition.get_solute_names())))
-        except StopIteration:
+        diluent_well = next((well for well in self.get_all_wells(layout) if well.composition == self.diluent), None)
+        
+        if diluent_well is None:        
             print(f'Diluent ({self.diluent}) not available on bed')
             return [], [], False
-
         
         diluent_volume = self.target_volume - sum(volumes)
 
-        if diluent_volume < 0:
-            print(f'Diluent volume less than zero; should never happen')
-            return [], [], False
-        
-        if not np.isclose(diluent_volume, 0.0, atol=1e-9):
+        # if no diluent required, do nothing
+        if not np.isclose(diluent_volume, 0.0, atol=ZERO_VOLUME_TOLERANCE):
             volumes += [diluent_volume]
             wells += [diluent_well]
+
+            # only check for this if diluent volume is not close to zero
+            if diluent_volume < 0:
+                print(f'Diluent volume less than zero; should never happen')
+                return [], [], False
 
         return volumes, wells, True
 

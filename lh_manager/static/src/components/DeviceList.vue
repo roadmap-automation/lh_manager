@@ -37,32 +37,34 @@ function clone(obj) {
     <button type="button" class="btn btn-primary m-8" @click="initialize_devices">Initialize devices</button>
   </div>
   <div class="row-sm-auto">
-    <div class="card" v-for="(device, device_name) of props.devices" :key="device_name">
-      <div class="card-body p-2 border bg-light">
-        <h5 class="card-title">{{ device_name }}</h5>
-        <!-- <h6 class="card-title">{{ device.device_type }}</h6> -->
-        <table class="table m-2">
-          <tr v-for="field of get_parameters(device)" :key="field.name">
-            <td>
-              <div>
-                <label>
-                  {{ field.name }}:
-                </label>
-              </div>
-            </td>
-            <td v-if="field.type === 'number'">
-              <input class="number px-1 py-0" v-model.number="field.value" :name="`param_${field.name}`"
-                @keydown.enter="update_device(device_name, field.name, field.value)" @blur="update_device(device_name, field.name, field.value)" />
-            </td>
-            <td v-if="field.type === 'string'">
-              <input class="string py-1" v-model="field.value" :name="`param_${field.name}`"
-                @keydown.enter="update_device(device_name, field.name, field.value)" @blur="update_device(device_name, field.name, field.value)" />
-            </td>
-            <td v-if="field.type === 'boolean'">
-              <input type="checkbox" v-model="field.value" :name="`param_${field.name}`" @change="update_device(device_name, field.name, field.value)" />
-            </td>
-          </tr>
-        </table>
+    <div class="col d-flex flex-wrap">
+      <div class="card" v-for="(device, device_name) of props.devices" :key="device_name">
+        <div class="card-body p-2 border bg-light">
+          <a class="h5 card-title" :href="device.address" target="_blank">{{ device_name }}</a>
+          <!-- <h6 class="card-title">{{ device.device_type }}</h6> -->
+          <table class="table m-2">
+            <tr v-for="field of get_parameters(device)" :key="field.name">
+              <td>
+                <div>
+                  <label>
+                    {{ field.name }}:
+                  </label>
+                </div>
+              </td>
+              <td v-if="field.type === 'number'">
+                <input class="number px-1 py-0" v-model.number="field.value" :name="`param_${field.name}`"
+                  @keydown.enter="update_device(device_name, field.name, field.value)" @blur="update_device(device_name, field.name, field.value)" />
+              </td>
+              <td v-if="field.type === 'string'">
+                <input class="string py-1" v-model="field.value" :name="`param_${field.name}`"
+                  @keydown.enter="update_device(device_name, field.name, field.value)" @blur="update_device(device_name, field.name, field.value)" />
+              </td>
+              <td v-if="field.type === 'boolean'">
+                <input type="checkbox" v-model="field.value" :name="`param_${field.name}`" @change="update_device(device_name, field.name, field.value)" />
+              </td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>
   </div>

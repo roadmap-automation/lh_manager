@@ -3,9 +3,10 @@ from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .sio import socketio
 from .material_db import blueprint as material_db_blueprint
+from .waste_manager.waste_api import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
-import app_config
+from .app_config import config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -23,6 +24,7 @@ app.register_blueprint(gui_blueprint)
 app.register_blueprint(lh_blueprint)
 app.register_blueprint(autocontrol_blueprint)
 app.register_blueprint(material_db_blueprint)
+app.register_blueprint(waste_blueprint)
 socketio.init_app(app)
 
 #@app.route('/')
@@ -39,7 +41,6 @@ def test_emit():
 
 if __name__ == '__main__':
 
-    config = app_config.config
     config.stage_names = ['methods']
 
     launch_autocontrol_interface(poll_delay=5)

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { ref, defineProps } from 'vue'
+import { ref, computed, defineProps } from 'vue'
 import Bed from './Bed.vue';
-import { layout } from '../store';
-import type { Well } from '../store';
+import { device_layouts } from '../store';
+import type { Well, DeviceLayout } from '../store';
 
 const props = defineProps<{
-  wells: Well[]
+  device_name: string
+  layout: DeviceLayout
 }>();
+
+const max_x = computed(() => Math.max(...Object.values(props.layout.layout.racks).map((rack) => rack.x_translate + rack.width)));
+const max_y = computed(() => Math.max(...Object.values(props.layout.layout.racks).map((rack) => rack.y_translate + rack.height)));
 
 </script>
 
 <template>
-  <svg class="wrapper" v-if="layout !== undefined" xmlns="http://www.w3.org/2000/svg">
+  <svg class="wrapper" v-if="props.layout !== undefined" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <pattern id="pattern"
               width="8" height="10"
@@ -36,19 +40,10 @@ const props = defineProps<{
         <line stroke="pink" stroke-width="6px" x1="0" x2="0" y1="0" y2="10"/>
       </pattern>
     </defs>
-    <svg class="inner" viewBox="0 0 900 1000" x="0" y="0" preserveAspectRatio="xMinYMin meet">
+    <svg class="inner" :viewBox="'0 0 ' + max_x.toString() + ' ' + max_y.toString()" x="0" y="0" preserveAspectRatio="xMinYMin meet">
       <!-- <rect width="150" height="80" fill="green" x="0" y="20"></rect> -->
-      <g transform="translate(0,0)">
-        <Bed width="900" height="200" rack_id="Solvent" shape="rect" :wells="wells"/>
-      </g>
-      <g transform="translate(0,200)">
-        <Bed width="300" height="800" rack_id="Samples" shape="circle" :wells="wells" />
-      </g>
-      <g transform="translate(300,200)">
-        <Bed width="300" height="800" rack_id="Stock" shape="circle" :wells="wells" />
-      </g>
-      <g transform="translate(600,200)">
-        <Bed width="300" height="800" rack_id="Mix" shape="circle" :wells="wells" />
+      <g v-for="(rack, rack_id) in props.layout.layout.racks" :transform="'translate(' + rack.x_translate + ',' + rack.y_translate + ')'">
+        <Bed :rack_id="rack_id" :rack="rack" :wells="props.layout.wells" :device_name="props.device_name"/>
       </g>
     </svg>
   </svg>
@@ -61,8 +56,10 @@ svg.inner {
 }
 
 svg.wrapper {
-  height: 100%;
-  width: 100%;
+  height: 95%;
+  width: 95%;
+  margin: 1%;
+  padding: 1%;
 }
 
 .vial-button {

@@ -2,9 +2,12 @@ from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_compos
 from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, register, MethodContainer, MethodsType, MethodType
 from .formulation import Formulation, SoluteFormulation
-from .injectionmethods import InjectLoop, BaseInjectionSystemMethod
+from .distributionmethods import BaseDistributionMethod
+from .injectionmethods import InjectLoop, BaseInjectionSystemMethod, RinseLoadLoop, RinseLoadLoopBubbleSensor
+from .rinsemethods import BaseRinseMethod
 from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWithRinse, InjectMethod, ROADMAP_QCMD_LoadLoop, ROADMAP_QCMD_DirectInject, TransferMethod, LHMethodCluster
 from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
+from ..waste_manager.wastedata import WasteItem, WATER
 
 import numpy as np
 from copy import copy
@@ -57,14 +60,16 @@ class InjectOrganicsWithRinse(InjectWithRinse):
 @register
 class ROADMAP_QCMD_MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
-    Bilayer_Composition: Composition = Field(default_factory=Composition)
     Bilayer_Solvent: Composition = Field(default_factory=Composition)
-    Lipid_Injection_Volume: float = 0.0
-    Buffer_Composition: Composition = Field(default_factory=Composition)
-    Buffer_Injection_Volume: float = 0.0
-    Extra_Volume: float = 0.1
+    Use_Rinse_System_for_Solvent: bool = True
     Rinse_Volume: float = 2.0
+    Extra_Volume: float = 0.1
     Flow_Rate: float = 2.0
+    Bilayer_Composition: Composition = Field(default_factory=Composition)
+    Lipid_Injection_Volume: float = 1.0
+    Buffer_Composition: Composition = Field(default_factory=Composition)
+    Use_Rinse_System_for_Buffer: bool = True
+    Buffer_Injection_Volume: float = 2.0
     Exchange_Flow_Rate: float = 0.1
     Equilibration_Time: float = 1.0
     Measurement_Time: float = 2.0
@@ -76,9 +81,12 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         """
 
         methods = []
-        minimum_volume = 0.15
-        
-        mix_extra_volume = 0.05
+        minimum_volume = 0.2
+        mix_extra_volume = 0.1
+
+        default_equilibration_time = 1
+        default_measurement_time = 1
+
         extra_volume = self.Extra_Volume
         rinse_volume = self.Rinse_Volume
         injection_flow_rate=self.Flow_Rate
@@ -95,22 +103,38 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
         """
 
         # ==== Solvent rinse ====
-        required_volume = minimum_volume + extra_volume + rinse_volume
-        lipid_prep_well, error = find_well_and_volume(self.Bilayer_Solvent, required_volume, layout.get_all_wells())
-        if lipid_prep_well is None:
-            print('Error: insufficient or nonexistent bilayer solvent. Aborting.')
-            return []
 
-        inject_rinse = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=lipid_prep_well.composition,
-                                                         Volume=rinse_volume,
-                                                         Injection_Flow_Rate=injection_flow_rate,
-                                                         Extra_Volume=extra_volume,
-                                                         Is_Organic=True,
-                                                         Use_Bubble_Sensors=True,
-                                                         Equilibration_Time=equilibration_time,
-                                                         Measurement_Time=measurement_time)
+        if self.Use_Rinse_System_for_Solvent:
 
-        methods += inject_rinse.get_methods_from_well(lipid_prep_well, lipid_prep_well.composition, layout)
+            inject_rinse = ROADMAP_QCMD_RinseLoopInjectandMeasure(Target_Composition=self.Bilayer_Solvent,
+                                                                Volume=rinse_volume,
+                                                                Injection_Flow_Rate=injection_flow_rate,
+                                                                Extra_Volume=extra_volume,
+                                                                Is_Organic=True,
+                                                                Use_Bubble_Sensors=True,
+                                                                Equilibration_Time=default_equilibration_time,
+                                                                Measurement_Time=default_measurement_time)
+            
+            methods += inject_rinse.get_methods(layout)
+
+        else:
+
+            required_volume = minimum_volume + extra_volume + rinse_volume
+            lipid_prep_well, error = find_well_and_volume(self.Bilayer_Solvent, required_volume, layout.get_all_wells())
+            if lipid_prep_well is None:
+                print('Error: insufficient or nonexistent bilayer solvent. Aborting.')
+                return []
+
+            inject_rinse = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=lipid_prep_well.composition,
+                                                            Volume=rinse_volume,
+                                                            Injection_Flow_Rate=injection_flow_rate,
+                                                            Extra_Volume=extra_volume,
+                                                            Is_Organic=True,
+                                                            Use_Bubble_Sensors=True,
+                                                            Equilibration_Time=default_equilibration_time,
+                                                            Measurement_Time=default_measurement_time)
+
+            methods += inject_rinse.get_methods_from_well(lipid_prep_well, lipid_prep_well.composition, layout)
 
         # ==== Lipids in solvent ====
         required_volume = minimum_volume + extra_volume + self.Lipid_Injection_Volume
@@ -123,13 +147,14 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                                             target_volume=self.Lipid_Injection_Volume + minimum_volume + extra_volume + mix_extra_volume,
                                             Target=lipid_mixing_well,
                                             transfer_template=TransferOrganicsWithRinse(),
-                                            mix_template=MixOrganicsWithRinse(Repeats=1,
+                                            mix_template=MixOrganicsWithRinse(Repeats=3,
                                                                               Extra_Volume=mix_extra_volume))
             
             lipid_mixing_well.expected_composition = bilayer_formulation.get_expected_composition(layout)
 
-            methods += [LHMethodCluster(method_type=MethodType.PREPARE,
-                                        methods=bilayer_formulation.get_methods(layout))]
+            # insert formulation first
+            methods = bilayer_formulation.get_methods(layout) + methods
+            
         else:
             lipid_mixing_well = WellLocation(rack_id=lipid_mixing_well.rack_id,
                                              well_number=lipid_mixing_well.well_number,
@@ -142,50 +167,66 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                              Injection_Flow_Rate=injection_flow_rate,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
-                             Air_Gap=0.1,
+                             Air_Gap=0.15,
                              Use_Liquid_Level_Detection=False,
                              Use_Bubble_Sensors=True
                              )
         
         methods += direct_inject.get_methods(layout)
 
-        measure = QCMDRecordTag(record_time=self.Measurement_Time * 60,
-                                sleep_time=self.Equilibration_Time * 60,
+        measure = QCMDRecordTag(record_time=default_measurement_time * 60,
+                                sleep_time=default_equilibration_time * 60,
                                 tag_name=repr(lipid_mixing_well.expected_composition))
         
         methods += measure.get_methods(layout)
 
+        buffer_methods = []
         # ==== Buffer ====
-        required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
-        buffer_mixing_well, error = find_well_and_volume(self.Buffer_Composition, required_volume, layout.get_all_wells())
-        if buffer_mixing_well is None:
-            buffer_mixing_well = InferredWellLocation(rack_id='Mix')
-
-            buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
-                                            target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
-                                            Target=buffer_mixing_well,
-                                            exact_match=True,
-                                            transfer_template=TransferWithRinse(),
-                                            mix_template=MixWithRinse())
+        if self.Use_Rinse_System_for_Buffer:
+            inject_buffer = ROADMAP_QCMD_RinseLoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
+                                                            Volume=self.Buffer_Injection_Volume,
+                                                            Injection_Flow_Rate=exchange_flow_rate,
+                                                            Is_Organic=False,
+                                                            Use_Bubble_Sensors=True,
+                                                            Equilibration_Time=equilibration_time,
+                                                            Measurement_Time=measurement_time)
             
-            buffer_mixing_well.expected_composition = buffer_formulation.get_expected_composition(layout)
+            buffer_methods += inject_buffer.get_methods(layout)
 
-            methods += [LHMethodCluster(method_type=MethodType.PREPARE,
-                                        methods=buffer_formulation.get_methods(layout))]
-        else:
-            buffer_mixing_well = InferredWellLocation(rack_id=buffer_mixing_well.rack_id,
-                                                      well_number=buffer_mixing_well.well_number,
-                                                      expected_composition=buffer_mixing_well.composition)
+        else:        
+            required_volume = minimum_volume + extra_volume + self.Buffer_Injection_Volume
+            buffer_mixing_well, error = find_well_and_volume(self.Buffer_Composition, required_volume, layout.get_all_wells())
+            if buffer_mixing_well is None:
+                buffer_mixing_well = InferredWellLocation(rack_id='Mix')
 
-        inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Bilayer_Composition, 
-                                                         Volume=self.Buffer_Injection_Volume,
-                                                         Injection_Flow_Rate=exchange_flow_rate,
-                                                         Is_Organic=False,
-                                                         Use_Bubble_Sensors=True,
-                                                         Equilibration_Time=equilibration_time,
-                                                         Measurement_Time=measurement_time)
-        
-        methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
+                buffer_formulation = Formulation(target_composition=self.Buffer_Composition,
+                                                target_volume=self.Buffer_Injection_Volume + minimum_volume + extra_volume,
+                                                Target=buffer_mixing_well,
+                                                exact_match=True,
+                                                transfer_template=TransferWithRinse(),
+                                                mix_template=MixWithRinse())
+                
+                buffer_mixing_well.expected_composition = buffer_formulation.get_expected_composition(layout)
+
+                # insert formulation methods at the beginning of the buffer methods
+                buffer_methods = buffer_formulation.get_methods(layout) + buffer_methods
+
+            else:
+                buffer_mixing_well = InferredWellLocation(rack_id=buffer_mixing_well.rack_id,
+                                                        well_number=buffer_mixing_well.well_number,
+                                                        expected_composition=buffer_mixing_well.composition)
+
+            inject_buffer = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=self.Buffer_Composition, 
+                                                            Volume=self.Buffer_Injection_Volume,
+                                                            Injection_Flow_Rate=exchange_flow_rate,
+                                                            Is_Organic=False,
+                                                            Use_Bubble_Sensors=True,
+                                                            Equilibration_Time=equilibration_time,
+                                                            Measurement_Time=measurement_time)
+            
+            buffer_methods += inject_buffer.get_methods_from_well(buffer_mixing_well, buffer_mixing_well.expected_composition, layout)
+
+        methods += buffer_methods
 
         return methods
 
@@ -278,14 +319,19 @@ class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
                          sample_description: str,
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
         
+        source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                                
             self.sub_method(
                 method_name='LoadLoopBubbleSensor' if self.Use_Bubble_Sensors else 'LoadLoop',
                 method_data=dict(pump_volume=self.Volume * 1000,
                                  excess_volume=self.Extra_Volume * 1000,
-                                 air_gap=self.Air_Gap * 1000)
+                                 air_gap=self.Air_Gap * 1000,
+                                 composition=source_well.composition)
             ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
@@ -335,12 +381,12 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
                          layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
 
         return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Volume=f'{self.Volume}',
-            Flow_Rate=f'{self.Flow_Rate}',
-        ).to_dict()]
+                    SAMPLENAME=sample_name,
+                    SAMPLEDESCRIPTION=sample_description,
+                    METHODNAME=self.method_name,
+                    Volume=f'{self.Volume}',
+                    Flow_Rate=f'{self.Flow_Rate}',
+                ).to_dict()]
 
     def render_method(self,
                          sample_name: str,
@@ -350,6 +396,8 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                              
             BaseInjectionSystemMethod.sub_method(
                 method_name='DirectInjectPrime',
                 method_data=dict(pump_volume=self.Volume * 1000,
@@ -358,6 +406,14 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
+    
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Volume
+        return super().execute(layout)
+
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+
+        return WasteItem(volume=self.Volume, composition=layout.carrier_well.composition)
 
 @register
 class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemMethod, BaseQCMDMethod):
@@ -380,16 +436,21 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
         
-        self.Source = layout.infer_location(self.Source)
-        if self.Source.well_number is not None:
-            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
-            composition = repr(source_well.composition)
-        else:
+        if self.Source.expected_composition is not None:
             composition = self.Source.expected_composition
+        else:
+            inferred_source = layout.infer_location(self.Source)
+            print('Source', self.Source.model_dump())
+            print('Inferred source', inferred_source.model_dump())
+            source_well, _ = layout.get_well_and_rack(inferred_source.rack_id, inferred_source.well_number)
+            print('Source well', source_well.model_dump())
+            composition = source_well.composition
                     
         return [super().render_method(sample_name=sample_name,
                                         sample_description=sample_description,
                                         layout=layout)[0] | 
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                          
             BaseInjectionSystemMethod.sub_method(
                 method_name='DirectInjectBubbleSensor' if self.Use_Bubble_Sensors else 'DirectInject',
                 method_data=dict(pump_volume=self.Volume * 1000,
@@ -435,7 +496,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
                              Flow_Rate=2.0,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
-                             Air_Gap=0.1,
+                             Air_Gap=0.15,
                              Use_Bubble_Sensors=self.Use_Bubble_Sensors,
                              Use_Liquid_Level_Detection=(False if self.Is_Organic else True))
         
@@ -443,7 +504,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
 
         inject_loop = ROADMAP_InjectLooptoQCMD(Volume=self.Volume,
                                  Flow_Rate=self.Injection_Flow_Rate,
-                                 contents=repr(composition))
+                                 contents=composition)
         
         methods += inject_loop.get_methods(layout)
 
@@ -509,7 +570,7 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
                              Injection_Flow_Rate=self.Injection_Flow_Rate,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
-                             Air_Gap=0.1,
+                             Air_Gap=0.15,
                              Use_Liquid_Level_Detection=(False if self.Is_Organic else True),
                              Use_Bubble_Sensors=self.Use_Bubble_Sensors
                              )
@@ -536,11 +597,164 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
         # select well with sufficient volume
         target_well, error = find_well_and_volume(self.Target_Composition, required_volume, layout.get_all_wells())
         if error is not None:
-            print(f'Warning in {self.method_name}' + error + ', aborting')
+            print(f'Warning in {self.method_name}: ' + error + ', aborting')
             return []
         else:
             print(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
 
         methods += self.get_methods_from_well(target_well, target_well.composition, layout)
+
+        return methods
+
+# ============= Rinse system methods ==============
+
+@register
+class ROADMAP_RinseDirectInjecttoQCMD(BaseInjectionSystemMethod):
+    """Direct injection to QCMD via rinse system"""
+    Rinse_Composition: Composition = Field(default_factory=Composition)
+    Volume: float = 1 # ml
+    Extra_Volume: float = 0.1 #mL
+    Air_Gap: float = 0.1 #ml
+    Aspirate_Flow_Rate: float = 1 # mL/min
+    Load_Flow_Rate: float = 1 # mL/min
+    Injection_Flow_Rate: float = 1 # mL/min
+    Rinse_Volume: float = 0.5 # ml
+    Use_Bubble_Sensors: bool = True
+    display_name: Literal['ROADMAP Direct Inject to QCMD from Rinse'] = 'ROADMAP Direct Inject to QCMD from Rinse'
+    method_name: Literal['ROADMAP_RinseDirectInjecttoQCMD'] = 'ROADMAP_RinseDirectInjecttoQCMD'
+    method_type: Literal[MethodType.INJECT] = MethodType.INJECT
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        # Order matters
+        return [BaseRinseMethod.sub_method(method_name='InitiateRinse',
+                                           method_data={}).to_dict() |
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                             
+            self.sub_method(method_name='RinseDirectInjectBubbleSensor' if self.Use_Bubble_Sensors else 'RinseDirectInject',
+                                method_data={'composition': self.Rinse_Composition,
+                                            'aspirate_flow_rate': self.Aspirate_Flow_Rate,
+                                            'inject_flow_rate': self.Injection_Flow_Rate,
+                                            'excess_volume': self.Extra_Volume,
+                                            'air_gap': self.Air_Gap,
+                                            'rinse_volume': self.Rinse_Volume,
+                                            'pump_volume': self.Volume,
+                                            'flow_rate': self.Load_Flow_Rate}
+            ).to_dict() |
+            QCMDAcceptTransfer.sub_method(
+                method_name='QCMDAcceptTransfer',
+                method_data=dict(contents=self.Rinse_Composition)
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        total_volume = self.Extra_Volume + self.Volume + 2 * self.Air_Gap
+        return 60 * (total_volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate + (self.Rinse_Volume + self.Extra_Volume) / self.Load_Flow_Rate)
+
+@register
+class ROADMAP_QCMD_RinseLoopInjectandMeasure(MethodContainer):
+    """Use rinse system to do a loop injection to QCMD"""
+    Target_Composition: Composition = Field(default_factory=Composition)
+    Volume: float = 0.0
+    Injection_Flow_Rate: float = 1.0
+    Extra_Volume: float = 0.1
+    Is_Organic: bool = False
+    Use_Bubble_Sensors: bool = True
+    Equilibration_Time: float = 0.5
+    Measurement_Time: float = 1.0
+    display_name: Literal['ROADMAP QCMD Rinse Loop Inject and Measure'] = 'ROADMAP QCMD Rinse Loop Inject and Measure'
+    method_name: Literal['ROADMAP_QCMD_RinseLoopInjectandMeasure'] = 'ROADMAP_QCMD_RinseLoopInjectandMeasure'
+
+    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
+        """Helper function that gets all methods from a well location
+
+        Args:
+            well (WellLocation): Well location for injections
+
+        Returns:
+            List[MethodsType]: method list
+        """
+
+        methods = []
+        composition = self.Target_Composition
+
+        if self.Use_Bubble_Sensors:
+            load_loop = RinseLoadLoopBubbleSensor(Rinse_Composition=composition,
+                                Volume=self.Volume,
+                                Aspirate_Flow_Rate=(3.0 if self.Is_Organic else 6.0),
+                                Flow_Rate=3.0,
+                                Rinse_Volume=0.5,
+                                Extra_Volume=self.Extra_Volume,
+                                Air_Gap=0.2)
+        else:
+            load_loop = RinseLoadLoop(Rinse_Composition=composition,
+                                Volume=self.Volume,
+                                Aspirate_Flow_Rate=(3.0 if self.Is_Organic else 6.0),
+                                Flow_Rate=3.0,
+                                Rinse_Volume=0.5,
+                                Extra_Volume=self.Extra_Volume,
+                                Air_Gap=0.2)
+        
+        methods += load_loop.get_methods(layout)
+
+        inject_loop = ROADMAP_InjectLooptoQCMD(Volume=self.Volume,
+                                 Flow_Rate=self.Injection_Flow_Rate,
+                                 contents=composition)
+        
+        methods += inject_loop.get_methods(layout)
+
+        measure = QCMDRecordTag(record_time=self.Measurement_Time * 60,
+                                sleep_time=self.Equilibration_Time * 60,
+                                tag_name=repr(composition))
+        
+        methods += measure.get_methods(layout)
+
+        return methods
+
+@register
+class ROADMAP_QCMD_RinseDirectInjectandMeasure(MethodContainer):
+    """Use rinse system to do a loop injection to QCMD"""
+    Target_Composition: Composition = Field(default_factory=Composition)
+    Volume: float = 0.0
+    Injection_Flow_Rate: float = 1.0
+    Extra_Volume: float = 0.1
+    Is_Organic: bool = False
+    Use_Bubble_Sensors: bool = True
+    Equilibration_Time: float = 0.5
+    Measurement_Time: float = 1.0
+    display_name: Literal['ROADMAP QCMD Rinse Direct Inject and Measure'] = 'ROADMAP QCMD Rinse Direct Inject and Measure'
+    method_name: Literal['ROADMAP_QCMD_RinseDirectInjectandMeasure'] = 'ROADMAP_QCMD_RinseDirectInjectandMeasure'
+
+    def get_methods(self, layout: LHBedLayout) -> List[MethodsType]:
+        """Helper function that gets all methods from a well location
+
+        Args:
+            well (WellLocation): Well location for injections
+
+        Returns:
+            List[MethodsType]: method list
+        """
+
+        methods = []
+        composition = self.Target_Composition
+
+        direct_inject = ROADMAP_RinseDirectInjecttoQCMD(Rinse_Composition=composition,
+                            Volume=self.Volume,
+                            Aspirate_Flow_Rate=(3.0 if self.Is_Organic else 6.0),
+                            Load_Flow_Rate=2.0,
+                            Injection_Flow_Rate=self.Injection_Flow_Rate,
+                            Rinse_Volume=0.5,
+                            Extra_Volume=self.Extra_Volume,
+                            Air_Gap=0.2,
+                            Use_Bubble_Sensors=self.Use_Bubble_Sensors)
+        
+        methods += direct_inject.get_methods(layout)
+
+        measure = QCMDRecordTag(record_time=self.Measurement_Time * 60,
+                                sleep_time=self.Equilibration_Time * 60,
+                                tag_name=repr(composition))
+        
+        methods += measure.get_methods(layout)
 
         return methods

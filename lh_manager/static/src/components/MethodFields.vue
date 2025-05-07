@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, source_components, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, layout, update_at_pointer } from '../store';
+import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, } from '../store';
 import json_pointer from 'json-pointer';
-import type { MethodType } from '../store';
+import type { MethodType, Solvent, Solute } from '../store';
 
 const props = defineProps<{
   sample_id: string,
@@ -17,6 +17,27 @@ function send_changes(param) {
   update_at_pointer(props.sample_id, method_pointer, param.value);
 }
 
+const source_components = computed(() => {
+  // compile all components
+  const solvents = {} as {[name: string]: (Solvent & { zone: string })[]};
+  const solutes = {} as {[name: string]: (Solute & { zone: string })[]};
+  for (const device_name in device_layouts.value) {
+    const sc = device_layouts.value[device_name].source_components
+    for (const s in sc.solvents) {
+      if (!(s in solvents)) {
+        solvents[s] = [];
+      }
+      solvents[s].push(...sc.solvents[s]);
+    }
+    for (const s in sc.solutes) {
+      if (!(s in solutes)) {
+        solutes[s] = [];
+      }
+      solutes[s].push(...sc.solutes[s]);
+    }
+  };
+  return { solvents, solutes };
+});
 
 function get_parameters(method: MethodType) {
   const { method_name } = method;
@@ -68,12 +89,13 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
   console.log(component_type, first_available);
   if (first_available !== undefined) {
     const [name, values] = first_available;
-    const new_component: {name: string, fraction?: number, concentration?: number, units?: string} = { name };
+    const new_component: {name: string, fraction?: number, concentration?: number, molecular_weight?: number, units?: string} = { name };
     if (component_type === 'solvents') {
       new_component.fraction = values[0].fraction ?? 0;
     }
     else {
       new_component.concentration = values[0].concentration ?? 0;
+      new_component.molecular_weight = values[0].molecular_weight ?? null;
       new_component.units = values[0].units ?? 'M';
     }
     console.log({param});
@@ -98,9 +120,10 @@ function filter_components(component_key: 'solutes' | 'solvents') {
 }
 
 function change_solute(solute, param) {
-  const { units, concentration } = source_components.value.solutes[solute.name][0];
+  const { units, concentration, molecular_weight } = source_components.value.solutes[solute.name][0];
   solute.units = units;
   solute.concentration = concentration;
+  solute.molecular_weight = molecular_weight;
   send_changes(param);
 }
 

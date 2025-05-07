@@ -1,10 +1,11 @@
-from .bedlayout import LHBedLayout, WellLocation
+from .bedlayout import LHBedLayout, WellLocation, Well
 from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .methods import BaseMethod, MethodType, register, MethodsType
+from .methods import BaseMethod, MethodType, register, MethodsType, method_manager, UnknownMethod
 from .devices import DeviceBase, device_manager
+from ..waste_manager.wastedata import WasteItem, WATER
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator, ValidationError
 
 from dataclasses import field
 from typing import List, Literal, ClassVar
@@ -65,6 +66,18 @@ class BaseLHMethod(BaseMethod):
         """Actions to be taken upon executing method. Default is nothing changes"""
         return None
     
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        """Generates a volume and composition of a waste stream
+
+        Args:
+            layout (LHBedLayout): current LH layout
+
+        Returns:
+            WasteItem: total waste
+        """
+
+        return WasteItem()
+    
     def new_sample_composition(self, layout: LHBedLayout) -> str:
         """Returns new sample composition if applicable"""
         
@@ -72,7 +85,8 @@ class BaseLHMethod(BaseMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         """Estimated time for method in default time units"""
-        return 0.0
+        # empirical base time for a method
+        return 7.0 / 60.0
     
     def render_method(self,
                          sample_name: str,
@@ -97,8 +111,27 @@ class LHMethodCluster(BaseLHMethod):
 
     method_name: Literal['LHMethodCluster'] = 'LHMethodCluster'
     display_name: Literal['LHMethodCluster'] = 'LHMethodCluster'
-    method_type: Literal[MethodType.PREPARE] = MethodType.PREPARE
-    methods: List[MethodsType] = field(default_factory=list)
+    method_type: MethodType = MethodType.PREPARE
+    methods: list = field(default_factory=list)
+
+    @validator('methods')
+    def validate_methods(cls, v):
+
+        if not isinstance(v, list):
+            raise ValueError(f"{v} must be a list")
+
+        for i, iv in enumerate(v):
+            if isinstance(iv, dict):
+                try:
+                    v[i] = method_manager.get_method_by_name(iv['method_name']).model_validate(iv)
+                except ValidationError:
+                    print(f'Attempted to process unknown method with data {iv}')
+                    v[i] = UnknownMethod(method_data=iv)
+            else:
+                if not (isinstance(iv, BaseMethod)):
+                    raise ValueError(f"{iv} must be derived from BaseMethod")
+
+        return v
 
     def explode(self, layout: LHBedLayout):
         methods = []
@@ -111,8 +144,15 @@ class LHMethodCluster(BaseLHMethod):
         
         return [{lhdevice.device_name: [dict(sample_name=sample_name,
                                              sample_description=sample_description,
-                                             method=m.model_dump())
+                                             method_name=m.method_name,
+                                             method_data=m.model_dump(exclude=EXCLUDE_FIELDS))
                                         for m in self.methods]}]
+    
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return sum(m.estimated_time(layout) for m in self.methods)
+    
+    def get_methods(self, layout: LHBedLayout) -> list[MethodsType]:
+        return self.methods
 
 class SetWellID(BaseMethod):
     """Sets an Inferred Well Location ID for future use
@@ -142,17 +182,21 @@ class InjectMethod(BaseLHMethod):
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         return repr(source_well.composition)
 
+    @property
+    def sample_volume(self):
+        return self.Volume
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
 
-        if self.Volume > source_well.volume:
+        if self.sample_volume > source_well.volume:
             return MethodError(name=self.display_name,
-                                      error=f"Injection of volume {self.Volume} requested but well {source_well.well_number} in {source_well.rack_id} rack contains only {source_well.volume}"
+                                      error=f"Injection of volume {self.sample_volume} requested but well {source_well.well_number} in {source_well.rack_id} rack contains only {source_well.volume}"
                                       )
 
-        source_well.volume -= self.Volume
+        source_well.volume -= self.sample_volume
 
 
 class MixMethod(BaseLHMethod):
@@ -169,15 +213,22 @@ class MixMethod(BaseLHMethod):
         target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
         return repr(target_well.composition)
 
+    @property
+    def extra_volume(self):
+        return 0.0
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
 
-        if self.Volume > target_well.volume:
-            return MethodError(name=self.display_name,
-                                      error=f"Mix with volume {self.Volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
-                                      )
+        required_volume = self.Volume + self.extra_volume
 
+        if required_volume > target_well.volume:
+            return MethodError(name=self.display_name,
+                                      error=f"Mix with volume {required_volume} requested but well {target_well.well_number} in {target_well.rack_id} rack contains only {target_well.volume}"
+                                      )
+        
+        target_well.volume -= self.extra_volume
 
 class TransferMethod(BaseLHMethod):
     """Special class for methods that change the sample composition"""
@@ -194,18 +245,22 @@ class TransferMethod(BaseLHMethod):
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         return repr(source_well.composition)
 
+    @property
+    def transfer_volume(self):
+        return self.Volume
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         # use layout.get_well_and_rack so operation can be performed on a copy of a layout instead of on self.Source directly
         source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
         target_well, target_rack = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
 
-        if self.Volume > source_well.volume:
+        if self.transfer_volume > source_well.volume:
             return MethodError(name=self.display_name,
                                       error=f"Well {source_well.well_number} in {source_well.rack_id} \
-                                      rack contains {source_well.volume} but needs {self.Volume}")
+                                      rack contains {source_well.volume} but needs {self.transfer_volume}")
 
-        source_well.volume -= self.Volume
+        source_well.volume -= self.transfer_volume
 
         if (target_well.volume + self.Volume) > target_rack.max_volume:
             return MethodError(name=self.display_name,
@@ -273,9 +328,32 @@ class TransferWithRinse(TransferMethod):
             Target_Well=target_well
         ).to_dict()]
 
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate
+    @property
+    def transfer_volume(self):
+        return self.Volume + self.Extra_Volume
 
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical
+        return self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
+
+    def execute(self, layout):
+        layout.carrier_well.volume -= (self.Outside_Rinse_Volume + self.Inside_Rinse_Volume)
+        return super().execute(layout)
+
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        inferred_source_well = layout.infer_location(self.Source)
+        if inferred_source_well.well_number is not None:
+            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+            source_composition = source_well.composition
+        else:
+            source_composition = self.Source.expected_composition
+
+        new_waste = WasteItem()
+        new_waste.mix_with(volume=self.Extra_Volume, composition=source_composition)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + self.Inside_Rinse_Volume, composition=layout.carrier_well.composition)
+
+        return new_waste
 
 @register
 class MixWithRinse(MixMethod):
@@ -329,6 +407,10 @@ class MixWithRinse(MixMethod):
             Target_Well=target_well
         ).to_dict()]
 
+    @property
+    def extra_volume(self):
+        return self.Extra_Volume
+
     def execute(self, layout: LHBedLayout) -> MethodError | None:
 
         target_well, _ = layout.get_well_and_rack(self.Target.rack_id, self.Target.well_number)
@@ -339,9 +421,26 @@ class MixWithRinse(MixMethod):
                                       )
 
         target_well.volume -= self.Extra_Volume
+        layout.carrier_well.volume -= (self.Outside_Rinse_Volume + self.Inside_Rinse_Volume)
+    
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        inferred_target_well = layout.infer_location(self.Target)
+        if inferred_target_well.well_number is not None:
+            target_well, _ = layout.get_well_and_rack(inferred_target_well.rack_id, inferred_target_well.well_number)
+            target_composition = target_well.composition
+        else:
+            target_composition = self.Target.expected_composition
+
+        new_waste = WasteItem()
+        new_waste.mix_with(volume=self.Extra_Volume, composition=target_composition)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + self.Inside_Rinse_Volume, composition=layout.carrier_well.composition)
+
+        return new_waste
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate)
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate) + self.Air_Gap / 0.3 + base_time + rinse_time
 
 
 @register
@@ -391,9 +490,32 @@ class InjectWithRinse(InjectMethod):
             Use_Liquid_Level_Detection=f'{self.Use_Liquid_Level_Detection}'
         ).to_dict()]
 
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
+    @property
+    def sample_volume(self):
+        return self.Volume + self.Extra_Volume
 
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
+
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
+        return super().execute(layout)
+
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        inferred_source_well = layout.infer_location(self.Source)
+        if inferred_source_well.well_number is not None:
+            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+            source_composition = source_well.composition
+        else:
+            source_composition = self.Source.expected_composition
+
+        new_waste = WasteItem()
+        new_waste.mix_with(volume=self.Volume + self.Extra_Volume, composition=source_composition)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=layout.carrier_well.composition)
+
+        return new_waste
 
 @register
 class Sleep(BaseLHMethod):
@@ -419,35 +541,8 @@ class Sleep(BaseLHMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return float(self.Time)
-
-
-@register
-class Sleep2(BaseLHMethod):
-    """Sleep"""
-
-    Time2: float = 1.0
-    display_name: Literal['Sleep2'] = 'Sleep2'
-    method_name: Literal['NCNR_Sleep2'] = 'NCNR_Sleep2'
-
-    class lh_method(BaseLHMethod.lh_method):
-        Time2: str
-
-    def render_lh_method(self,
-                         sample_name: str,
-                         sample_description: str,
-                         layout: LHBedLayout) -> List[BaseLHMethod.lh_method]:
-
-        return [self.lh_method(
-            SAMPLENAME=sample_name,
-            SAMPLEDESCRIPTION=sample_description,
-            METHODNAME=self.method_name,
-            Time2=f'{self.Time2}'
-        ).to_dict()]
-
-    def estimated_time(self, layout: LHBedLayout) -> float:
-        return float(self.Time2)
-
+        base_time = super().estimated_time(layout)
+        return float(self.Time) + base_time
 
 @register
 class Prime(BaseLHMethod):
@@ -476,9 +571,17 @@ class Prime(BaseLHMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
+        base_time = super().estimated_time(layout)
         flow_rate = 10.0 # mL/min
-        return 2 * float(self.Repeats) * float(self.Volume) / flow_rate
+        return 2 * float(self.Repeats) * float(self.Volume) / flow_rate + base_time
     
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Volume * self.Repeats
+        return super().execute(layout)
+
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        return WasteItem(volume=self.Volume * self.Repeats, composition=layout.carrier_well.composition)
+
 @register
 class ROADMAP_QCMD_LoadLoop(InjectMethod):
     """Inject with rinse"""
@@ -528,8 +631,32 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate
-    
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
+
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
+        return super().execute(layout)
+
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        inferred_source_well = layout.infer_location(self.Source)
+        if inferred_source_well.well_number is not None:
+            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+            source_composition = source_well.composition
+        else:
+            source_composition = self.Source.expected_composition
+
+        new_waste = WasteItem()
+        new_waste.mix_with(volume=self.Volume + self.Extra_Volume, composition=source_composition)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=layout.carrier_well.composition)
+
+        return new_waste
+
+    @property
+    def sample_volume(self):
+        return self.Volume + self.Extra_Volume
+
 @register
 class ROADMAP_QCMD_DirectInject(InjectMethod):
     """Direct Inject with rinse"""
@@ -583,4 +710,28 @@ class ROADMAP_QCMD_DirectInject(InjectMethod):
         ).to_dict()]
 
     def estimated_time(self, layout: LHBedLayout) -> float:
-        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate
+        base_time = super().estimated_time(layout)
+        rinse_time = 23.0 / 60.0    # empirical        
+        return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate + self.Air_Gap / 0.3 + base_time + rinse_time
+
+    def execute(self, layout):
+        layout.carrier_well.volume -= self.Outside_Rinse_Volume + 0.5
+        return super().execute(layout)
+
+    def waste(self, layout: LHBedLayout) -> WasteItem:
+        inferred_source_well = layout.infer_location(self.Source)
+        if inferred_source_well.well_number is not None:
+            source_well, _ = layout.get_well_and_rack(self.Source.rack_id, self.Source.well_number)
+            source_composition = source_well.composition
+        else:
+            source_composition = self.Source.expected_composition
+
+        new_waste = WasteItem()
+        new_waste.mix_with(volume=self.Volume + self.Extra_Volume, composition=source_composition)
+        new_waste.mix_with(volume=self.Outside_Rinse_Volume + 0.5, composition=layout.carrier_well.composition)
+
+        return new_waste
+
+    @property
+    def sample_volume(self):
+        return self.Volume + self.Extra_Volume

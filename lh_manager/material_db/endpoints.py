@@ -54,3 +54,37 @@ def delete() -> Response:
         database.delete_material(material)
     socketio.emit('update_materials', {'msg': 'update_materials'}, include_self=True)
     return make_response({'deleted': material.name}, 200)
+
+@blueprint.route('/Materials/MaterialFromSequence/', methods=['GET', 'POST'])
+def material_from_sequence() -> Response:
+    """Produce a material from an amino acid sequence. Fields:
+        'sequence': string representing sequence
+        'type': 'aa' (default) or 'dna' or 'rna'
+        'name': Optional, defaults to ''
+    """
+
+    import periodictable.fasta
+
+    data: dict = request.get_json(force=True)
+    sequence = data.get('sequence')
+
+    try:
+        seq = periodictable.fasta.Sequence(name=data.get('name', ''),
+                                        sequence=sequence,
+                                        type=data.get('type', 'aa'))
+    except KeyError:
+        # usually because there's a problem with the sequence
+        print(f'Bad sequence {sequence} from {data}')
+        return make_response({'material': None}, 400)
+    
+    mat = db.Material(name=seq.name,
+                      pubchem_cid=None,
+                      full_name=sequence,
+                      iupac_name=sequence,
+                      molecular_weight=seq.mass,
+                      density=round(seq.formula.density, 3),
+                      concentration_units='mg/mL',
+                      type='protein')
+    
+    return make_response({'material': asdict(mat)}, 200)
+    

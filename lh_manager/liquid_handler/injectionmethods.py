@@ -1,9 +1,11 @@
-from .bedlayout import LHBedLayout
+from .bedlayout import LHBedLayout, Composition
 from .methods import BaseMethod, MethodType, register
 from .devices import DeviceBase, device_manager
 from .job import JobBase
+from .rinsemethods import BaseRinseMethod
+from .distributionmethods import BaseDistributionMethod
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dataclasses import field
 from typing import List, Literal, ClassVar
@@ -136,3 +138,99 @@ class InjectLoop(BaseInjectionSystemMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
 
+# =========== Rinse system methods ============
+
+@register
+class RinseLoadLoop(BaseInjectionSystemMethod):
+    """Load injection system loop via rinse system"""
+    Rinse_Composition: Composition = Field(default_factory=Composition)
+    Aspirate_Flow_Rate: float = 1 # mL/min
+    Flow_Rate: float = 1 # mL/min
+    Volume: float = 1 # ml
+    Extra_Volume: float = 0.1 #mL
+    Air_Gap: float = 0.1 #ml
+    Rinse_Volume: float = 0.5 # ml
+    display_name: Literal['Load Injection Loop from Rinse'] = 'Load Injection Loop from Rinse'
+    method_name: Literal['RinseLoadLoop'] = 'RinseLoadLoop'
+    method_type: Literal[MethodType.INJECT] = MethodType.INJECT
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseInjectionSystemMethod.sub_method]:
+        
+        # Order matters
+        return [
+            BaseRinseMethod.sub_method(method_name='InitiateRinse',
+                                           method_data={}).to_dict() |
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                           
+            self.sub_method(
+                method_name='RinseLoadLoop',
+                method_data={'composition': self.Rinse_Composition,
+                             'aspirate_flow_rate': self.Aspirate_Flow_Rate,
+                             'excess_volume': self.Extra_Volume,
+                             'air_gap': self.Air_Gap,
+                             'rinse_volume': self.Rinse_Volume,
+                             'pump_volume': self.Volume,
+                             'flow_rate': self.Flow_Rate}
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        total_volume = self.Extra_Volume + self.Volume + 2 * self.Air_Gap
+        return 60 * (total_volume / self.Aspirate_Flow_Rate + total_volume / self.Flow_Rate + self.Rinse_Volume / self.Flow_Rate)
+    
+@register
+class RinseLoadLoopBubbleSensor(RinseLoadLoop):
+    """Inject contents of injection system loop"""
+    display_name: Literal['Load Injection Loop from Rinse with Bubble Sensor'] = 'Load Injection Loop from Rinse with Bubble Sensor'
+    method_name: Literal['RinseLoadLoopBubbleSensor'] = 'RinseLoadLoopBubbleSensor'
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseInjectionSystemMethod.sub_method]:
+        # Order matters
+        return [BaseRinseMethod.sub_method(method_name='InitiateRinse',
+                                           method_data={}).to_dict() |
+            BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                                   
+            self.sub_method(method_name='RinseLoadLoopBubbleSensor',
+                                method_data={'composition': self.Rinse_Composition,
+                                            'aspirate_flow_rate': self.Aspirate_Flow_Rate,
+                                            'excess_volume': self.Extra_Volume,
+                                            'air_gap': self.Air_Gap,
+                                            'rinse_volume': self.Rinse_Volume,
+                                            'pump_volume': self.Volume,
+                                            'flow_rate': self.Flow_Rate}
+                            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        total_volume = self.Extra_Volume + self.Volume + 2 * self.Air_Gap
+        return 60 * (total_volume / self.Aspirate_Flow_Rate + total_volume / self.Flow_Rate + self.Rinse_Volume / self.Flow_Rate)
+    
+@register
+class RinseDirectInjectPrime(BaseInjectionSystemMethod, BaseRinseMethod):
+    """Prime injection system loop via rinse system"""
+    Volume: float = 1 # ml
+    Flow_Rate: float = 1 # mL/min
+    display_name: Literal['Prime Direct Injection from Rinse'] = 'Prime Direct Injection from Rinse'
+    method_name: Literal['RinseDirectInjectPrime'] = 'RinseDirectInjectPrime'
+    method_type: Literal[MethodType.NONE] = MethodType.NONE
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[BaseInjectionSystemMethod.sub_method]:
+        # Order matters
+        return [BaseRinseMethod.sub_method(method_name='InitiateRinse',
+                                           method_data={}).to_dict() |
+                BaseDistributionMethod.sub_method(method_name='InitiateDistribution',
+                                           method_data={}).to_dict() |                                                   
+                self.sub_method(method_name='RinseDirectInjectPrime',
+                                method_data={'pump_volume': self.Volume,
+                                            'pump_flow_rate': self.Flow_Rate}
+            ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return 60 * self.Volume / self.Flow_Rate

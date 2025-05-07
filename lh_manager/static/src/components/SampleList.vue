@@ -57,6 +57,7 @@ function update_sample_name() {
 }
 
 async function run_stage(sample: Sample, stage: string[]) {
+  console.log({ stage })
   const result = await run_sample(sample, stage);
   console.log("result of run_stage: ", result);
 }
@@ -117,7 +118,7 @@ const status_class_map: {[status in StatusType]: string} = {
             class="btn-close btn-sm align-middle start"
             aria-label="Run all stages"
             title="Run all stages"
-            @click.stop="run_stage(sample, ['prep', 'inject'])">
+            @click.stop="run_stage(sample, Object.keys(sample.stages))">
           </button>
           <button
             v-if="true || (['active', 'completed', 'partially_completed'].includes(sample_status[sample.id]?.status))"
