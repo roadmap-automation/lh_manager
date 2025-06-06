@@ -164,7 +164,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
                              Volume=self.Lipid_Injection_Volume,
                              Aspirate_Flow_Rate=1.0,
                              Load_Flow_Rate=2.0,
-                             Injection_Flow_Rate=injection_flow_rate,
+                             Injection_Flow_Rate=1.0,
                              Outside_Rinse_Volume=0.5,
                              Extra_Volume=self.Extra_Volume,
                              Air_Gap=0.15,
