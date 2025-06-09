@@ -20,7 +20,7 @@ from ..app_config import config
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 #LH_JOB_HISTORY = Path(__file__).parent.parent.parent / 'persistent_state' / 'lh_jobs.sqlite'
-LH_JOB_HISTORY = config.log_path / 'lh_jobs.sqlite'
+LH_JOB_HISTORY = config.persistent_path / 'lh_jobs.sqlite'
 
 class InterfaceStatus(str, Enum):
     UP = 'up'

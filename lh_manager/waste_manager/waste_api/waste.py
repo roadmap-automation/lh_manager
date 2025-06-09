@@ -11,8 +11,8 @@ from ...liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
 from ...app_config import config
 from ..wastedata import WasteItem
 
-WASTE_LOG = config.log_path / 'waste.json'
-WASTE_HISTORY = config.log_path / 'waste.sqlite'
+WASTE_LOG = config.persistent_path / 'waste.json'
+WASTE_HISTORY = config.persistent_path / 'waste.sqlite'
 WASTE_RACK = 'waste'
 
 class WasteDevice(DeviceBase):

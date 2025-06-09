@@ -12,7 +12,7 @@ from .devices import device_manager
 from .notify import notifier
 from ..app_config import parser, config
 
-LOG_PATH, LAYOUT_LOG, SAMPLES_LOG, DEVICES_LOG = config.log_path, config.layout_path, config.samples_path, config.devices_path
+LOG_PATH, LAYOUT_LOG, SAMPLES_LOG, DEVICES_LOG = config.persistent_path, config.layout_path, config.samples_path, config.devices_path
 
 def load_state():
 

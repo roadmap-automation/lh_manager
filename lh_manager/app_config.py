@@ -6,16 +6,18 @@ parser.add_argument('--noload_samples', action='store_true')
 parser.add_argument('--noload_layout', action='store_true')
 parser.add_argument('--channels', type=int, default=2)
 
-LOG_PATH = Path(__file__).parent.parent / 'persistent_state'
-NOTIFICATION_SETTINGS = LOG_PATH / 'notification_settings.json'
-LAYOUT_LOG = LOG_PATH / 'layout.json'
-SAMPLES_LOG = LOG_PATH / 'samples.json'
-DEVICES_LOG = LOG_PATH / 'devices.json'
-HISTORY_LOG = LOG_PATH / 'completed_samples.sqlite'
+LOG_PATH = Path(__file__).parent.parent / 'logs'
+PERSISTENT_PATH = Path(__file__).parent.parent / 'persistent_state'
+NOTIFICATION_SETTINGS = PERSISTENT_PATH / 'notification_settings.json'
+LAYOUT_LOG = PERSISTENT_PATH / 'layout.json'
+SAMPLES_LOG = PERSISTENT_PATH / 'samples.json'
+DEVICES_LOG = PERSISTENT_PATH / 'devices.json'
+HISTORY_LOG = PERSISTENT_PATH / 'completed_samples.sqlite'
 
 class Config:
 
     log_path: str = LOG_PATH
+    persistent_path: str = PERSISTENT_PATH
     layout_path: str = LAYOUT_LOG
     samples_path: str = SAMPLES_LOG
     devices_path: str = DEVICES_LOG
