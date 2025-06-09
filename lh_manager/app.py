@@ -1,7 +1,9 @@
-import datetime
-import logging
-
 from flask import Flask, render_template, redirect
+from flask.logging import default_handler
+
+# config contains logging configuration and should be imported first
+from .app_config import config
+
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .sio import socketio
@@ -9,7 +11,6 @@ from .material_db import blueprint as material_db_blueprint
 from .waste_manager.waste_api import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
-from .app_config import config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -43,17 +44,6 @@ def test_emit():
     return render_template('test_emit.html')
 
 if __name__ == '__main__':
-
-    output_level = logging.INFO
-
-    file_handler = logging.FileHandler(config.log_path / (datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '_manager_log.txt'))
-    file_handler.setLevel(output_level)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(output_level)
-    logging.basicConfig(handlers=[file_handler, stream_handler],
-                    format='%(asctime)s.%(msecs)03d %(levelname)s in %(module)s: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    level=output_level)
 
     config.stage_names = ['methods']
 

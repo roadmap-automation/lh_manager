@@ -1,6 +1,7 @@
 """Utility for sending email notifications. Requires a settings file"""
 
 import json
+import logging
 import pathlib
 import smtplib
 
@@ -26,7 +27,7 @@ class EmailNotifier:
             self._smtp = smtplib.SMTP(host=self.config.host, port=self.config.port)
             self._connected = True
         except smtplib.SMTPException:
-            print(f"Error: unable to connect to {self.config.host}:{self.config.port}")
+            logging.error(f"Error: unable to connect to {self.config.host}:{self.config.port}")
 
     def disconnect(self):
         if self._smtp is not None:
@@ -42,9 +43,9 @@ class EmailNotifier:
             message = f"From: {self.config.sender_name} <{self.config.sender}>\nTo: {receiver_text}\nSubject: {subject}\n\n{msg}\n"
             try:
                 self._smtp.sendmail(self.config.sender, list(self.config.receivers.values()), message)
-                print(f'Sent message {message}')
+                logging.info(f'Sent message {message}')
             except smtplib.SMTPException:
-                print(f"Error: unable to send email")
+                logging.error(f"Error: unable to send email")
             finally:
                 self.disconnect()
     
@@ -54,7 +55,7 @@ class EmailNotifier:
             with open(fn, 'r') as f:
                 self.config = NotifierConfig(**json.load(f))
         else:
-            print(f'Warning loading config for EmailNotifier: {fn} does not exist')
+            logging.warning(f'Warning loading config for EmailNotifier: {fn} does not exist')
 
     @property
     def receivers(self):

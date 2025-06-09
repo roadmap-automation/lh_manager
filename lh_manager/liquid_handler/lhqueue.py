@@ -1,4 +1,6 @@
 """Internal queue for feeding LH operations one at a time"""
+import logging
+
 from flask import make_response, Response
 from typing import Dict, Callable, List
 from threading import Lock
@@ -15,7 +17,7 @@ from .lhinterface import LHJob, lh_interface
 
 def validate_format(data: dict, fields: list[str]) -> bool:
     """Checks format of data input"""
-    print('data in: ', list(data.keys()))
+    logging.debug('data in: ' + repr(list(data.keys())))
     return all(val in data.keys() for val in fields)
 
 class JobRunner:
@@ -133,9 +135,9 @@ class JobQueue(BaseModel):
                 sample.stages[job.parent.stage].status = SampleStatus.FAILED
                 # TODO: Handle error condition
             elif result == ValidationStatus.UNVALIDATED:
-                print('Received ValidationStatus.UNVALIDATED; this should not happen')
+                logging.error('Received ValidationStatus.UNVALIDATED; this should not happen')
             else:
-                print(f'Received ValidationStatus {result}; this should not happen')
+                logging.error(f'Received ValidationStatus {result}; this should not happen')
 
     def update_job_result(self, job: LHJob, method_number: int, method_name: str, result: ResultStatus) -> None:
         """Update job; if it's successful, remove from active list; otherwise,

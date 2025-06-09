@@ -1,5 +1,6 @@
 """Liquid handler state initialization"""
 import json
+import logging
 import os
 from pathlib import Path
 from .samplecontainer import SampleContainer
@@ -53,7 +54,7 @@ def save_devices():
     with open(DEVICES_LOG, 'w') as f:
         f.write(json.dumps(device_manager.get_all_schema(), indent=2))
 
-print('loading state!')
+logging.info('loading state!')
 layout, samples = load_state()
 
 notifier.load_config(config.notify_path)

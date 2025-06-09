@@ -1,5 +1,6 @@
 """Waste manager initialization"""
 import json
+import logging
 import os
 import sqlite3
 
@@ -70,7 +71,7 @@ def load_waste():
         layout = WasteLayout(**json.load(open(WASTE_LOG, 'r')))
     else:
 
-        print('Creating new waste layout...')
+        logging.info('Creating new waste layout...')
 
         # Single 10L waste bottle for now
         waste_rack = Rack(columns=1,

@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import BaseModel, validator, Field, ValidationError
 from enum import Enum
 from uuid import uuid4
@@ -30,7 +32,7 @@ class MethodList(BaseModel):
                 try:
                     v[i] = method_manager.get_method_by_name(iv['method_name']).model_validate(iv)
                 except ValidationError:
-                    print(f'Attempted to process unknown method with data {iv}')
+                    logging.warning(f'Attempted to process unknown method with data {iv}')
                     v[i] = UnknownMethod(method_data=iv)
             else:
                 if not (isinstance(iv, BaseMethod)):
@@ -78,10 +80,10 @@ class MethodList(BaseModel):
         #self.prepare_run_methods(layout)
         new_methods = []
         for m in self.methods:
-            print('m', type(m))
-            print('m exploded', m.explode(layout))
+            logging.debug('m ' + repr(type(m)))
+            logging.debug('m explode' + repr(m.explode(layout)))
             for im in m.explode(layout):
-                print('im', type(im))
+                logging.debug('im ' + repr(type(im)))
                 #print(im.explode(layout))
                 for iim in im.explode(layout):
                     new_methods.append(iim)
@@ -93,7 +95,7 @@ class MethodList(BaseModel):
 
         errors = []
         for m in self.methods:
-            print(f'Executing {m}')
+            logging.info(f'Executing {m}')
             errors += [m.method.execute(layout)]
 
         return errors
@@ -178,7 +180,7 @@ class Sample(BaseModel):
 
         else:
 
-            print('Warning: undefined sample status. This should never happen!')
+            logging.warning('Warning: undefined sample status. This should never happen!')
             return None
 
 #example_method = TransferWithRinse('Test sample', 'Description of a test sample', Zone.SOLVENT, '1', '1000', '2', Zone.MIX, '1')

@@ -1,3 +1,5 @@
+import logging
+
 from typing import List, Tuple, Dict
 from dataclasses import field
 from pydantic import BaseModel
@@ -40,7 +42,7 @@ class SampleContainer(BaseModel):
     def addSample(self, sample: Sample) -> None:
         """Sample appender that checks for proper ID value"""
         if sample.id in self._getIDs():
-            print(f'Warning: id {sample.id} already taken. Sample not added.')
+            logging.warning(f'Warning: id {sample.id} already taken. Sample not added.')
         else:
             self.samples.append(sample)
     

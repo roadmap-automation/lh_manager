@@ -1,6 +1,7 @@
 import os
 import copy
 import json
+import logging
 import sqlite3
 import traceback
 
@@ -101,7 +102,7 @@ class LHJob(JobBase):
         # should be a 1-dimensional list of methods (already exploded)
         sample_name = self.method_data['method_list'][0]['sample_name']
         sample_description = self.method_data['method_list'][0]['sample_description']
-        print(self.method_data)
+        logging.info(self.method_data)
         
         createdDate = datetime.now().strftime(DATE_FORMAT)
 
@@ -322,7 +323,7 @@ class LHInterface:
 
     def throw_error(self, msg: str):
         self.has_error = True
-        print(f'Error in {self.name}\n' + msg)
+        logging.error(f'Error in {self.name}\n' + msg)
         notifier.notify(f'Error in {self.name}', msg)
 
     def activate_job(self, job: LHJob, layout: LHBedLayout, *args, **kwargs):

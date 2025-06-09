@@ -1,5 +1,6 @@
+import logging
+
 from .bedlayout import LHBedLayout, Composition, WellLocation, Well, find_composition, InferredWellLocation
-from .layoutmap import LayoutWell2ZoneWell, Zone
 from .methods import BaseMethod, register, MethodContainer, MethodsType, MethodType
 from .formulation import Formulation, SoluteFormulation
 from .distributionmethods import BaseDistributionMethod
@@ -9,8 +10,6 @@ from .lhmethods import BaseLHMethod, TransferWithRinse, MixWithRinse, InjectWith
 from .qcmdmethods import QCMDRecord, QCMDRecordTag, QCMDMeasurementDevice, BaseQCMDMethod, QCMDAcceptTransfer
 from ..waste_manager.wastedata import WasteItem, WATER
 
-import numpy as np
-from copy import copy
 from typing import List, Literal, Tuple
 
 from pydantic import Field
@@ -122,7 +121,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
             required_volume = minimum_volume + extra_volume + rinse_volume
             lipid_prep_well, error = find_well_and_volume(self.Bilayer_Solvent, required_volume, layout.get_all_wells())
             if lipid_prep_well is None:
-                print('Error: insufficient or nonexistent bilayer solvent. Aborting.')
+                logging.error('Error: insufficient or nonexistent bilayer solvent. Aborting.')
                 return []
 
             inject_rinse = ROADMAP_QCMD_LoopInjectandMeasure(Target_Composition=lipid_prep_well.composition,
@@ -440,10 +439,10 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
             composition = self.Source.expected_composition
         else:
             inferred_source = layout.infer_location(self.Source)
-            print('Source', self.Source.model_dump())
-            print('Inferred source', inferred_source.model_dump())
+            logging.info('Source', self.Source.model_dump())
+            logging.info('Inferred source', inferred_source.model_dump())
             source_well, _ = layout.get_well_and_rack(inferred_source.rack_id, inferred_source.well_number)
-            print('Source well', source_well.model_dump())
+            logging.info('Source well', source_well.model_dump())
             composition = source_well.composition
                     
         return [super().render_method(sample_name=sample_name,
@@ -528,10 +527,10 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
         # select well with sufficient volume
         target_well, error = find_well_and_volume(self.Target_Composition, required_volume, layout.get_all_wells())
         if error is not None:
-            print(f'Warning in {self.method_name}' + error + ', aborting')
+            logging.warning(f'Warning in {self.method_name}' + error + ', aborting')
             return []
         else:
-            print(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
+            logging.info(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
        
         methods += self.get_methods_from_well(target_well, target_well.composition, layout)
 
@@ -597,10 +596,10 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
         # select well with sufficient volume
         target_well, error = find_well_and_volume(self.Target_Composition, required_volume, layout.get_all_wells())
         if error is not None:
-            print(f'Warning in {self.method_name}: ' + error + ', aborting')
+            logging.warning(f'Warning in {self.method_name}: ' + error + ', aborting')
             return []
         else:
-            print(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
+            logging.info(f'Found well in rack {target_well.rack_id} with number {target_well.well_number} with composition {repr(target_well.composition)} that matches target composition {self.Target_Composition}')
 
         methods += self.get_methods_from_well(target_well, target_well.composition, layout)
 
