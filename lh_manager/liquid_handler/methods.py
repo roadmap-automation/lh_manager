@@ -2,8 +2,7 @@ import logging
 
 from pydantic import BaseModel, Field, validator
 from enum import Enum
-from copy import copy
-from typing import Any, Dict, List, Literal, Union, Set, ClassVar
+from typing import Any, Dict, List, Literal, Union
 from uuid import uuid4
 
 from .bedlayout import LHBedLayout
@@ -130,21 +129,39 @@ class MethodContainer(BaseMethod):
 
 MethodsType = Union[BaseMethod, MethodContainer]
 
+class RegisteredMethod:
+
+    def __init__(self, method: MethodsType, display: bool = True):
+        self.method = method
+        self.display = display
+
+    @property
+    def display_name(self) -> str:
+        return self.method.model_fields['method_name'].default
+
+    def get_schema(self):
+
+        return {'fields': [name for name in self.method.model_fields.keys() if name not in EXCLUDE_FIELDS],
+                'display': self.display,
+                'display_name': self.display_name,
+                'schema': self.method.model_json_schema(mode='serialization')}
+
 class MethodManager:
     """Convenience class for managing methods."""
 
     def __init__(self) -> None:
 
-        self.method_list: Set[MethodsType] = set()
+        self.methods: dict[str, RegisteredMethod] = {}
 
-    def register(self, method: MethodsType) -> None:
+    def register(self, method: MethodsType, display: bool = True) -> None:
         """Registers a method in the manager
 
         Args:
             method (BaseMethod): method to register
+            display (bool): whether to display the method in 
         """
-
-        self.method_list.add(method)
+        rmethod = RegisteredMethod(method, display=display)
+        self.methods[rmethod.display_name] = rmethod
 
     def get_all_schema(self) -> Dict[str, Dict]:
         """Gets the schema of all the methods in the manager
@@ -154,15 +171,7 @@ class MethodManager:
                                 'display_name', and 'schema'; the last is the pydantic schema
         """
 
-        lh_method_fields: Dict[str, Dict] = {}
-        for method in self.method_list:
-            fieldlist = []
-            for name, fi in method.model_fields.items():
-                if not name in EXCLUDE_FIELDS:
-                    fieldlist.append(name)
-            lh_method_fields[method.model_fields['method_name'].default] = {'fields': fieldlist, 'display_name': method.model_fields['display_name'].default, 'schema': method.model_json_schema(mode='serialization')}
-
-        return lh_method_fields
+        return {k: rm.get_schema() for k, rm in self.methods.items()}
     
     def get_method_by_name(self, method_name: str) -> MethodsType:
         """Gets method object by name
@@ -175,8 +184,8 @@ class MethodManager:
         """
 
         try:
-            return next(m for m in self.method_list if m.model_fields['method_name'].default == method_name)
-        except StopIteration:
+            return self.methods[method_name].method
+        except KeyError:
             logging.error(f'{method_name} not found')
             return BaseMethod
 
@@ -185,7 +194,13 @@ method_manager = MethodManager()
 def register(cls):
     """Decorator to register a class
     """
-    method_manager.register(cls)
+    method_manager.register(cls, display=True)
+    return cls
+
+def register_nodisplay(cls):
+    """Decorator to register a class but mark it as non-displaying
+    """
+    method_manager.register(cls, display=False)
     return cls
 
 ## ========== Methods specification =============
