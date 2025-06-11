@@ -1,6 +1,6 @@
 """Material Database Endpoints"""
 from dataclasses import asdict
-from flask import g, make_response, Response, request, Blueprint
+from flask import g, make_response, Response, request, Blueprint, current_app
 from ..sio import socketio
 
 from . import db
@@ -74,7 +74,7 @@ def material_from_sequence() -> Response:
                                         type=data.get('type', 'aa'))
     except KeyError:
         # usually because there's a problem with the sequence
-        print(f'Bad sequence {sequence} from {data}')
+        current_app.logger.error(f'Bad sequence {sequence} from {data}')
         return make_response({'material': None}, 400)
     
     mat = db.Material(name=seq.name,

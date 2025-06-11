@@ -1,5 +1,6 @@
 """Waste manager initialization"""
 import json
+import logging
 import os
 import sqlite3
 
@@ -11,8 +12,8 @@ from ...liquid_handler.bedlayout import LHBedLayout, Rack, Well, Composition
 from ...app_config import config
 from ..wastedata import WasteItem
 
-WASTE_LOG = config.log_path / 'waste.json'
-WASTE_HISTORY = config.log_path / 'waste.sqlite'
+WASTE_LOG = config.persistent_path / 'waste.json'
+WASTE_HISTORY = config.persistent_path / 'waste.sqlite'
 WASTE_RACK = 'waste'
 
 class WasteDevice(DeviceBase):
@@ -70,7 +71,7 @@ def load_waste():
         layout = WasteLayout(**json.load(open(WASTE_LOG, 'r')))
     else:
 
-        print('Creating new waste layout...')
+        logging.info('Creating new waste layout...')
 
         # Single 10L waste bottle for now
         waste_rack = Rack(columns=1,

@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import sqlite3
 import time
 
@@ -59,7 +60,7 @@ class History:
         
         self.db.commit()
 
-        print(f'Total insertion time: {time.time() - insert_start_time} seconds')
+        logging.debug(f'Total insertion time: {time.time() - insert_start_time} seconds')
 
     def _get_samples(self, field: str, value: str) -> List[Sample]:
         """Basic selection operation using WHERE

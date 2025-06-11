@@ -1,11 +1,13 @@
 """Interface for autocontrol"""
 
-from typing import List, Dict
+import copy
+import json
+import logging
 import requests
 import threading
 import time
-import copy
-import json
+
+from typing import List, Dict
 from uuid import uuid4
 
 from autocontrol.task_struct import Task, TaskData, TaskType
@@ -36,15 +38,15 @@ def verify_connection() -> bool:
     Returns:
         bool: False if any issues, otherwise True
     """
-    print('Connecting to AutoControl server...')
+    logging.info('Connecting to AutoControl server...')
     try:
         response = requests.get(AUTOCONTROL_URL)
     except requests.ConnectionError:
-        print('Autocontrol connection failed')
+        logging.error('Autocontrol connection failed')
         return False
     
     if not response.ok:
-        print(f'Autocontrol connection error, response code {response.status_code}')
+        logging.error(f'Autocontrol connection error, response code {response.status_code}')
         return False
 
     return True
@@ -212,12 +214,12 @@ def submit_tasks(tasks: List[AutocontrolTaskContainer], resubmit=False):
     with submission_lock:
         for taskcontainer in tasks:
             task = taskcontainer.task
-            print('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
+            logging.info('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
             if resubmit:
                 response = requests.post(AUTOCONTROL_URL + '/resubmit', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'task': task.model_dump(mode='json')}))
             else:
                 response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=task.model_dump_json())
-            print('Autocontrol response: ', response.status_code, response.text)
+            logging.info(f'Autocontrol response: status code {response.status_code}, {response.text}')
             if task.task_type != TaskType.INIT:
                 with active_tasks.lock:
                     if response.ok:
@@ -253,9 +255,9 @@ def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_mat
                     m.status = SampleStatus.PENDING
 
     for task in tasks:
-        print('Cancelling task: ' + str(task.id))
+        logging.info('Cancelling task: ' + str(task.id))
         response = requests.post(AUTOCONTROL_URL + '/cancel', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'include_active_queue': include_active_queue, 'drop_material': drop_material}))
-        print('Autocontrol response: ', response.status_code, response.text)
+        logging.info(f'Autocontrol response: status code {response.status_code}, {response.text}')
         with active_tasks.lock:
             if response.ok:
                 if str(task.id) in active_tasks.active:
@@ -285,7 +287,7 @@ def synchronize_status(poll_delay: int = 5):
         try:
             response = requests.get(AUTOCONTROL_URL + '/get_task_status/' + id)
         except ConnectionError:
-            print(f'Warning: Autocontrol not connected')
+            logging.warning(f'Warning: Autocontrol not connected')
             return 'not connected'
 
         if response.ok:
@@ -304,7 +306,7 @@ def synchronize_status(poll_delay: int = 5):
             if 'No task found' in response.text:
                 return 'task not found'
 
-            print(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
+            logging.warning(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
         
         return 'uncaught error'
 
@@ -357,7 +359,7 @@ def synchronize_status(poll_delay: int = 5):
                     mark_status(task_id, SampleStatus.ACTIVE)
                 elif result == 'task not found':
                     # Remove item without updating parent
-                    print(f'Warning: id {task_id} not found, marking as cancelled')
+                    logging.warning(f'Warning: id {task_id} not found, marking as cancelled')
                     mark_status(task_id, SampleStatus.CANCELLED)
 
         time.sleep(poll_delay)

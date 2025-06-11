@@ -37,8 +37,8 @@ def test_emit():
 if __name__ == '__main__':
 
     config = app_config.config
-    config.samples_path = config.log_path / 'nice_samples.json'
-    config.samples_path = config.log_path / 'nice_completed_samples.sqlite'
+    config.samples_path = config.persistent_path / 'nice_samples.json'
+    config.samples_path = config.persistent_path / 'nice_completed_samples.sqlite'
 
     socketio.run(app, host='localhost', port=5001, debug=True)
 

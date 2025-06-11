@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import BaseModel, Field, validator
 from enum import Enum
 from copy import copy
@@ -175,7 +177,7 @@ class MethodManager:
         try:
             return next(m for m in self.method_list if m.model_fields['method_name'].default == method_name)
         except StopIteration:
-            print(f'{method_name} not found')
+            logging.error(f'{method_name} not found')
             return BaseMethod
 
 method_manager = MethodManager()

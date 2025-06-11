@@ -1,3 +1,5 @@
+import logging
+
 from .bedlayout import LHBedLayout, WellLocation, Well
 from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
@@ -125,7 +127,7 @@ class LHMethodCluster(BaseLHMethod):
                 try:
                     v[i] = method_manager.get_method_by_name(iv['method_name']).model_validate(iv)
                 except ValidationError:
-                    print(f'Attempted to process unknown method with data {iv}')
+                    logging.warning(f'Attempted to process unknown method with data {iv}')
                     v[i] = UnknownMethod(method_data=iv)
             else:
                 if not (isinstance(iv, BaseMethod)):

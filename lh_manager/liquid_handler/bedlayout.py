@@ -126,12 +126,14 @@ class Composition(BaseModel):
         value_solvents = set((s.name, s.fraction / value_sum_fractions) for s in value.solvents if s.fraction > 0)
         solvents_same = (set(solvents) == set(value_solvents))
 
-        # check solutes. assumes no duplicates
+        # check solutes. assumes no duplicates, and filters negative or zero concentrations
         solutes_same = False
         self_solute_names = [s.name for s in self.solutes if s.concentration > 0]
         value_solute_names = [s.name for s in value.solutes if s.concentration > 0]
+        self_solutes = [s for s in self.solutes if s.concentration > 0]
+        value_solutes = [s for s in value.solutes if s.concentration > 0]
         if set(self_solute_names) == set(value_solute_names):
-            if all(s == value.solutes[value_solute_names.index(s.name)] for s in self.solutes):
+            if all(s == value_solutes[value_solute_names.index(s.name)] for s in self_solutes):
                 solutes_same = True
 
         return solvents_same & solutes_same

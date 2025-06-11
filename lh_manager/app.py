@@ -1,4 +1,9 @@
 from flask import Flask, render_template, redirect
+from flask.logging import default_handler
+
+# config contains logging configuration and should be imported first
+from .app_config import config
+
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .sio import socketio
@@ -6,7 +11,6 @@ from .material_db import blueprint as material_db_blueprint
 from .waste_manager.waste_api import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface
 from .autocontrol.autocontrol_api import autocontrol_blueprint
-from .app_config import config
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")

@@ -1,7 +1,7 @@
 """HTTP Endpoints for GUI API"""
 import warnings
 from copy import deepcopy
-from flask import make_response, request, Response, redirect, url_for
+from flask import make_response, request, Response, redirect, url_for, current_app
 from typing import List, Tuple, Optional
 
 from ..liquid_handler.devices import device_manager
@@ -73,7 +73,8 @@ def ExplodeSample() -> Response:
         return make_response({'error': "no stage specified, can't explode"}, 200)
 
     _, sample = samples.getSampleById(id)
-    print(data, sample)
+    current_app.logger.info(data)
+    current_app.logger.info(sample)
     """ exploding sample """
     sample.stages[stage].explode(layout)
     return make_response({'sample exploded': id}, 200)
@@ -91,7 +92,8 @@ def DuplicateSample() -> Response:
         return make_response({'error': "no id in sample, can't duplicate"}, 200)
 
     sample_index, sample = samples.getSampleById(id)
-    print(data, sample)
+    current_app.logger.info(data)
+    current_app.logger.info(sample)
     if sample is None or sample_index is None:
         """ sample not found """
         return make_response({'error': "sample not found, can't duplicate"}, 200)
@@ -131,7 +133,8 @@ def RemoveSample() -> Response:
         return make_response({'error': "no id in sample, can't delete"}, 200)
 
     sample_index, sample = samples.getSampleById(id)
-    print(data, sample)
+    current_app.logger.info(data)
+    current_app.logger.info(sample)
     if sample is None or sample_index is None:
         """ sample not found """
         return make_response({'error': "sample not found, can't delete"}, 200)
@@ -152,7 +155,8 @@ def ArchiveandRemoveSample() -> Response:
         return make_response({'error': "no id in sample, can't archive"}, 200)
 
     sample_index, sample = samples.getSampleById(id)
-    print(data, sample)
+    current_app.logger.info(data)
+    current_app.logger.info(sample)
     if sample is None or sample_index is None:
         """ sample not found """
         return make_response({'error': "sample not found, can't archive"}, 200)

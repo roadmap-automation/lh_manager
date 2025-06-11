@@ -1,5 +1,6 @@
 from typing import List, Tuple, Literal
 from copy import copy, deepcopy
+import logging
 import numpy as np
 from scipy.optimize import nnls
 from pydantic import Field, validator, SerializeAsAny
@@ -55,40 +56,40 @@ class Formulation(MethodContainer):
 
         # 1. Create target vector from target composition.
         target_names, target_vector, target_units = self.make_target_vector()
-        print(f'target names: {target_names}')
-        print(f'target vector: {target_vector}')
+        logging.info(f'target names: {target_names}')
+        logging.info(f'target vector: {target_vector}')
 
         # 2. get all components in layout and zones and check that the required solutions are available
         #    based on whether an exact match is required
         source_wells, source_components = self.select_wells(self.get_all_wells(layout), target_names)
 
         if not len(source_wells):
-            print('Cannot create formulation: no acceptable solutions available')
+            logging.error('Cannot create formulation: no acceptable solutions available')
             self._formulation_results = [], [], False
         
         # 3. Check that all components of target are present in layout
         for target_name in target_names:
             if target_name not in source_components:
-                print(f'Cannot make formulation: {target_name} is missing')
+                logging.error(f'Cannot make formulation: {target_name} is missing')
                 self._formulation_results = [], [], False
                 return self._formulation_results
 
         # 4. Attempt to solve
         success = False
         while not success:
-            print(f'Source wells: {source_wells}')
+            logging.info(f'Source wells: {source_wells}')
             source_matrix, source_wells = self.make_source_matrix(target_names, source_wells, target_units)
 
-            print(f'Source matrix: {source_matrix}')
+            logging.info(f'Source matrix: {source_matrix}')
 
             # 3. Solve
             sol, res = nnls(source_matrix, target_vector)
 
             if np.isclose(res, 0.0, atol=1e-9):
-                print(f'Good residual {res:0.0e}, solution {sol}')
+                logging.info(f'Good residual {res:0.0e}, solution {sol}')
                 success = True
             else:
-                print(f'Bad residual {res:0.0e}, quitting formulation')
+                logging.warning(f'Bad residual {res:0.0e}, quitting formulation')
                 success = False
                 break
 
@@ -98,7 +99,7 @@ class Formulation(MethodContainer):
 
             for well, source_well_volume, required_volume in zip(source_wells, source_well_volumes, required_volumes):
                 if (required_volume + layout.racks[well.rack_id].min_volume) > source_well_volume :
-                    print(f'Well {well} has volume {source_well_volume}, needs volume {required_volume} plus minimum volume {layout.racks[well.rack_id].min_volume}, removing it')
+                    logging.error(f'Well {well} has volume {source_well_volume}, needs volume {required_volume} plus minimum volume {layout.racks[well.rack_id].min_volume}, removing it')
                     source_wells.pop(source_wells.index(well))
                     success = False
 
@@ -111,7 +112,7 @@ class Formulation(MethodContainer):
                 result_wells.append(well)
 
         self._formulation_results = volumes, result_wells, success
-        print(self._formulation_results)
+        logging.info(self._formulation_results)
 
         return self._formulation_results
 
@@ -344,7 +345,7 @@ class SoluteFormulation(Formulation):
         diluent_well = next((well for well in self.get_all_wells(layout) if well.composition == self.diluent), None)
         
         if diluent_well is None:        
-            print(f'Diluent ({self.diluent}) not available on bed')
+            logging.error(f'Diluent ({self.diluent}) not available on bed')
             return [], [], False
         
         diluent_volume = self.target_volume - sum(volumes)
@@ -356,7 +357,7 @@ class SoluteFormulation(Formulation):
 
             # only check for this if diluent volume is not close to zero
             if diluent_volume < 0:
-                print(f'Diluent volume less than zero; should never happen')
+                logging.error(f'Diluent volume less than zero; should never happen')
                 return [], [], False
 
         return volumes, wells, True
