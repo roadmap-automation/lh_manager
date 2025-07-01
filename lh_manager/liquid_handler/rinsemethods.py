@@ -58,4 +58,23 @@ class RinseInitiateTransfer(BaseRinseMethod):
         return [self.sub_method(method_name=self.method_name,
                                 method_data={}
                                 ).to_dict()]
-    
+
+@register
+class PrimeRinseLoop(BaseRinseMethod):
+    """Primes the rinse system loop"""
+
+    display_name: Literal['Prime Rinse Loop'] = 'Prime Rinse Loop'
+    method_name: Literal['PrimeRinseLoop'] = 'PrimeRinseLoop'
+    number_of_primes: int = 1
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [self.sub_method(method_name=self.method_name,
+                                method_data=dict(number_of_primes=self.number_of_primes)
+                                ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return 40.0

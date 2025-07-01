@@ -160,3 +160,25 @@ class QCMDStop(BaseQCMDMethod):
 
     def estimated_time(self, layout: LHBedLayout) -> float:
         return 0.0
+    
+@register
+class QCMDStart(BaseQCMDMethod):
+    """Starts QCMD recording"""
+
+    display_name: Literal['QCMD Start'] = 'QCMD Start'
+    method_name: Literal['QCMDStart'] = 'QCMDStart'
+    Description: str = ''
+    Temperature: float = 25.0    
+
+    def render_method(self,
+                         sample_name: str,
+                         sample_description: str,
+                         layout: LHBedLayout) -> List[dict]:
+        
+        return [self.sub_method(method_name=self.method_name,
+                                method_data=dict(description=self.Description,
+                                                 temperature=self.Temperature)
+                                ).to_dict()]
+
+    def estimated_time(self, layout: LHBedLayout) -> float:
+        return 90.0
