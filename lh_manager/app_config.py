@@ -30,26 +30,3 @@ class Config:
     stage_names: list[str] = ['prep', 'inject']
 
 config = Config()
-
-dictConfig({
-    'version': 1,
-    'formatters': {'default': {
-        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
-    }},
-    'handlers': {'stream': {
-        'class': 'logging.StreamHandler',
-        'stream': 'ext://sys.stdout',
-        'level': 'INFO',
-        'formatter': 'default'
-    },
-    'file': {
-        'class': 'logging.FileHandler',
-        'filename': config.log_path / (datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '_manager_log.txt'),
-        'level': 'INFO',
-        'formatter': 'default'
-    }},
-    'root': {
-        'level': 'INFO',
-        'handlers': ['stream', 'file']
-    }
-})

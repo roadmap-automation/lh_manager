@@ -1,8 +1,32 @@
+import datetime
 from flask import Flask, render_template, redirect
-from flask.logging import default_handler
+from logging.config import dictConfig
 
 # config contains logging configuration and should be imported first
 from .app_config import config
+
+dictConfig({
+    'version': 1,
+    'formatters': {'default': {
+        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+    }},
+    'handlers': {'stream': {
+        'class': 'logging.StreamHandler',
+        'stream': 'ext://sys.stdout',
+        'level': 'INFO',
+        'formatter': 'default'
+    },
+    'file': {
+        'class': 'logging.FileHandler',
+        'filename': config.log_path / (datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '_manager_log.txt'),
+        'level': 'INFO',
+        'formatter': 'default'
+    }},
+    'root': {
+        'level': 'INFO',
+        'handlers': ['stream', 'file']
+    }
+})
 
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
