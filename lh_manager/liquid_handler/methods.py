@@ -137,6 +137,10 @@ class RegisteredMethod:
 
     @property
     def display_name(self) -> str:
+        return self.method.model_fields['display_name'].default
+    
+    @property
+    def name(self) -> str:
         return self.method.model_fields['method_name'].default
 
     def get_schema(self):
@@ -161,7 +165,7 @@ class MethodManager:
             display (bool): whether to display the method in 
         """
         rmethod = RegisteredMethod(method, display=display)
-        self.methods[rmethod.display_name] = rmethod
+        self.methods[rmethod.name] = rmethod
 
     def get_all_schema(self) -> Dict[str, Dict]:
         """Gets the schema of all the methods in the manager
