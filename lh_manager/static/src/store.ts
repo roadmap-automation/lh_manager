@@ -379,6 +379,27 @@ export function move_method(sample_id: string, stage_name: string, method_index:
     }
   }
 
+  export function reuse_all_methods(sample_id: string, stage_name: string) {
+    const sample = get_sample_by_id(sample_id);
+    if (sample !== undefined) {
+      const s: Sample = structuredClone(toRaw(sample));
+      const { stages } = s;
+      const stage = stages[stage_name];
+      const all_methods = stage.active;
+      const new_methods = structuredClone(toRaw(all_methods))
+      new_methods.forEach((method) => {
+        method.id = null
+        method.tasks = []
+        method.status = 'inactive'
+        stage.methods.push(method)
+      })
+      const num_methods = stage.methods.length
+      update_sample(s);
+      active_stage.value = stage_name;
+      active_method_index.value = num_methods - 1;
+    }
+  }
+
 export function remove_method(sample_id: string, stage_name: string, method_index: number) {
   const sample = get_sample_by_id(sample_id);
   if (sample !== undefined) {

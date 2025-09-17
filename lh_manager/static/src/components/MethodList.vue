@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods } from '../store';
 import type { MethodType } from '../store';
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
@@ -10,7 +10,8 @@ const props = defineProps<{
   stage_name: string,
   methods: MethodType[],
   editable: boolean,
-  stage_label: string
+  stage_label: string,
+  display_label: string,
 }>();
 
 // const active_well_field = ref<string | null>(null);
@@ -86,6 +87,17 @@ const status = computed(() => {
 </script>
 
 <template>
+  <div class="stage-label">
+    {{ props.display_label }}
+    <button
+      v-if="(props.stage_label === 'active')"
+      type="button"
+      class="btn-close btn-sm align-middle arrow-90deg-up"
+      aria-label="Reuse all methods"
+      title="Reuse all methods"
+      @click.stop="reuse_all_methods(props.sample_id, props.stage_name)">
+    </button>
+  </div>
   <div class="accordion accordion-flush">
     <div class="accordion-item" v-for="(method, index) of methods" :key="index">
       <h2 class="accordion-header">
@@ -162,7 +174,7 @@ const status = computed(() => {
       </div>
     </div>
     <select v-if="props.editable" class="form-select form-select-sm text-primary outline-primary"
-      @change="add_method(sample_id, stage_name, $event)" value="">
+      @change="add_method(props.sample_id, props.stage_name, $event)" value="">
       <option class="disabled" disabled selected value="">+ Add method</option>
       <option v-for="(mdef, mname) of method_defs" :value="mname">{{ mdef.display_name }}</option>
     </select>
@@ -220,6 +232,11 @@ const status = computed(() => {
 .btn-method {
     margin-left: 4px;
 }
+
+.stage-label {
+  font-style:italic;
+}
+
 
 input.number {
   width: 10em;
