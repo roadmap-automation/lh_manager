@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks } from '../store';
 import type { MethodType } from '../store';
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
@@ -44,6 +44,14 @@ function toggleItem(method_index) {
       active_well_field.value = null;
     }
   }
+}
+
+function any_methodlist_tasks_pending() {
+  return props.methods.some((method) => any_method_tasks_pending(method));
+}
+
+function any_method_tasks_pending(method: MethodType) {
+  return method.tasks.some((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'active'));
 }
 
 function method_string(method: MethodType) {
@@ -97,6 +105,14 @@ const status = computed(() => {
       title="Reuse all methods"
       @click.stop="reuse_all_methods(props.sample_id, props.stage_name)">
     </button>
+    <button
+      v-if="(props.stage_label === 'active') && any_methodlist_tasks_pending()"
+      type="button"
+      class="btn-close btn-sm align-middle dash-circle-fill"
+      aria-label="Cancel all tasks"
+      title="Cancel all tasks"
+      @click.stop="cancel_all_tasks(props.sample_id, props.stage_name)">
+    </button>    
   </div>
   <div class="accordion accordion-flush">
     <div class="accordion-item" v-for="(method, index) of methods" :key="index">
@@ -132,13 +148,21 @@ const status = computed(() => {
             @click.stop="reuse_method(sample_id, stage_name, index)">
           </button>      
           <button
-            v-if="(props.stage_label === 'active') && !(method.status === 'completed')"
+            v-if="(props.stage_label === 'active') && any_method_tasks_pending(method)"
             type="button"
             class="btn-close btn-sm align-middle arrow-repeat"
             aria-label="Resubmit all tasks"
             title="Resubmit all tasks"
             @click.stop="resubmit_all_tasks(sample_id, stage_name, index)">
-          </button>                  
+          </button>
+          <button
+            v-if="(props.stage_label === 'active') && any_method_tasks_pending(method)"
+            type="button"
+            class="btn-close btn-sm align-middle dash-circle-fill"
+            aria-label="Cancel all tasks"
+            title="Cancel all tasks"
+            @click.stop="cancel_all_tasks(props.sample_id, props.stage_name, index)">
+          </button>              
           <button
             v-if="props.editable"
             class="btn-close btn-sm btn-danger trash"
@@ -205,6 +229,10 @@ const status = computed(() => {
 </style>
 
 <style scoped>
+.btn-close.dash-circle-fill {
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-dash-circle-fill' viewBox='0 0 16 16'><path d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M4.5 7.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1z'/></svg>")
+}
+
 .btn-close.edit {
   background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-pencil-square' viewBox='0 0 16 16'><path d='M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z'/><path fill-rule='evenodd' d='M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z'/></svg>")
 }

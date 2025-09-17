@@ -538,6 +538,49 @@ export async function resubmit_all_tasks(sample_id: string, stage: string, metho
   }
 }
 
+export async function cancel_all_tasks(sample_id: string, stage: string, method_index?: number): Promise<object> {
+  const sample = get_sample_by_id(sample_id);
+  if (sample !== undefined) {
+
+    // return all pending tasks and cancel them
+    const s: Sample = structuredClone(toRaw(sample));
+    const methods = method_index ? [s.stages[stage].active[method_index]] : s.stages[stage].active;
+    const incomplete_tasks = methods.map((method) => {
+      return method.tasks.filter((task) => (task.status === 'pending') || (task.status === 'error'))
+    });
+    const tasklist = incomplete_tasks.flat().map((task) => {
+      return task.task;
+    });
+    if (tasklist.length) {
+      const update_result = await fetch("/GUI/CancelTasks/", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks: tasklist, include_active_queue: false, drop_material: false })
+      });
+      const response_body = await update_result.json();
+      return response_body;
+    }
+
+    // return all active tasks and cancel them, dropping the material. Unclear whether these two operations need to be
+    // separated or not
+    const active_tasks = methods.map((method) => {
+      return method.tasks.filter((task) => (task.status === 'active'))
+    });
+    const active_tasklist = active_tasks.flat().map((task) => {
+      return task.task;
+    });
+    if (active_tasklist.length) {
+      const update_result = await fetch("/GUI/CancelTasks/", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks: tasklist, include_active_queue: true, drop_material: true })
+      });
+      const response_body = await update_result.json();
+      return response_body;
+    }
+  }
+}
+
 export async function resubmit_task(task: TaskType): Promise<object> {
   const update_result = await fetch("/GUI/ResubmitTasks/", {
     method: "POST",
