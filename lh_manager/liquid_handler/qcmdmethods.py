@@ -23,6 +23,8 @@ class QCMDMeasurementDevice(DeviceBase):
 qcmddevice = QCMDMeasurementDevice()
 device_manager.register(qcmddevice)
 
+ORIGIN = qcmddevice.device_name
+
 class BaseQCMDMethod(BaseMethod):
     """Base class for LH methods"""
 
@@ -44,7 +46,7 @@ class BaseQCMDMethod(BaseMethod):
 
             return d2
 
-@register
+@register(origin=ORIGIN)
 class QCMDInit(BaseQCMDMethod):
     """Initialize QCMD instrument"""
     display_name: Literal['QCMD Init'] = 'QCMD Init'
@@ -62,7 +64,7 @@ class QCMDInit(BaseQCMDMethod):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return 0.0
 
-@register
+@register(origin=ORIGIN)
 class QCMDSleep(BaseQCMDMethod):
     """Sleep the QCMD instrument"""
     sleep_time: float = 10.0
@@ -82,7 +84,7 @@ class QCMDSleep(BaseQCMDMethod):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time
 
-@register
+@register(origin=ORIGIN)
 class QCMDAcceptTransfer(BaseQCMDMethod):
     """Register a solution in the QCMD instrument"""
     contents: Composition = Field(default_factory=Composition)
@@ -98,7 +100,7 @@ class QCMDAcceptTransfer(BaseQCMDMethod):
                                 method_data=dict(contents=self.contents)
                                 ).to_dict()]
 
-@register
+@register(origin=ORIGIN)
 class QCMDRecord(BaseQCMDMethod):
     """Record QCMD measurements"""
     record_time: float = 60.0
@@ -120,7 +122,7 @@ class QCMDRecord(BaseQCMDMethod):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time + self.record_time
 
-@register
+@register(origin=ORIGIN)
 class QCMDRecordTag(QCMDRecord):
     """Record QCMD measurements"""
     tag_name: str = ''
@@ -142,7 +144,7 @@ class QCMDRecordTag(QCMDRecord):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time + self.record_time
 
-@register
+@register(origin=ORIGIN)
 class QCMDStop(BaseQCMDMethod):
     """Stops QCMD recording"""
 
@@ -161,7 +163,7 @@ class QCMDStop(BaseQCMDMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return 0.0
     
-@register
+@register(origin=ORIGIN)
 class QCMDStart(BaseQCMDMethod):
     """Starts QCMD recording"""
 

@@ -9,7 +9,9 @@ from .lhmethods import InjectMethod, InjectWithRinse, MixMethod, MixWithRinse, T
 from .bedlayout import LHBedLayout, WellLocation
 from .methods import MethodContainer, MethodsType, register, method_manager
 
-@register
+ORIGIN = None
+
+@register(origin=ORIGIN)
 class SerialDilution(MethodContainer):
 
     # Defined from BaseMethod
@@ -140,7 +142,7 @@ class SerialDilution(MethodContainer):
         return methods
 
 
-@register
+@register(origin=ORIGIN)
 class SerialDilutionInject(SerialDilution):
 
     method_name: Literal['SerialDilutionInject'] = 'SerialDilutionInject'
@@ -176,7 +178,7 @@ class SerialDilutionInject(SerialDilution):
 
         return methods
 
-@register
+@register(origin=ORIGIN)
 class StandardDilution(MethodContainer):
 
     # Defined from BaseMethod
@@ -285,7 +287,7 @@ class StandardDilution(MethodContainer):
 
         return methods
 
-@register
+@register(origin=ORIGIN)
 class StandardDilutionInject(StandardDilution):
 
     # Defined from BaseMethod

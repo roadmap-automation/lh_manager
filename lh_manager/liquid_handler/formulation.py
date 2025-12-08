@@ -12,9 +12,10 @@ from .layoutmap import Zone, LayoutWell2ZoneWell
 from .samplelist import example_sample_list
 from .methods import MethodContainer, MethodsType, register, method_manager
 
+ORIGIN = None
 ZERO_VOLUME_TOLERANCE = 1e-3
 
-@register
+@register(origin=ORIGIN)
 class Formulation(MethodContainer):
 
     # Defined from BaseMethod
@@ -317,7 +318,7 @@ class Formulation(MethodContainer):
 
 # TODO: NEEDS TESTING
 
-@register
+@register(origin=ORIGIN)
 class SoluteFormulation(Formulation):
     """Subclass of Formulation. In target_composition, specify only the solutes
         of interest; any missing volume will be filled in with the diluent. Diluent

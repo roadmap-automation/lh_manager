@@ -14,6 +14,8 @@ from typing import List, Literal, Tuple
 
 from pydantic import Field
 
+ORIGIN = 'ROADMAP'
+
 def find_well_and_volume(composition: Composition, volume: float, wells: List[Well]) -> Tuple[Well | None, str | None]:
     """Finds the well with the target composition and the most available volume
 
@@ -38,25 +40,25 @@ def find_well_and_volume(composition: Composition, volume: float, wells: List[We
 
     return well_candidates[well_volumes.index(max(well_volumes))], None
 
-@register    
+@register(origin=ORIGIN)    
 class TransferOrganicsWithRinse(TransferWithRinse):
     Flow_Rate: float = 1.0
     Aspirate_Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
-@register
+@register(origin=ORIGIN)
 class MixOrganicsWithRinse(MixWithRinse):
     Flow_Rate: float = 1.0
     Aspirate_Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
-@register
+@register(origin=ORIGIN)
 class InjectOrganicsWithRinse(InjectWithRinse):
     Aspirate_Flow_Rate: float = 1.0
     Flow_Rate: float = 2.0
     Use_Liquid_Level_Detection: bool = False
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_MakeBilayer(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Bilayer_Solvent: Composition = Field(default_factory=Composition)
@@ -229,7 +231,7 @@ class ROADMAP_QCMD_MakeBilayer(MethodContainer):
 
         return methods
 
-@register
+@register(origin=ORIGIN)
 class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
     display_name: Literal['IS + LH Sleep'] = 'IS + LH Sleep'
     method_name: Literal['IS_LH_Sleep'] = 'IS_LH_Sleep'
@@ -255,7 +257,7 @@ class MultiInstrumentSleep(BaseInjectionSystemMethod, BaseLHMethod):
                 method_data={'sleep_time': self.Injection_System_Sleep_Time}
             ).to_dict()]    
 
-@register
+@register(origin=ORIGIN)
 class MultiTransfer(MethodContainer):
     Source: WellLocation = Field(default_factory=WellLocation)
     display_name: Literal['TestWellInference'] = 'TestWellInference'
@@ -298,7 +300,7 @@ class MultiTransfer(MethodContainer):
 
         return methods
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -336,7 +338,7 @@ class ROADMAP_LoadLoop_Sync(ROADMAP_QCMD_LoadLoop, BaseInjectionSystemMethod):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Flow_Rate + self.Volume / self.Flow_Rate
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
     """Inject contents of injection system loop"""
     Use_Bubble_Sensors: bool = True
@@ -361,7 +363,7 @@ class ROADMAP_InjectLooptoQCMD(InjectLoop, QCMDAcceptTransfer):
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Flow_Rate
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
     """Flush direct injection line with carrier liquid"""
     Volume: float = 3.0
@@ -414,7 +416,7 @@ class ROADMAP_DirectInjectPrime(BaseLHMethod, BaseInjectionSystemMethod):
 
         return WasteItem(volume=self.Volume, composition=layout.carrier_well.composition)
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemMethod, BaseQCMDMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -463,7 +465,7 @@ class ROADMAP_DirectInjecttoQCMD(ROADMAP_QCMD_DirectInject, BaseInjectionSystemM
     def estimated_time(self, layout: LHBedLayout) -> float:
         return self.Volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Target_Composition: Composition = Field(default_factory=Composition)
@@ -536,7 +538,7 @@ class ROADMAP_QCMD_LoopInjectandMeasure(MethodContainer):
 
         return methods
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
     """Make a bilayer with solvent exchange"""
     Target_Composition: Composition = Field(default_factory=Composition)
@@ -607,7 +609,7 @@ class ROADMAP_QCMD_DirectInjectandMeasure(MethodContainer):
 
 # ============= Rinse system methods ==============
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_RinseDirectInjecttoQCMD(BaseInjectionSystemMethod):
     """Direct injection to QCMD via rinse system"""
     Rinse_Composition: Composition = Field(default_factory=Composition)
@@ -651,7 +653,7 @@ class ROADMAP_RinseDirectInjecttoQCMD(BaseInjectionSystemMethod):
         total_volume = self.Extra_Volume + self.Volume + 2 * self.Air_Gap
         return 60 * (total_volume / self.Aspirate_Flow_Rate + self.Volume / self.Injection_Flow_Rate + (self.Rinse_Volume + self.Extra_Volume) / self.Load_Flow_Rate)
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_RinseLoopInjectandMeasure(MethodContainer):
     """Use rinse system to do a loop injection to QCMD"""
     Target_Composition: Composition = Field(default_factory=Composition)
@@ -711,7 +713,7 @@ class ROADMAP_QCMD_RinseLoopInjectandMeasure(MethodContainer):
 
         return methods
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_RinseDirectInjectandMeasure(MethodContainer):
     """Use rinse system to do a loop injection to QCMD"""
     Target_Composition: Composition = Field(default_factory=Composition)

@@ -1,3 +1,4 @@
+import functools
 import logging
 
 from pydantic import BaseModel, Field, validator
@@ -131,9 +132,10 @@ MethodsType = Union[BaseMethod, MethodContainer]
 
 class RegisteredMethod:
 
-    def __init__(self, method: MethodsType, display: bool = True):
+    def __init__(self, method: MethodsType, display: bool = True, origin: str | None = None) -> None:
         self.method = method
         self.display = display
+        self.origin = origin
 
     @property
     def display_name(self) -> str:
@@ -148,6 +150,7 @@ class RegisteredMethod:
         return {'fields': [name for name in self.method.model_fields.keys() if name not in EXCLUDE_FIELDS],
                 'display': self.display,
                 'display_name': self.display_name,
+                'origin': self.origin,
                 'schema': self.method.model_json_schema(mode='serialization')}
 
 class MethodManager:
@@ -157,14 +160,14 @@ class MethodManager:
 
         self.methods: dict[str, RegisteredMethod] = {}
 
-    def register(self, method: MethodsType, display: bool = True) -> None:
+    def register(self, method: MethodsType, display: bool = True, origin: str | None = None) -> None:
         """Registers a method in the manager
 
         Args:
             method (BaseMethod): method to register
             display (bool): whether to display the method in 
         """
-        rmethod = RegisteredMethod(method, display=display)
+        rmethod = RegisteredMethod(method, display=display, origin=origin)
         self.methods[rmethod.name] = rmethod
 
     def get_all_schema(self) -> Dict[str, Dict]:
@@ -195,17 +198,15 @@ class MethodManager:
 
 method_manager = MethodManager()
 
-def register(cls):
-    """Decorator to register a class
+def register(display: bool = True, origin: str | None = None):
+    """Decorator factory to register a class with an origin classification
     """
-    method_manager.register(cls, display=True)
-    return cls
-
-def register_nodisplay(cls):
-    """Decorator to register a class but mark it as non-displaying
-    """
-    method_manager.register(cls, display=False)
-    return cls
+    
+    def decorator(cls):
+        method_manager.register(cls, display=display, origin=origin)
+        return cls
+    
+    return decorator
 
 ## ========== Methods specification =============
 # methods must be registered in methods manager

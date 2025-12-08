@@ -32,6 +32,7 @@ lhdevice = LHDevice()
 device_manager.register(lhdevice)
 
 EXCLUDE_FIELDS = ['status', 'tasks']
+ORIGIN = str(lhdevice.device_name)
 
 class BaseLHMethod(BaseMethod):
     """Base class for LH methods"""
@@ -273,7 +274,7 @@ class TransferMethod(BaseLHMethod):
         target_well.mix_with(self.Volume, source_well.composition)
 
 
-@register
+@register(origin=ORIGIN)
 class TransferWithRinse(TransferMethod):
     """Transfer with rinse"""
 
@@ -357,7 +358,7 @@ class TransferWithRinse(TransferMethod):
 
         return new_waste
 
-@register
+@register(origin=ORIGIN)
 class MixWithRinse(MixMethod):
     """Inject with rinse"""
     # Target and Volume defined in MixMethod
@@ -445,7 +446,7 @@ class MixWithRinse(MixMethod):
         return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate) + self.Air_Gap / 0.3 + base_time + rinse_time
 
 
-@register
+@register(origin=ORIGIN)
 class InjectWithRinse(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -519,7 +520,7 @@ class InjectWithRinse(InjectMethod):
 
         return new_waste
 
-@register
+@register(origin=ORIGIN)
 class Sleep(BaseLHMethod):
     """Sleep"""
 
@@ -546,7 +547,7 @@ class Sleep(BaseLHMethod):
         base_time = super().estimated_time(layout)
         return float(self.Time) + base_time
 
-@register
+@register(origin=ORIGIN)
 class Prime(BaseLHMethod):
     """Prime"""
 
@@ -584,7 +585,7 @@ class Prime(BaseLHMethod):
     def waste(self, layout: LHBedLayout) -> WasteItem:
         return WasteItem(volume=self.Volume * self.Repeats, composition=layout.carrier_well.composition)
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_LoadLoop(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -659,7 +660,7 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
     def sample_volume(self):
         return self.Volume + self.Extra_Volume
 
-@register
+@register(origin=ORIGIN)
 class ROADMAP_QCMD_DirectInject(InjectMethod):
     """Direct Inject with rinse"""
     #Source: WellLocation defined in InjectMethod

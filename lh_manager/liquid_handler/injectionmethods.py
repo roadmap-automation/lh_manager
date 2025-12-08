@@ -28,6 +28,8 @@ class InjectionSystemDevice(DeviceBase):
 injectionsystem = InjectionSystemDevice()
 device_manager.register(injectionsystem)
 
+ORIGIN = injectionsystem.device_name
+
 class BaseInjectionSystemMethod(BaseMethod):
     """Base class for LH methods"""
 
@@ -49,7 +51,7 @@ class BaseInjectionSystemMethod(BaseMethod):
 
             return d2
 
-@register
+@register(origin=ORIGIN)
 class RoadmapChannelInit(BaseInjectionSystemMethod):
     """Initialize QCMD instrument"""
     display_name: Literal['Init Injection System'] = 'Init Injection System'
@@ -70,7 +72,7 @@ class RoadmapChannelInit(BaseInjectionSystemMethod):
         return 0.0
 
 
-@register
+@register(origin=ORIGIN)
 class RoadmapChannelSleep(BaseInjectionSystemMethod):
     """Initialize QCMD instrument"""
     display_name: Literal['Sleep Injection System'] = 'Sleep Injection System'
@@ -92,7 +94,7 @@ class RoadmapChannelSleep(BaseInjectionSystemMethod):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return self.sleep_time
 
-@register
+@register(origin=ORIGIN)
 class PrimeLoop(BaseInjectionSystemMethod):
     """Prime a loop"""
     number_of_primes: int = 3
@@ -114,7 +116,7 @@ class PrimeLoop(BaseInjectionSystemMethod):
         # flow rates are not defined, so can't really do this. Need to know loop volume and aspirate and dispense flow rates
         return 0.0
     
-@register
+@register(origin=ORIGIN)
 class InjectLoop(BaseInjectionSystemMethod):
     """Inject contents of injection system loop"""
     Volume: float = 0
@@ -140,7 +142,7 @@ class InjectLoop(BaseInjectionSystemMethod):
 
 # =========== Rinse system methods ============
 
-@register
+@register(origin=ORIGIN)
 class RinseLoadLoop(BaseInjectionSystemMethod):
     """Load injection system loop via rinse system"""
     Rinse_Composition: Composition = Field(default_factory=Composition)
@@ -180,7 +182,7 @@ class RinseLoadLoop(BaseInjectionSystemMethod):
         total_volume = self.Extra_Volume + self.Volume + 2 * self.Air_Gap
         return 60 * (total_volume / self.Aspirate_Flow_Rate + total_volume / self.Flow_Rate + self.Rinse_Volume / self.Flow_Rate)
     
-@register
+@register(origin=ORIGIN)
 class RinseLoadLoopBubbleSensor(RinseLoadLoop):
     """Inject contents of injection system loop"""
     display_name: Literal['Load Injection Loop from Rinse with Bubble Sensor'] = 'Load Injection Loop from Rinse with Bubble Sensor'
@@ -209,7 +211,7 @@ class RinseLoadLoopBubbleSensor(RinseLoadLoop):
         total_volume = self.Extra_Volume + self.Volume + 2 * self.Air_Gap
         return 60 * (total_volume / self.Aspirate_Flow_Rate + total_volume / self.Flow_Rate + self.Rinse_Volume / self.Flow_Rate)
     
-@register
+@register(origin=ORIGIN)
 class RinseDirectInjectPrime(BaseInjectionSystemMethod, BaseRinseMethod):
     """Prime injection system loop via rinse system"""
     Volume: float = 1 # ml
