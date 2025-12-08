@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks } from '../store';
 import type { MethodType } from '../store';
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
@@ -200,7 +200,9 @@ const status = computed(() => {
     <select v-if="props.editable" class="form-select form-select-sm text-primary outline-primary"
       @change="add_method(props.sample_id, props.stage_name, $event)" value="">
       <option class="disabled" disabled selected value="">+ Add method</option>
-      <option v-for="(mdef, mname) of method_defs" :value="mname">{{ mdef.display_name }}</option>
+      <optgroup v-for="(methods, origin) in grouped_method_defs" :label="origin">
+        <option v-for="[mname, mdef] of methods" :value="mname">{{ mdef.display_name }}</option>
+      </optgroup>
     </select>
   </div>
 </template>

@@ -4,6 +4,7 @@ import Modal from 'bootstrap/js/src/modal';
 import mitt from 'mitt';
 
 export interface MethodDef {
+  origin?: string | null,
   display_name: string,
   fields: string[],
   schema: {
@@ -909,3 +910,14 @@ export const active_method_index = ref<number | null>(null);
 export const active_stage = ref<string | null>(null);
 export const active_stage_label = ref<string | null>(null);
 export const active_well_field = ref<WellFieldName | null>(null);
+export const grouped_method_defs = computed(() => {
+  const groups: { [origin: string]: [string, MethodDef][] } = {};
+  Object.entries(method_defs.value).forEach(([mname, mdef]) => {
+    const origin = mdef.origin || 'General';
+    if (!groups[origin]) {
+      groups[origin] = [];
+    }
+    groups[origin].push([mname, mdef]);
+  });
+  return groups;
+});
