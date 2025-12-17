@@ -4,7 +4,8 @@
 import traceback
 
 from flask import make_response, Response, request
-
+from ..liquid_handler.bedlayout import Composition
+from ..liquid_handler.formulation import solve_formulation
 from ..liquid_handler.job import ResultStatus, ValidationStatus
 from ..liquid_handler.lhinterface import LHJob, lh_interface, LHJobHistory, InterfaceStatus
 from ..liquid_handler.state import layout
@@ -115,6 +116,34 @@ def SubmitJob() -> Response:
     lh_interface.activate_job(job, layout)
 
     return make_response({'success': 'job accepted'}, 200)
+
+@lh_blueprint.route('/LH/CheckFormulation/', methods=['POST'])
+def CheckFormulation() -> Response:
+    """Checks if a formulation is possible given the current layout."""
+    data = request.get_json(force=True)
+    
+    try:
+        target_composition = Composition(**data.get('target_composition', {}))
+        target_volume = float(data.get('target_volume', 0.0))
+        exact_match = bool(data.get('exact_match', True))
+        
+        # Call the helper function directly
+        result = solve_formulation(
+            layout=layout,
+            target_composition=target_composition,
+            target_volume=target_volume,
+            exact_match=exact_match
+            # include_zones uses default
+        )
+        
+        # Serialize wells in the result
+        if result['wells']:
+            result['wells'] = [w.model_dump() for w in result['wells']]
+            
+        return make_response(result, 200)
+        
+    except Exception as e:
+        return make_response({'success': False, 'error': str(e)}, 400)
 
 @lh_blueprint.route('/LH/GetListofSampleLists/', methods=['GET'])
 def GetListofSampleLists() -> Response:

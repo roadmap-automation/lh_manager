@@ -21,7 +21,7 @@ from urllib.parse import urljoin
 import aiohttp
 import requests
 
-from ..liquid_handler.bedlayout import LHBedLayout, Rack, Solute, Solvent, Well, WellLocation
+from ..liquid_handler.bedlayout import LHBedLayout, Rack, Solute, Solvent, Well, WellLocation, Composition
 from ..liquid_handler.methods import BaseMethod
 from ..liquid_handler.samplelist import Sample
 from ..material_db.db import Material
@@ -348,6 +348,27 @@ class AsyncManagerClient:
     async def submit_job(self, job_data: Dict):
         """Submits a raw LHJob object."""
         return await self._request('POST', '/LH/SubmitJob/', json=job_data)
+
+    async def check_formulation(self, 
+                                target_composition: Composition, 
+                                target_volume: float, 
+                                exact_match: bool = True) -> Dict[str, Any]:
+        """Checks if a target composition can be formulated.
+
+        Args:
+            target_composition (Composition): The desired composition.
+            target_volume (float): The desired volume.
+            exact_match (bool): Whether to require exact match of components.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing 'success', 'error', 'volumes', and 'wells'.
+        """
+        data = {
+            'target_composition': target_composition.model_dump(),
+            'target_volume': target_volume,
+            'exact_match': exact_match
+        }
+        return await self._request('POST', '/LH/CheckFormulation/', json=data)
 
     async def get_list_of_sample_lists(self) -> List:
         """Gets list of sample lists."""
@@ -833,6 +854,27 @@ class ManagerClient:
     def submit_job(self, job_data: Dict):
         """Submits a raw LHJob object."""
         return self._request('POST', '/LH/SubmitJob/', json=job_data)
+
+    def check_formulation(self, 
+                          target_composition: Composition, 
+                          target_volume: float, 
+                          exact_match: bool = True) -> Dict[str, Any]:
+        """Checks if a target composition can be formulated.
+
+        Args:
+            target_composition (Composition): The desired composition.
+            target_volume (float): The desired volume.
+            exact_match (bool): Whether to require exact match of components.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing 'success', 'error', 'volumes', and 'wells'.
+        """
+        data = {
+            'target_composition': target_composition.model_dump(),
+            'target_volume': target_volume,
+            'exact_match': exact_match
+        }
+        return self._request('POST', '/LH/CheckFormulation/', json=data)
 
     def get_list_of_sample_lists(self) -> List:
         """Gets list of sample lists."""
