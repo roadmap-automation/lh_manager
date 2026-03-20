@@ -1,1 +1,1 @@
-from .client import ManagerClient
+from .client import ManagerClient, AsyncManagerClient
