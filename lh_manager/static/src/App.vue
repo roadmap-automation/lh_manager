@@ -2,10 +2,9 @@
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import LiquidHandler from './components/LiquidHandler.vue';
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { io } from 'socket.io-client';
-import { samples, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, refreshLHStatus, device_defs } from './store';
-import type { MethodDef } from './store';
+import { refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, refreshLHStatus } from './store';
 
 const connected = ref(false);
 
@@ -20,7 +19,7 @@ socket.on('connect', () => {
   refreshMethodDefs();
   refreshMaterials();
   refreshLHStatus();
-  establish_socket_connections();
+  refreshDeviceLayouts();
   refreshWaste();
 });
 
@@ -53,27 +52,14 @@ socket.on('update_devices', () => {
   refreshDeviceDefs();
 });
 
+socket.on('update_layout', (payload: {device_name: string, retrieval_uri?: string}) => {
+  refreshWells(payload.device_name, payload.retrieval_uri);
+});
+
 socket.on('update_lh_job', () => {
   refreshLHStatus();
 });
 
-async function establish_socket_connections() {
-  await refreshDeviceLayouts();
-  for (const device of Object.values(device_defs.value)) {
-    console.log('Creating new socket for ' + device.device_name)
-    const new_socket = io(device.address)
-
-    new_socket.on('connect', () => {
-      console.log('Connected to ' + device.device_name);
-      refreshWells(device.device_name);
-    })
-
-    new_socket.on('update_layout', () => {
-      console.log('Got update layout from ' + device.device_name)
-      refreshWells(device.device_name);
-    })
-  }
-}
 
 </script>
 

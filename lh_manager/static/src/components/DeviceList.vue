@@ -3,7 +3,7 @@ import { ref, computed, defineProps } from 'vue';
 import { device_defs, initialize_devices, update_device } from '../store';
 import type { DeviceType } from '../store';
 
-const excluded_fields = ['device_name', 'device_type'];
+const excluded_fields = ['device_name', 'display_name', 'device_type'];
 
 const props = defineProps<{
   devices: Record<string, DeviceType>,
@@ -40,7 +40,7 @@ function clone(obj) {
     <div class="col d-flex flex-wrap">
       <div class="card" v-for="(device, device_name) of props.devices" :key="device_name">
         <div class="card-body p-2 border bg-light">
-          <a class="h5 card-title" :href="device.address" target="_blank">{{ device_name }}</a>
+          <a class="h5 card-title" :href="device.address" target="_blank">{{ device.display_name || device_name }}</a>
           <!-- <h6 class="card-title">{{ device.device_type }}</h6> -->
           <table class="table m-2">
             <tr v-for="field of get_parameters(device)" :key="field.name">

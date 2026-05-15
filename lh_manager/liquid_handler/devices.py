@@ -10,6 +10,7 @@ class DeviceBase(BaseModel):
     """
 
     device_name: Literal['none'] = 'none'
+    display_name: str = ''
     device_type: Literal['none'] = 'none'
     multichannel: bool = False
     allow_sample_mixing: bool = False

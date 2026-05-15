@@ -5,7 +5,9 @@ from flask import make_response, Response, request, redirect
 
 from . import autocontrol_blueprint
 from autocontrol.status import Status
-from ..autocontrol import init_devices, AUTOCONTROL_URL
+from ..autocontrol import init_devices
+
+AUTOCONTROL_URL = 'http://localhost:5004'
 from ...liquid_handler.lhinterface import InterfaceStatus, lh_interface
 from ...liquid_handler.state import samples
 

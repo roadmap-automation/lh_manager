@@ -10,7 +10,9 @@ dependencies = [
   "simple-websocket",
   "pydantic",
   "numpy",
-  "scipy"
+  "scipy",
+  "aio-pika",
+  "roadmap-broker-client"
 ]
 version = "0.0.2"
 authors = [

@@ -76,6 +76,7 @@ export type MethodType = {
 
 export type DeviceType = {
   device_name: string,
+  display_name: string,
   device_type: string,
   multichannel: boolean,
   allow_sample_mixing: boolean,
@@ -660,9 +661,15 @@ export async function getDeviceWells(base_address: string) {
   return { source_components, wells }
 }
 
-export async function refreshWells(device_name: string) {
-  const new_wells = await getDeviceWells(device_defs.value[device_name].address);
-  const new_layout = await getDeviceLayout(device_defs.value[device_name].address);
+export async function refreshWells(device_name: string, base_url?: string) {
+  if (!(device_name in device_layouts.value)) {
+    // Unknown device — could be newly registered; rebuild everything.
+    await refreshDeviceLayouts();
+    return;
+  }
+  const addr = base_url ?? device_defs.value[device_name].address;
+  const new_wells = await getDeviceWells(addr);
+  const new_layout = await getDeviceLayout(addr);
   const current_layout = device_layouts.value[device_name];
   current_layout.wells = new_wells.wells;
   current_layout.source_components = new_wells.source_components;

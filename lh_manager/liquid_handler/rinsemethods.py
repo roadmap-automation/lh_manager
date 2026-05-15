@@ -11,7 +11,8 @@ class RinseSystemDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: Literal['Rinse System'] = 'Rinse System'
+    device_name: Literal['rinse'] = 'rinse'
+    display_name: str = 'Rinse System'
     device_type: Literal['rinse'] = 'rinse'
     multichannel: bool = False
     allow_sample_mixing: bool = False

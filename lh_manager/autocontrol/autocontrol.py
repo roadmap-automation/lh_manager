@@ -1,11 +1,7 @@
 """Interface for autocontrol"""
 
-import copy
-import json
 import logging
-import requests
 import threading
-import time
 
 from typing import List, Dict
 from uuid import uuid4
@@ -24,49 +20,24 @@ from ..liquid_handler.state import samples, layout
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus, SampleContainer
 
-AUTOCONTROL_PORT = 5004
-AUTOCONTROL_URL = 'http://localhost:' + str(AUTOCONTROL_PORT)
-DEFAULT_HEADERS = {'Content-Type': 'application/json'}
-
 COMPLETED_STATUS = [SampleStatus.COMPLETED, SampleStatus.FAILED, SampleStatus.CANCELLED, SampleStatus.UNKNOWN]
 
 active_tasks = ActiveTasks()
 
-def verify_connection() -> bool:
-    """Verifies that Autocontrol is alive
+# Broker worker reference — set by app.py via set_broker_worker() before
+# launch_autocontrol_interface() is called.
+_broker_worker = None
 
-    Returns:
-        bool: False if any issues, otherwise True
-    """
-    logging.info('Connecting to AutoControl server...')
-    try:
-        response = requests.get(AUTOCONTROL_URL)
-    except requests.ConnectionError:
-        logging.error('Autocontrol connection failed')
-        return False
-    
-    if not response.ok:
-        logging.error(f'Autocontrol connection error, response code {response.status_code}')
-        return False
+def set_broker_worker(worker) -> None:
+    global _broker_worker
+    _broker_worker = worker
 
-    return True
 
-def launch_autocontrol_interface(poll_delay: int = 5):
-    """Launches autocontrol-based threads
-    """
-
-    # check that autocontrol is running
-    if verify_connection():
-
-        # register callback
-        submit_handler.submit_callbacks.append(submission_callback)
-        submit_handler.cancel_callbacks.append(cancel_callback)
-
-        # initialize devices
-        init_devices()
-
-        # start synchronization code
-        synchronize_status(poll_delay)
+def launch_autocontrol_interface():
+    """Register submission/cancel callbacks and send device INIT tasks."""
+    submit_handler.submit_callbacks.append(submission_callback)
+    submit_handler.cancel_callbacks.append(cancel_callback)
+    init_devices()
 
 def submission_callback(data: dict):
     """Submission handler callback
@@ -130,7 +101,7 @@ class AutocontrolItem(Item):
 def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout) -> List[Task]:
     """Runs all draft methods in an entire stage
     """
-   
+
     # Generate real-time tasks based on layout
     for _ in range(len(sample.stages[stage].methods)):
         prepare_and_submit_method(sample, stage, 0, layout)
@@ -138,7 +109,7 @@ def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout) ->
 def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout) -> List[Task]:
     """Runs a specific method by index
     """
-   
+
     # Generate real-time tasks based on layout
     m: MethodsType = sample.stages[stage].methods[method_index]
     all_methods: List[MethodsType] = m.get_methods(layout)
@@ -148,14 +119,14 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
                                                     sample_description=sample.description,
                                                     layout=layout)
                                             for m in all_methods]
-    
+
     method_types: List[MethodType] = [m.method_type
                                     for m in all_methods]
 
     # create tasks, one per method
     tasks: List[AutocontrolTaskContainer] = []
     for method_type, method_list in zip(method_types, rendered_methods):
-        
+
         # should typically only ever be one method in method_list
         for method in method_list:
             taskdata: List[TaskData] = []
@@ -169,7 +140,7 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
                                 method_data=device_manager.get_device_by_name(device_name).create_job_data(device_data),
                                 non_channel_storage='vial' if channel is None else None)
                 taskdata.append(newtaskdata)
-            
+
             # transfer if multiple devices are involved
             if method_type == MethodType.NONE:
                 tasktype = TaskType.NOCHANNEL
@@ -181,7 +152,7 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
                 tasktype = TaskType.MEASURE
             else:
                 tasktype = TaskType.NOCHANNEL
-                
+
             new_task = AutocontrolTaskContainer(task=Task(sample_id=sample.id,
                                                           task_type=tasktype,
                                                           tasks=taskdata),
@@ -215,53 +186,34 @@ def submit_tasks(tasks: List[AutocontrolTaskContainer], resubmit=False):
         for taskcontainer in tasks:
             task = taskcontainer.task
             logging.info('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
+            if _broker_worker is None:
+                logging.error('Broker worker not set — cannot submit task %s', task.id)
+                if task.task_type != TaskType.INIT:
+                    taskcontainer.status = SampleStatus.FAILED
+                continue
             if resubmit:
-                response = requests.post(AUTOCONTROL_URL + '/resubmit', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'task': task.model_dump(mode='json')}))
+                _broker_worker.resubmit_task(task)
             else:
-                response = requests.post(AUTOCONTROL_URL + '/put', headers=DEFAULT_HEADERS, data=task.model_dump_json())
-            logging.info(f'Autocontrol response: status code {response.status_code}, {response.text}')
+                _broker_worker.submit_task(task)
             if task.task_type != TaskType.INIT:
                 with active_tasks.lock:
-                    if response.ok:
-                        if str(task.id) in active_tasks.pending:
-                            taskcontainer.status = SampleStatus.PENDING
-                            active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
-                    else:
-                        taskcontainer.status = SampleStatus.FAILED
+                    if str(task.id) in active_tasks.pending:
+                        taskcontainer.status = SampleStatus.PENDING
+                        active_tasks.active.update({str(task.id): active_tasks.pending.pop(str(task.id))})
 
 @to_thread()
 def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_material: bool = True):
-
-    @trigger_samples_update
-    def mark_cancelled(id: str) -> None:
-        parent_item = active_tasks.active.pop(id)
-        _, sample = samples.getSampleById(parent_item.id)
-        active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
-        for m in active_methods:
-            if m.status != SampleStatus.COMPLETED:
-                for t in m.tasks:
-                    # coerce to str because t.id can be UUID
-                    if str(t.id) == id:
-                        t.status = SampleStatus.CANCELLED
-                        #m.tasks.pop(m.tasks.index(t))
-            
-                if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
-                    m.status = SampleStatus.COMPLETED
-                elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
-                    m.status = SampleStatus.ACTIVE
-                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
-                    m.status = SampleStatus.ERROR
-                else:
-                    m.status = SampleStatus.PENDING
-
     for task in tasks:
         logging.info('Cancelling task: ' + str(task.id))
-        response = requests.post(AUTOCONTROL_URL + '/cancel', headers=DEFAULT_HEADERS, data=json.dumps({'task_id': str(task.id), 'include_active_queue': include_active_queue, 'drop_material': drop_material}))
-        logging.info(f'Autocontrol response: status code {response.status_code}, {response.text}')
+        if _broker_worker is None:
+            logging.error('Broker worker not set — cannot cancel task %s', task.id)
+            continue
+        _broker_worker.cancel_task(str(task.id),
+                                   include_active_queue=include_active_queue,
+                                   drop_material=drop_material)
         with active_tasks.lock:
-            if response.ok:
-                if str(task.id) in active_tasks.active:
-                    mark_cancelled(str(task.id))
+            if str(task.id) in active_tasks.active:
+                mark_cancelled(str(task.id))
 
 def init_devices():
     init_tasks = [Task(task_type=TaskType.INIT,
@@ -274,93 +226,61 @@ def init_devices():
 
     submit_tasks([AutocontrolTaskContainer(task=t) for t in init_tasks])
 
-@to_thread(daemon=True)
-def synchronize_status(poll_delay: int = 5):
-    """Thread to periodically query sample status and update
+@trigger_samples_update
+def mark_cancelled(id: str) -> None:
+    """Mark a task cancelled in the active method tree.
 
-    Args:
-        poll_delay (Optional, int): Poll delay in seconds. Default 5
+    Must be called with active_tasks.lock held by the caller.
     """
+    parent_item = active_tasks.active.pop(id)
+    _, sample = samples.getSampleById(parent_item.id)
+    if sample is None:
+        return
+    active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
+    for m in active_methods:
+        if m.status != SampleStatus.COMPLETED:
+            for t in m.tasks:
+                if str(t.id) == id:
+                    t.status = SampleStatus.CANCELLED
 
-    def check_status_completion(id: str) -> str:
-        # send task id to autocontrol to get status
-        try:
-            response = requests.get(AUTOCONTROL_URL + '/get_task_status/' + id)
-        except ConnectionError:
-            logging.warning(f'Warning: Autocontrol not connected')
-            return 'not connected'
+            if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
+                m.status = SampleStatus.COMPLETED
+            elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
+                m.status = SampleStatus.ACTIVE
+            elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                m.status = SampleStatus.ERROR
+            else:
+                m.status = SampleStatus.PENDING
 
-        if response.ok:
-            try:
-                response_json: dict = response.json()
-            except json.JSONDecodeError:
-                return 'json decode error, ignoring'
+@trigger_samples_update
+def mark_status(id: str, status: SampleStatus) -> None:
+    """Update task status in the active method tree.
 
-            if response_json['queue'] == 'history':
-                return 'complete'
-            elif response_json['queue'] == 'active':
-                return 'active'
-            elif response_json['queue'] == 'scheduled':
-                return 'pending'
-        else:
-            if 'No task found' in response.text:
-                return 'task not found'
+    Must be called with active_tasks.lock held by the caller.
+    Decorated with @trigger_samples_update so the GUI is notified automatically.
+    """
+    parent_item = active_tasks.active.pop(id)
+    _, sample = samples.getSampleById(parent_item.id)
 
-            logging.warning(f'Warning: status completion fail for id {id} with code {response.status_code}: {response.text}')
-        
-        return 'uncaught error'
+    # check that sample still exists (not yet archived)
+    if sample is not None:
+        active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
+        for m in active_methods:
+            if m.status != SampleStatus.COMPLETED:
+                for t in m.tasks:
+                    # coerce to str because t.id can be UUID
+                    if str(t.id) == id:
+                        t.status = status
 
-    @trigger_samples_update
-    def mark_status(id: str, status: SampleStatus) -> None:
-        parent_item = active_tasks.active.pop(id)
-        _, sample = samples.getSampleById(parent_item.id)
+                if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
+                    m.status = SampleStatus.COMPLETED
+                elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
+                    m.status = SampleStatus.ACTIVE
+                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                    m.status = SampleStatus.ERROR
+                else:
+                    m.status = SampleStatus.PENDING
 
-        # check that sample still exists (not yet archived)
-        if sample is not None:
-            active_methods: List[BaseMethod] = sample.stages[parent_item.stage].active
-            for m in active_methods:
-                if m.status != SampleStatus.COMPLETED:
-                    for t in m.tasks:
-                        # coerce to str because t.id can be UUID
-                        if str(t.id) == id:
-                            t.status = status
-                
-                    if all(t.status == SampleStatus.COMPLETED for t in m.tasks):
-                        m.status = SampleStatus.COMPLETED
-                    elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
-                        m.status = SampleStatus.ACTIVE
-                    elif any(t.status == SampleStatus.ERROR for t in m.tasks):
-                        m.status = SampleStatus.ERROR
-                    else:
-                        m.status = SampleStatus.PENDING
-
-            if (status not in COMPLETED_STATUS):
-                # put it back if not marking complete
-                active_tasks.active.update({id: parent_item})
-
-                #sample.stages[parent_item.stage].update_status()
-
-        # NOTE: this is now done at the LHInterface level. However, GUI is only updated here.
-        # if sample stage is complete, execute all methods
-        #if sample.stages[parent_item.stage].status == SampleStatus.COMPLETED:
-        #    for method in sample.stages[parent_item.stage].methods:
-        #        method.execute(layout)
-
-    while True:
-
-        # reserve active_tasks (and samples)
-        with active_tasks.lock:
-            for task_id in copy.copy(list(active_tasks.active.keys())):
-                result = check_status_completion(task_id)
-                #print(task_id, result)
-                if result == 'complete':
-                    mark_status(task_id, SampleStatus.COMPLETED)
-                elif result == 'active':
-                    mark_status(task_id, SampleStatus.ACTIVE)
-                elif result == 'task not found':
-                    # Remove item without updating parent
-                    logging.warning(f'Warning: id {task_id} not found, marking as cancelled')
-                    mark_status(task_id, SampleStatus.CANCELLED)
-
-        time.sleep(poll_delay)
-
+        if status not in COMPLETED_STATUS:
+            # put it back if not marking complete
+            active_tasks.active.update({id: parent_item})

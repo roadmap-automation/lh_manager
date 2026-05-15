@@ -11,7 +11,8 @@ class QCMDMeasurementDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: Literal['QCMD Instrument Array'] = 'QCMD Instrument Array'
+    device_name: Literal['qcmd'] = 'qcmd'
+    display_name: str = 'QCMD Instrument Array'
     device_type: Literal['qcmd'] = 'qcmd'
     multichannel: bool = True
     allow_sample_mixing: bool = False

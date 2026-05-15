@@ -30,8 +30,10 @@ def load_state():
     if os.path.exists(DEVICES_LOG):
         device_data = json.load(open(DEVICES_LOG, 'r'))
         for device in device_manager.device_list:
-            device = device.model_copy(update=device_data[device.device_name])
-            device_manager.register(device)
+            update = device_data.get(device.device_name, {})
+            if update:
+                device = device.model_copy(update=update)
+                device_manager.register(device)
 
     return layout, samples
 

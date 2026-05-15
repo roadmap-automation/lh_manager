@@ -1,0 +1,264 @@
+"""Broker integration for lh_manager.
+
+Runs an asyncio event loop in a dedicated daemon thread alongside the
+synchronous Flask/SocketIO server.  Provides:
+
+  Inbound (broker → lh_manager):
+    scheduler.task_dispatched  — task is now active on a device
+    scheduler.task_completed   — task has finished successfully
+    scheduler.task_failed      — task has finished with an error
+    layout.updated             — a device's bed layout has changed
+
+  Outbound (lh_manager → broker):
+    command.autocontrol.submit_task    — replaces POST /put
+    command.autocontrol.resubmit_task  — replaces POST /resubmit
+    command.autocontrol.cancel_task    — replaces POST /cancel
+
+Thread model
+------------
+The broker event loop runs in a daemon thread.  Sync Flask threads call
+the public submit_task / resubmit_task / cancel_task methods, which use
+asyncio.run_coroutine_threadsafe to hand work to that loop.  A _ready
+threading.Event gates all outbound calls until the exchange is connected.
+"""
+
+import asyncio
+import logging
+import threading
+from typing import Optional
+
+import aio_pika
+
+from roadmap_broker_client.connection import get_connection
+from roadmap_broker_client.consumer import consume
+from roadmap_broker_client.envelope import Envelope, build
+from roadmap_broker_client.publisher import publish
+from roadmap_broker_client.topology import declare_topology
+from roadmap_broker_client.topics import (
+    INSTRUMENT_EXCHANGE,
+    LAYOUT_UPDATED,
+    PROTOCOL_EXCHANGE,
+    SAMPLE_METHOD_COMPLETED,
+    SCHEDULER_TASK_COMPLETED,
+    SCHEDULER_TASK_DISPATCHED,
+    SCHEDULER_TASK_FAILED,
+    command_key,
+)
+
+logger = logging.getLogger(__name__)
+
+_READY_TIMEOUT = 30.0  # seconds to wait for broker connection before giving up
+
+
+class LHManagerBrokerWorker:
+    """Subscribes to autocontrol scheduler events and device layout events.
+    Also publishes commands to autocontrol (submit/resubmit/cancel task).
+
+    Wire in app.py:
+        broker_worker = LHManagerBrokerWorker(socketio)
+        broker_worker.start()
+        set_broker_worker(broker_worker)   # in autocontrol module
+        launch_autocontrol_interface()
+    """
+
+    def __init__(self, socketio) -> None:
+        self._socketio = socketio
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._exchange: Optional[aio_pika.abc.AbstractExchange] = None
+        self._protocol_exchange: Optional[aio_pika.abc.AbstractExchange] = None
+        self._thread: Optional[threading.Thread] = None
+        self._ready = threading.Event()
+
+    # ------------------------------------------------------------------
+    # Thread-safe public API  (called from sync Flask threads)
+    # ------------------------------------------------------------------
+
+    def submit_task(self, task) -> None:
+        """Publish command.autocontrol.submit_task (replaces POST /put)."""
+        self._schedule(self._emit_command(
+            "submit_task",
+            task.model_dump(mode="json"),
+            task_id=task.id,
+            sample_id=task.sample_id,
+        ))
+
+    def resubmit_task(self, task) -> None:
+        """Publish command.autocontrol.resubmit_task (replaces POST /resubmit)."""
+        self._schedule(self._emit_command(
+            "resubmit_task",
+            {"task_id": str(task.id), "task": task.model_dump(mode="json")},
+            task_id=task.id,
+            sample_id=task.sample_id,
+        ))
+
+    def cancel_task(self, task_id: str, include_active_queue: bool = False,
+                    drop_material: bool = True) -> None:
+        """Publish command.autocontrol.cancel_task (replaces POST /cancel)."""
+        self._schedule(self._emit_command(
+            "cancel_task",
+            {"task_id": task_id,
+             "include_active_queue": include_active_queue,
+             "drop_material": drop_material},
+        ))
+
+    # ------------------------------------------------------------------
+    # Internal: schedule a coroutine on the broker event loop
+    # ------------------------------------------------------------------
+
+    def _schedule(self, coro) -> None:
+        if not self._ready.wait(timeout=_READY_TIMEOUT):
+            logger.error("Broker not ready after %.0fs — dropping command.", _READY_TIMEOUT)
+            return
+        if self._loop is None or self._loop.is_closed():
+            logger.warning("Broker loop not running — dropping command.")
+            return
+        asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    # ------------------------------------------------------------------
+    # Async publish helpers
+    # ------------------------------------------------------------------
+
+    async def _emit_command(self, verb: str, payload: dict,
+                             task_id=None, sample_id=None) -> None:
+        if self._exchange is None:
+            return
+        rk = command_key("autocontrol", verb)
+        envelope = build(
+            device_id="lh_manager",
+            routing_key=rk,
+            task_id=task_id,
+            sample_id=sample_id,
+            payload=payload,
+        )
+        await publish(self._exchange, rk, envelope)
+
+    # ------------------------------------------------------------------
+    # Start
+    # ------------------------------------------------------------------
+
+    def start(self) -> None:
+        """Start the broker worker in a background daemon thread."""
+
+        def _thread_main() -> None:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            try:
+                self._loop.run_until_complete(self._run())
+            except Exception:
+                logger.exception("LHManager broker worker exited with error.")
+            finally:
+                self._loop.close()
+
+        self._thread = threading.Thread(
+            target=_thread_main, name="lh-manager-broker", daemon=True
+        )
+        self._thread.start()
+        logger.info("LHManager broker worker thread started.")
+
+    # ------------------------------------------------------------------
+    # Async main loop
+    # ------------------------------------------------------------------
+
+    async def _run(self) -> None:
+        connection = await get_connection()
+        async with connection:
+            channel = await connection.channel()
+            await channel.set_qos(prefetch_count=10)
+            await declare_topology(channel)
+
+            self._exchange = await channel.get_exchange(INSTRUMENT_EXCHANGE)
+            self._protocol_exchange = await channel.get_exchange(PROTOCOL_EXCHANGE)
+            self._ready.set()
+
+            # Subscribe to autocontrol scheduler task events.
+            task_queue = await channel.declare_queue(
+                "lh_manager.scheduler_events",
+                durable=True,
+                arguments={"x-dead-letter-exchange": "exchange.dead_letter"},
+            )
+            await task_queue.bind(self._exchange, routing_key=SCHEDULER_TASK_DISPATCHED)
+            await task_queue.bind(self._exchange, routing_key=SCHEDULER_TASK_COMPLETED)
+            await task_queue.bind(self._exchange, routing_key=SCHEDULER_TASK_FAILED)
+
+            # Transient queue for layout notifications — non-durable, auto-deletes
+            # on disconnect so stale messages never pile up across restarts.
+            layout_queue = await channel.declare_queue(
+                "lh_manager.layout_events",
+                durable=False,
+                auto_delete=True,
+            )
+            await layout_queue.bind(self._exchange, routing_key=LAYOUT_UPDATED)
+
+            logger.info("LHManager broker worker running.")
+            await asyncio.gather(
+                consume(task_queue, self._on_scheduler_event),
+                consume(layout_queue, self._on_layout_updated),
+            )
+
+    # ------------------------------------------------------------------
+    # Inbound: scheduler.task_* events from autocontrol
+    # ------------------------------------------------------------------
+
+    async def _on_scheduler_event(
+        self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
+        from .autocontrol.autocontrol import active_tasks, mark_status
+        from .liquid_handler.samplecontainer import SampleStatus
+
+        rk = message.routing_key or ""
+        task_id = str(envelope.task_id)
+
+        if rk == SCHEDULER_TASK_COMPLETED:
+            new_status = SampleStatus.COMPLETED
+        elif rk == SCHEDULER_TASK_DISPATCHED:
+            new_status = SampleStatus.ACTIVE
+        elif rk == SCHEDULER_TASK_FAILED:
+            new_status = SampleStatus.FAILED
+        else:
+            return
+
+        # Capture sample_id and step_id before mark_status() pops the item for
+        # completed/failed tasks — after that call the dict entry is gone.
+        captured: dict = {}
+
+        def _sync_update() -> None:
+            with active_tasks.lock:
+                if task_id not in active_tasks.active:
+                    logger.debug("Scheduler event for untracked task %s — ignoring.", task_id)
+                    return
+                item = active_tasks.active[task_id]
+                captured["sample_id"] = item.id
+                captured["step_id"] = item.method_id
+                mark_status(task_id, new_status)
+
+        await asyncio.to_thread(_sync_update)
+
+        if rk in (SCHEDULER_TASK_COMPLETED, SCHEDULER_TASK_FAILED):
+            sample_id = captured.get("sample_id")
+            step_id = captured.get("step_id")
+            if sample_id and step_id and self._protocol_exchange is not None:
+                envelope_out = build(
+                    device_id="lh_manager",
+                    routing_key=SAMPLE_METHOD_COMPLETED,
+                    task_id=task_id,
+                    sample_id=sample_id,
+                    payload={"step_id": step_id, "status": new_status.value},
+                )
+                await publish(self._protocol_exchange, SAMPLE_METHOD_COMPLETED, envelope_out)
+
+    # ------------------------------------------------------------------
+    # Inbound: layout.updated events from devices
+    # ------------------------------------------------------------------
+
+    async def _on_layout_updated(
+        self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
+        device_name = envelope.payload.get("device_name") or envelope.device_id
+        retrieval_uri = envelope.payload.get("retrieval_uri")
+        if not device_name:
+            return
+        self._socketio.emit("update_layout", {
+            "device_name": device_name,
+            "retrieval_uri": retrieval_uri,
+        })
+        logger.debug("Forwarded layout.updated for device '%s' to frontend.", device_name)

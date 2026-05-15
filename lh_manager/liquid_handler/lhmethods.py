@@ -22,7 +22,8 @@ class LHDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: Literal['Gilson 271 Liquid Handler'] = 'Gilson 271 Liquid Handler'
+    device_name: Literal['lh'] = 'lh'
+    display_name: str = 'Gilson 271 Liquid Handler'
     device_type: Literal['lh'] = 'lh'
     multichannel: bool = True
     allow_sample_mixing: bool = True

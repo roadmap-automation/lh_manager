@@ -33,8 +33,9 @@ from .lh_api import lh_blueprint
 from .sio import socketio
 from .material_db import blueprint as material_db_blueprint
 from .waste_manager.waste_api import blueprint as waste_blueprint
-from .autocontrol.autocontrol import launch_autocontrol_interface
+from .autocontrol.autocontrol import launch_autocontrol_interface, set_broker_worker
 from .autocontrol.autocontrol_api import autocontrol_blueprint
+from .broker_worker import LHManagerBrokerWorker
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -71,7 +72,10 @@ if __name__ == '__main__':
 
     config.stage_names = ['methods']
 
-    launch_autocontrol_interface(poll_delay=5)
+    broker_worker = LHManagerBrokerWorker(socketio)
+    broker_worker.start()
+    set_broker_worker(broker_worker)
+    launch_autocontrol_interface()
     socketio.run(app, host='localhost', port=5001, debug=False)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)

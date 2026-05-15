@@ -16,7 +16,8 @@ class InjectionSystemDevice(DeviceBase):
     """Liquid Handler device
     """
 
-    device_name: Literal['Multichannel Injection System'] = 'Multichannel Injection System'
+    device_name: Literal['injection'] = 'injection'
+    display_name: str = 'Multichannel Injection System'
     device_type: Literal['injection'] = 'injection'
     multichannel: bool = True
     allow_sample_mixing: bool = True
