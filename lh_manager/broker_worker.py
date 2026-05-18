@@ -49,6 +49,7 @@ from roadmap_broker_client.topics import (
     TASK_ACCEPTED,
     TASK_COMPLETED,
     TASK_FAILED,
+    WASTE_GENERATED,
     command_key,
 )
 
@@ -199,11 +200,20 @@ class LHManagerBrokerWorker:
             # Durable command queue for LH jobs dispatched by autocontrol.
             lh_cmd_queue = await declare_node_queue(channel, "lh", INSTRUMENT_EXCHANGE)
 
+            # Transient queue for waste events from devices.
+            waste_queue = await channel.declare_queue(
+                "lh_manager.waste_events",
+                durable=False,
+                auto_delete=True,
+            )
+            await waste_queue.bind(self._exchange, routing_key=WASTE_GENERATED)
+
             logger.info("LHManager broker worker running.")
             await asyncio.gather(
                 consume(task_queue, self._on_scheduler_event),
                 consume(layout_queue, self._on_layout_updated),
                 consume(lh_cmd_queue, self._on_lh_command),
+                consume(waste_queue, self._on_waste_generated),
             )
 
     # ------------------------------------------------------------------
@@ -327,6 +337,27 @@ class LHManagerBrokerWorker:
             payload=extra,
         )
         await publish(self._exchange, routing_key, msg)
+
+    # ------------------------------------------------------------------
+    # Inbound: waste.generated events from devices
+    # ------------------------------------------------------------------
+
+    async def _on_waste_generated(
+        self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
+        from .waste_manager.wastedata import WasteItem
+        from .waste_manager.waste_api.waste import waste_layout
+
+        try:
+            waste_item = WasteItem(**envelope.payload)
+        except Exception as exc:
+            logger.error("waste.generated: cannot deserialize payload: %s", exc)
+            raise
+
+        await asyncio.to_thread(waste_layout.add_waste, waste_item)
+        await asyncio.to_thread(waste_layout.save_waste)
+        self._socketio.emit('update_waste', {'msg': 'update_waste'})
+        logger.debug("Waste added: %s", waste_item)
 
     # ------------------------------------------------------------------
     # Inbound: layout.updated events from devices
