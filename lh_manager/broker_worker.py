@@ -323,6 +323,10 @@ class LHManagerBrokerWorker:
             lh_interface.results_callbacks.remove(_on_result)
             logger.error("LH: activate_job failed: %s", exc)
             await self._emit_lh(TASK_FAILED, envelope, {"error": str(exc)})
+            return
+
+        self._socketio.emit('job_activation', {'job_id': job.id})
+        self._socketio.emit('update_lh_job', {'msg': 'update_lh_job'})
 
     async def _emit_lh(self, routing_key: str, envelope: Envelope, extra: dict) -> None:
         if self._exchange is None:
