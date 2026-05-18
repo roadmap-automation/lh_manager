@@ -28,6 +28,7 @@ threading.Event gates all outbound calls until the exchange is connected.
 
 import asyncio
 import logging
+import queue
 import threading
 from typing import Optional
 
@@ -76,6 +77,7 @@ class LHManagerBrokerWorker:
         self._protocol_exchange: Optional[aio_pika.abc.AbstractExchange] = None
         self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
+        self._emit_queue: queue.Queue = queue.Queue()
 
     # ------------------------------------------------------------------
     # Thread-safe public API  (called from sync Flask threads)
@@ -144,8 +146,31 @@ class LHManagerBrokerWorker:
     # Start
     # ------------------------------------------------------------------
 
+    def _sio_emit(self, event: str, data: dict) -> None:
+        """Enqueue a SocketIO emit for delivery on a plain threading.Thread.
+
+        Flask-SocketIO (threading mode) doesn't reliably emit when called
+        from within an asyncio coroutine.  This method decouples the emit
+        from the asyncio execution context by handing it off to a dedicated
+        emitter thread that has no asyncio loop running.
+        """
+        self._emit_queue.put((event, data))
+
     def start(self) -> None:
         """Start the broker worker in a background daemon thread."""
+
+        def _emitter_loop() -> None:
+            while True:
+                event, data = self._emit_queue.get()
+                try:
+                    self._socketio.emit(event, data)
+                except Exception:
+                    logger.exception("SocketIO emit failed for event '%s'.", event)
+
+        emitter = threading.Thread(
+            target=_emitter_loop, name="lh-manager-sio-emitter", daemon=True
+        )
+        emitter.start()
 
         def _thread_main() -> None:
             self._loop = asyncio.new_event_loop()
@@ -325,8 +350,8 @@ class LHManagerBrokerWorker:
             await self._emit_lh(TASK_FAILED, envelope, {"error": str(exc)})
             return
 
-        self._socketio.emit('job_activation', {'job_id': job.id})
-        self._socketio.emit('update_lh_job', {'msg': 'update_lh_job'})
+        self._sio_emit('job_activation', {'job_id': job.id})
+        self._sio_emit('update_lh_job', {'msg': 'update_lh_job'})
 
     async def _emit_lh(self, routing_key: str, envelope: Envelope, extra: dict) -> None:
         if self._exchange is None:
@@ -360,7 +385,7 @@ class LHManagerBrokerWorker:
 
         await asyncio.to_thread(waste_layout.add_waste, waste_item)
         await asyncio.to_thread(waste_layout.save_waste)
-        self._socketio.emit('update_waste', {'msg': 'update_waste'})
+        self._sio_emit('update_waste', {'msg': 'update_waste'})
         logger.debug("Waste added: %s", waste_item)
 
     # ------------------------------------------------------------------
@@ -374,7 +399,7 @@ class LHManagerBrokerWorker:
         retrieval_uri = envelope.payload.get("retrieval_uri")
         if not device_name:
             return
-        self._socketio.emit("update_layout", {
+        self._sio_emit("update_layout", {
             "device_name": device_name,
             "retrieval_uri": retrieval_uri,
         })
