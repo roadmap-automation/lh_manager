@@ -8,11 +8,15 @@ synchronous Flask/SocketIO server.  Provides:
     scheduler.task_completed   — task has finished successfully
     scheduler.task_failed      — task has finished with an error
     layout.updated             — a device's bed layout has changed
+    command.lh.submit_task     — autocontrol dispatching an LH job
 
   Outbound (lh_manager → broker):
     command.autocontrol.submit_task    — replaces POST /put
     command.autocontrol.resubmit_task  — replaces POST /resubmit
     command.autocontrol.cancel_task    — replaces POST /cancel
+    task.accepted              — LH job accepted
+    task.completed             — LH job completed successfully
+    task.failed                — LH job failed
 
 Thread model
 ------------
@@ -33,7 +37,7 @@ from roadmap_broker_client.connection import get_connection
 from roadmap_broker_client.consumer import consume
 from roadmap_broker_client.envelope import Envelope, build
 from roadmap_broker_client.publisher import publish
-from roadmap_broker_client.topology import declare_topology
+from roadmap_broker_client.topology import declare_node_queue, declare_topology
 from roadmap_broker_client.topics import (
     INSTRUMENT_EXCHANGE,
     LAYOUT_UPDATED,
@@ -42,6 +46,9 @@ from roadmap_broker_client.topics import (
     SCHEDULER_TASK_COMPLETED,
     SCHEDULER_TASK_DISPATCHED,
     SCHEDULER_TASK_FAILED,
+    TASK_ACCEPTED,
+    TASK_COMPLETED,
+    TASK_FAILED,
     command_key,
 )
 
@@ -189,10 +196,14 @@ class LHManagerBrokerWorker:
             )
             await layout_queue.bind(self._exchange, routing_key=LAYOUT_UPDATED)
 
+            # Durable command queue for LH jobs dispatched by autocontrol.
+            lh_cmd_queue = await declare_node_queue(channel, "lh", INSTRUMENT_EXCHANGE)
+
             logger.info("LHManager broker worker running.")
             await asyncio.gather(
                 consume(task_queue, self._on_scheduler_event),
                 consume(layout_queue, self._on_layout_updated),
+                consume(lh_cmd_queue, self._on_lh_command),
             )
 
     # ------------------------------------------------------------------
@@ -245,6 +256,77 @@ class LHManagerBrokerWorker:
                     payload={"step_id": step_id, "status": new_status.value},
                 )
                 await publish(self._protocol_exchange, SAMPLE_METHOD_COMPLETED, envelope_out)
+
+    # ------------------------------------------------------------------
+    # Inbound: command.lh.submit_task from autocontrol
+    # ------------------------------------------------------------------
+
+    async def _on_lh_command(
+        self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
+        from .liquid_handler.lhinterface import LHJob, lh_interface, InterfaceStatus
+        from .liquid_handler.job import ResultStatus
+        from .liquid_handler.state import layout
+
+        rk = message.routing_key or ""
+        if rk.split(".")[-1] != "submit_task":
+            logger.warning("LH: unknown command verb on key '%s'", rk)
+            return
+
+        try:
+            job = LHJob(**envelope.payload)
+        except Exception as exc:
+            logger.error("LH: cannot deserialize job: %s", exc)
+            raise
+
+        if lh_interface.get_status() != InterfaceStatus.UP:
+            logger.error("LH: interface busy, rejecting task %s", envelope.task_id)
+            await self._emit_lh(TASK_FAILED, envelope, {"error": "LH interface busy"})
+            return
+
+        await self._emit_lh(TASK_ACCEPTED, envelope, {})
+
+        # One-shot callback: fires on each result update; publishes completed/failed
+        # once the job reaches a terminal state. Uses a flag to prevent double-firing.
+        fired = [False]
+
+        def _on_result(result_job: LHJob, *args, **kwargs) -> None:
+            if fired[0]:
+                return
+            status = result_job.get_result_status()
+            if status == ResultStatus.SUCCESS:
+                fired[0] = True
+                asyncio.run_coroutine_threadsafe(
+                    self._emit_lh(TASK_COMPLETED, envelope, {}), self._loop
+                )
+            elif status == ResultStatus.FAIL:
+                fired[0] = True
+                asyncio.run_coroutine_threadsafe(
+                    self._emit_lh(TASK_FAILED, envelope, {"error": "LH job failed"}), self._loop
+                )
+
+        lh_interface.results_callbacks.append(_on_result)
+
+        try:
+            await asyncio.to_thread(lh_interface.activate_job, job, layout)
+        except Exception as exc:
+            lh_interface.results_callbacks.remove(_on_result)
+            logger.error("LH: activate_job failed: %s", exc)
+            await self._emit_lh(TASK_FAILED, envelope, {"error": str(exc)})
+
+    async def _emit_lh(self, routing_key: str, envelope: Envelope, extra: dict) -> None:
+        if self._exchange is None:
+            return
+        msg = build(
+            device_id="lh_manager",
+            routing_key=routing_key,
+            task_id=envelope.task_id,
+            sample_id=envelope.sample_id,
+            assigned_channel=envelope.assigned_channel,
+            execution_policy=envelope.execution_policy or "infrastructure",
+            payload=extra,
+        )
+        await publish(self._exchange, routing_key, msg)
 
     # ------------------------------------------------------------------
     # Inbound: layout.updated events from devices
