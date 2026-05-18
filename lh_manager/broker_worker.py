@@ -309,7 +309,9 @@ class LHManagerBrokerWorker:
             return
 
         try:
-            job = LHJob(**envelope.payload)
+            # envelope.task_id is authoritative; autocontrol puts it in the
+            # envelope header only, not in the payload body.
+            job = LHJob(**{**envelope.payload, "id": str(envelope.task_id)})
         except Exception as exc:
             logger.error("LH: cannot deserialize job: %s", exc)
             raise
