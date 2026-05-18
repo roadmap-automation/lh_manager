@@ -318,7 +318,7 @@ class LHManagerBrokerWorker:
         lh_interface.results_callbacks.append(_on_result)
 
         try:
-            await asyncio.to_thread(lh_interface.activate_job, job, layout)
+            lh_interface.activate_job(job, layout)
         except Exception as exc:
             lh_interface.results_callbacks.remove(_on_result)
             logger.error("LH: activate_job failed: %s", exc)
