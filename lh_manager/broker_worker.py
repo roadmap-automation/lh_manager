@@ -40,6 +40,7 @@ from roadmap_broker_client.envelope import Envelope, build
 from roadmap_broker_client.publisher import publish
 from roadmap_broker_client.topology import declare_node_queue, declare_topology
 from roadmap_broker_client.topics import (
+    DEVICE_REGISTERED,
     INSTRUMENT_EXCHANGE,
     LAYOUT_UPDATED,
     PROTOCOL_EXCHANGE,
@@ -233,12 +234,22 @@ class LHManagerBrokerWorker:
             )
             await waste_queue.bind(self._exchange, routing_key=WASTE_GENERATED)
 
+            # Transient queue for device registration — auto-deletes on disconnect
+            # so stale announcements never pile up across restarts.
+            reg_queue = await channel.declare_queue(
+                "lh_manager.device_registrations",
+                durable=False,
+                auto_delete=True,
+            )
+            await reg_queue.bind(self._exchange, routing_key=DEVICE_REGISTERED)
+
             logger.info("LHManager broker worker running.")
             await asyncio.gather(
                 consume(task_queue, self._on_scheduler_event),
                 consume(layout_queue, self._on_layout_updated),
                 consume(lh_cmd_queue, self._on_lh_command),
                 consume(waste_queue, self._on_waste_generated),
+                consume(reg_queue, self._on_device_registered),
             )
 
     # ------------------------------------------------------------------
@@ -389,6 +400,42 @@ class LHManagerBrokerWorker:
         await asyncio.to_thread(waste_layout.save_waste)
         self._sio_emit('update_waste', {'msg': 'update_waste'})
         logger.debug("Waste added: %s", waste_item)
+
+    # ------------------------------------------------------------------
+    # Inbound: device.registered — dynamic device registration
+    # ------------------------------------------------------------------
+
+    async def _on_device_registered(
+        self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
+        from .liquid_handler.devices import DeviceBase, device_manager
+
+        payload = envelope.payload
+        device_id = payload.get("device_id", "")
+        num_channels = int(payload.get("num_channels", 1))
+
+        # model_construct bypasses Literal validation on device_name / device_type
+        # so we can create a generic DeviceBase for any dynamically discovered device.
+        device = DeviceBase.model_construct(
+            device_name=device_id,
+            display_name=payload.get("display_name", device_id),
+            device_type=payload.get("device_type", device_id),
+            multichannel=(num_channels > 1),
+            allow_sample_mixing=bool(payload.get("allow_sample_mixing", True)),
+            address=payload.get("address", ""),
+        )
+        await asyncio.to_thread(device_manager.register, device)
+        logger.info(
+            "device.registered: lh_manager registered '%s' at %s",
+            device_id, device.address,
+        )
+
+        # Tell the frontend a new device is available; refreshWells() will call
+        # refreshDeviceLayouts() if device_id is not yet in device_layouts.
+        self._sio_emit("update_layout", {
+            "device_name": device_id,
+            "retrieval_uri": payload.get("address", ""),
+        })
 
     # ------------------------------------------------------------------
     # Inbound: layout.updated events from devices
