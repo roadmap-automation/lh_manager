@@ -5,23 +5,17 @@ import os
 from pathlib import Path
 from .samplecontainer import SampleContainer
 from .samplelist import example_sample_list
-from . import lhmethods, formulation, qcmd, dilution, injectionmethods, qcmdmethods, roadmapmethods
-from .layoutmap import racks
-from .bedlayout import LHBedLayout, example_wells
+from . import qcmd, dilution, injectionmethods, qcmdmethods, roadmapmethods
 from .items import Item
 from .devices import device_manager
 from .notify import notifier
 from ..app_config import parser, config
 
-LOG_PATH, LAYOUT_LOG, SAMPLES_LOG, DEVICES_LOG = config.persistent_path, config.layout_path, config.samples_path, config.devices_path
+LOG_PATH, SAMPLES_LOG, DEVICES_LOG = config.persistent_path, config.samples_path, config.devices_path
 
 def load_state():
 
-    layout, samples = None, None
-
-    if not parser.parse_args().noload_layout:
-        if os.path.exists(LAYOUT_LOG):
-            layout = LHBedLayout(**json.load(open(LAYOUT_LOG, 'r')))
+    samples = None
 
     if not parser.parse_args().noload_samples:
         if os.path.exists(SAMPLES_LOG):
@@ -35,17 +29,12 @@ def load_state():
                 device = device.model_copy(update=update)
                 device_manager.register(device)
 
-    return layout, samples
+    return samples
 
 def make_persistent_dir():
     if not os.path.exists(LOG_PATH):
         os.mkdir(LOG_PATH)
     
-def save_layout():
-    make_persistent_dir()
-    with open(LAYOUT_LOG, 'w') as f:
-        f.write(layout.model_dump_json(indent=2))
-
 def save_samples():
     make_persistent_dir()
     with open(SAMPLES_LOG, 'w') as f:
@@ -57,7 +46,7 @@ def save_devices():
         f.write(json.dumps(device_manager.get_all_schema(), indent=2))
 
 logging.info('loading state!')
-layout, samples = load_state()
+samples = load_state()
 
 notifier.load_config(config.notify_path)
 notifier.connect()
@@ -74,16 +63,8 @@ if samples is None:
 
 samples.n_channels = parser.parse_args().channels
 
-    ## ======= Initialize bed layout =========
-if layout is None:
-    # layout is sent to the GUI
-    layout = LHBedLayout(racks={})
-    for name, rack in racks.items():
-        layout.add_rack_from_dict(name, rack)
-
-    # TODO: remove for production
-    for well in example_wells:
-        layout.add_well_to_rack(well.rack_id, well)
+# layout is now owned by gilson_lh device service; lh_manager no longer holds it
+layout = None
 
 #samples.dryrun_queue.add_item(Item(example_sample_list[9].id, StageName.PREP))
 #example_sample_list[1].NICE_uuid = 'test_NICE_uuid'
