@@ -40,6 +40,7 @@ from roadmap_broker_client.envelope import Envelope, build
 from roadmap_broker_client.publisher import publish
 from roadmap_broker_client.topology import declare_node_queue, declare_topology
 from roadmap_broker_client.topics import (
+    DEVICE_ANNOUNCE_REQUEST,
     DEVICE_REGISTERED,
     INSTRUMENT_EXCHANGE,
     LAYOUT_UPDATED,
@@ -243,6 +244,16 @@ class LHManagerBrokerWorker:
             )
             await reg_queue.bind(self._exchange, routing_key=DEVICE_REGISTERED)
 
+            # Request all running devices to re-announce themselves with their current
+            # method schemas. This handles the case where lh_manager starts after devices.
+            announce_msg = build(
+                device_id="lh_manager",
+                routing_key=DEVICE_ANNOUNCE_REQUEST,
+                payload={},
+            )
+            await publish(self._exchange, DEVICE_ANNOUNCE_REQUEST, announce_msg)
+            logger.info("LHManager published device.announce_request to trigger re-registration.")
+
             logger.info("LHManager broker worker running.")
             await asyncio.gather(
                 consume(task_queue, self._on_scheduler_event),
@@ -409,6 +420,7 @@ class LHManagerBrokerWorker:
         self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
     ) -> None:
         from .liquid_handler.devices import DeviceBase, device_manager
+        from .liquid_handler.methods import method_manager
 
         payload = envelope.payload
         device_id = payload.get("device_id", "")
@@ -425,10 +437,23 @@ class LHManagerBrokerWorker:
             address=payload.get("address", ""),
         )
         await asyncio.to_thread(device_manager.register, device)
-        logger.info(
-            "device.registered: lh_manager registered '%s' at %s",
-            device_id, device.address,
-        )
+
+        # Register method schemas provided by the device.
+        methods: dict = payload.get("methods", {})
+        if methods:
+            def _register() -> None:
+                for name, schema in methods.items():
+                    method_manager.register_schema(name, {**schema, 'device_id': device_id, 'origin': device_id})
+            await asyncio.to_thread(_register)
+            logger.info(
+                "device.registered: lh_manager registered '%s' at %s with %d methods",
+                device_id, device.address, len(methods),
+            )
+        else:
+            logger.info(
+                "device.registered: lh_manager registered '%s' at %s",
+                device_id, device.address,
+            )
 
         # Tell the frontend a new device is available; refreshWells() will call
         # refreshDeviceLayouts() if device_id is not yet in device_layouts.
@@ -436,6 +461,9 @@ class LHManagerBrokerWorker:
             "device_name": device_id,
             "retrieval_uri": payload.get("address", ""),
         })
+        # Tell the frontend to refresh its method dropdown — new schemas may have arrived.
+        if methods:
+            self._sio_emit("update_methods", {})
 
     # ------------------------------------------------------------------
     # Inbound: layout.updated events from devices

@@ -9,7 +9,6 @@ import EditWellContents from './EditWellContents.vue';
 import MaterialManager from './MaterialManager.vue';
 import AddWaste from './AddWaste.vue';
 import WasteManager from './WasteManager.vue';
-import LHInterface from './LHInterface.vue';
 import EditRackSettings from './EditRackSettings.vue';
 import BatchWellEditor from './BatchWellEditor.vue';
 
@@ -44,10 +43,6 @@ const filtered_layouts = computed(()=> {
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#Devices" type="button" role="tab"
         aria-controls="Devices" aria-selected="false">Devices</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="lh-tab" data-bs-toggle="tab" data-bs-target="#LHInterface" type="button" role="tab"
-        aria-controls="LHInterface" aria-selected="false">LH Controls</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#Materials" type="button" role="tab"
@@ -89,9 +84,6 @@ const filtered_layouts = computed(()=> {
 
 
     </div>
-    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="LHInterface" role="tabpanel" aria-labelledby="lh-tab">
-      <LHInterface />
-    </div>    
     <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>

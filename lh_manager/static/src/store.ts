@@ -289,7 +289,15 @@ export function add_method(sample_id: string, stage_name: string, event: Event) 
     const s: Sample = structuredClone(toRaw(sample));
     const { stages } = s;
     const stage = stages[stage_name];
-    const num_methods = stage.methods.push({ method_name });
+    const mdef = method_defs.value[method_name];
+    const defaults: Record<string, any> = {};
+    const props = mdef?.schema?.properties as Record<string, any> | undefined;
+    if (props) {
+      for (const [field, prop] of Object.entries(props)) {
+        if (prop != null && 'default' in prop) defaults[field] = prop.default;
+      }
+    }
+    const num_methods = stage.methods.push({ ...defaults, method_name, display_name: mdef?.display_name ?? method_name });
     update_sample(s);
     active_stage.value = stage_name;
     active_method_index.value = num_methods - 1;
@@ -302,7 +310,6 @@ export async function update_at_pointer(sample_id: string, pointer: string | str
   // console.log({pointer});
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
-    const g = json_pointer.get(s, pointer);
     json_pointer.set(s, pointer, value);
     return await update_sample(s);
   }
@@ -784,15 +791,6 @@ export async function update_device(device_name: string, param_name: string, par
   return response_body;
 }
 
-export async function initialize_devices() {
-  const update_result = await fetch("/GUI/InitializeDevices/", {
-    method: "POST",
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
-  });
-  const response_body = await update_result.json();
-  return response_body;
-}
 
 export async function remove_sample(sample_id: string) {
   const update_result = await fetch("/GUI/RemoveSample/", {

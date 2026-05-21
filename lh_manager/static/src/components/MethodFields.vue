@@ -40,6 +40,7 @@ const source_components = computed(() => {
 });
 
 function get_parameters(method: MethodType) {
+  if (!method) return [];
   const { method_name } = method;
   const method_def = method_defs.value[method_name];
   if (method_def == null) {
@@ -49,7 +50,14 @@ function get_parameters(method: MethodType) {
   const params = fields.map((field_name) => {
     const properties = schema.properties[field_name];
     const type = ('$ref' in properties) ? properties['$ref'] : properties.type;
-    const value = clone(method[field_name]);
+    let value = clone(method[field_name]);
+    // Ensure structured fields always have a base object so their controls render.
+    if (isWellLocationType(type) && value == null) {
+      value = { rack_id: null, well_number: 0 };
+    }
+    if ((type === '#/$defs/TransferMethod' || type === '#/$defs/MixMethod' || type === '#/$defs/InjectMethod') && value == null) {
+      value = { method_name: null };
+    }
     const original_value = clone(method[field_name]);
     return {name: field_name, value, original_value, type, schema, properties };
   });
@@ -59,6 +67,24 @@ function get_parameters(method: MethodType) {
 const parameters = computed(() => {
   return get_parameters(props.method);
 });
+
+function getMethodDefaults(method_name: string): Record<string, any> {
+  const mdef = method_defs.value[method_name];
+  if (!mdef) return { method_name };
+  const defaults: Record<string, any> = { method_name };
+  const props = (mdef.schema?.properties ?? {}) as Record<string, any>;
+  for (const [field, prop] of Object.entries(props)) {
+    if (prop != null && 'default' in prop) {
+      defaults[field] = prop.default;
+    }
+  }
+  return defaults;
+}
+
+function wellCount(rack_id: string): number {
+  const rack = available_racks.value[rack_id] as any;
+  return rack ? (rack.rows ?? 1) * (rack.columns ?? 1) : 0;
+}
 
 function get_template_names(field_type: string, schema: any) {
   const schema_def = json_pointer.get(schema, field_type.replace(/^#/, ''));
@@ -139,8 +165,36 @@ function available_solute_units(solute_name: string) {
   return [...massUnitsToAdd, ...volumeUnitsToAdd];
 }
 
+const method_origin = computed(() =>
+  method_defs.value[props.method?.method_name]?.origin ?? null
+);
+const method_device_layout = computed(() =>
+  method_origin.value ? device_layouts.value[method_origin.value] : null
+);
+
+// Racks to show in WellLocation and include_zones selectors.
+// Prefers the method's own device layout; falls back to all known device racks
+// so that locally-registered methods (origin=null) still show something.
+const available_racks = computed(() => {
+  const specific = method_device_layout.value?.layout?.racks;
+  if (specific) return specific;
+  const racks: Record<string, unknown> = {};
+  for (const dl of Object.values(device_layouts.value)) {
+    Object.assign(racks, dl.layout?.racks ?? {});
+  }
+  return racks;
+});
+
+function isWellLocationType(t: string) {
+  return t === '#/$defs/WellLocation' || t === 'WellLocation';
+}
+
+function isCompositionType(t: string) {
+  return t === '#/$defs/Composition' || t === 'Composition';
+}
+
 function activateSelector({name, type}) {
-  if (type === '#/$defs/WellLocation') {
+  if (isWellLocationType(type)) {
     active_well_field.value = name;
   }
 }
@@ -149,7 +203,7 @@ function activateSelector({name, type}) {
 <template>
   <fieldset :disabled="!editable">
     <tr v-for="param of parameters.filter((p) => (!hide_fields.includes(p.name)))" @click="activateSelector(param)">
-      <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: param.type === '#/$defs/WellLocation' }">
+      <td :class="{ 'selector-active': active_well_field === param.name, [param.name]: isWellLocationType(param.type) }">
         <div class="form-check">
           <label>
             {{ param.name }}:
@@ -167,22 +221,25 @@ function activateSelector({name, type}) {
       <td v-if="param.type === 'boolean'">
         <input type="checkbox" v-model="param.value" :name="`param_${param.name}`" @change="send_changes(param)" />
       </td>
-      <td v-if="param.type === '#/$defs/WellLocation'">
-        <select v-if="layout != null && param.value && 'rack_id' in param.value" v-model="param.value.rack_id"
-          @change="send_changes(param)">
+      <td v-if="isWellLocationType(param.type)">
+        <select v-if="Object.keys(available_racks).length > 0"
+          v-model="param.value.rack_id"
+          @change="param.value.well_number = 1; send_changes(param)">
           <option :value="null" disabled></option>
-          <option v-for="(rack_def, rack_name) of layout.racks">{{ rack_name }}</option>
+          <option v-for="(rack_def, rack_name) of available_racks">{{ rack_name }}</option>
         </select>
-        <input v-if="param.value && 'well_number' in param.value" class="number px-1 py-0"
-          v-model="param.value.well_number" :name="`param_${param.name}_well`" @keydown.enter="send_changes(param)"
-          @blur="send_changes(param)" />
+        <input type="number" class="number px-1 py-0"
+          v-model.number="param.value.well_number"
+          :min="1" :max="wellCount(param.value.rack_id)"
+          :name="`param_${param.name}_well`"
+          @keydown.enter="send_changes(param)" @blur="send_changes(param)" />
       </td>
-      <td v-if="param.type === 'array' && param.properties?.items?.$ref === '#/$defs/Zone'">
+      <td v-if="param.type === 'array' && (param.properties?.items?.$ref === '#/$defs/Zone' || param.name === 'include_zones')">
         <select v-model="param.value" multiple @change="send_changes(param)">
-          <option v-for="zone in param.schema.$defs?.Zone?.enum" :value="zone">{{ zone }}</option>
+          <option v-for="zone in Object.keys(available_racks)" :value="zone">{{ zone }}</option>
         </select>
       </td>
-      <td v-if="param.type === '#/$defs/Composition'">
+      <td v-if="isCompositionType(param.type)">
         <div>
           <div>Solutes:
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solutes')">add</button>
@@ -222,7 +279,8 @@ function activateSelector({name, type}) {
         </div>
       </td>
       <td v-if="param.type === '#/$defs/TransferMethod' || param.type === '#/$defs/MixMethod' || param.type === '#/$defs/InjectMethod'">
-        <select v-model="param.value.method_name" @change="param.value = {method_name: param.value.method_name}; send_changes(param)">
+        <select v-model="param.value.method_name" @change="param.value = getMethodDefaults(param.value.method_name); send_changes(param)">
+            <option :value="null" disabled>-- select --</option>
             <option v-for="mname of get_template_names(param.type, param.schema)" >
               {{ mname }}</option>
         </select>

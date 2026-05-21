@@ -1,7 +1,7 @@
 import functools
 import logging
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_serializer
 from enum import Enum
 from typing import Any, Dict, List, Literal, Union
 from uuid import uuid4
@@ -70,19 +70,45 @@ class BaseMethod(BaseModel):
         
         return [{}]
     
-class UnknownMethod(BaseMethod):
-    """Special method for holding an unknown data type (cannot be deserialized, previous schema version, etc.)
+class RawMethod(BaseMethod):
+    """Passthrough container for a method whose schema is not registered locally.
+
+    Stores the full raw dict in method_data so it can be forwarded to the broker
+    without modification. The inherited id/status/tasks fields preserve in-flight
+    tracking state across serialization cycles. method_type is populated from
+    the stored dict so autocontrol can determine TaskType without a local class.
+
+    method_name and display_name are non-Literal so they can carry the real device
+    method name (e.g. 'InjectLoop') instead of the class name 'RawMethod'. This
+    allows the frontend schema lookup (method_defs[method_name]) to find the schema.
+    model_dump() emits a flat representation (method_data fields + tracking fields)
+    so the frontend sees an identical structure to locally-registered methods.
     """
-    method_name: Literal['Unknown'] = 'Unknown'
-    display_name: Literal['Unknown'] = 'Unknown'
-    method_data: dict = Field(default_factory={})
+    method_name: str = 'RawMethod'
+    display_name: str = 'RawMethod'
+    method_type: MethodType = MethodType.NONE
+    method_data: dict = Field(default_factory=dict)
+
+    @model_serializer(mode='plain')
+    def _flat_serialize(self) -> dict:
+        """Flat serialization: method_data fields merged with tracking state.
+
+        Uses @model_serializer so this is called by parent models (e.g. MethodList)
+        as well as direct model_dump() calls. The frontend reads method[field_name]
+        directly, so device-specific fields must be at the top level. Tracking fields
+        (id, status, tasks) overlay
+        whatever is in method_data so the backend round-trip is lossless.
+        """
+        base = dict(self.method_data)
+        base['id'] = self.id
+        base['status'] = self.status
+        base['tasks'] = [t.model_dump() for t in self.tasks]
+        return base
 
     def render_method(self,
                          sample_name: str,
                          sample_description: str,
                          layout: LHBedLayout) -> List[dict]:
-        """Returns empty list for unknown methods"""
-        
         return []
 
 class MethodContainer(BaseMethod):
@@ -159,26 +185,38 @@ class MethodManager:
     def __init__(self) -> None:
 
         self.methods: dict[str, RegisteredMethod] = {}
+        # Schemas received from remote devices via device.registered broker events.
+        self._remote_schemas: dict[str, dict] = {}
 
     def register(self, method: MethodsType, display: bool = True, origin: str | None = None) -> None:
         """Registers a method in the manager
 
         Args:
             method (BaseMethod): method to register
-            display (bool): whether to display the method in 
+            display (bool): whether to display the method in
         """
         rmethod = RegisteredMethod(method, display=display, origin=origin)
         self.methods[rmethod.name] = rmethod
+
+    def register_schema(self, name: str, schema: dict) -> None:
+        """Register a method schema received from a remote device.
+
+        Merges into get_all_schema() so the frontend sees device-provided methods
+        without requiring a local Pydantic class.
+        """
+        self._remote_schemas[name] = schema
 
     def get_all_schema(self) -> Dict[str, Dict]:
         """Gets the schema of all the methods in the manager
 
         Returns:
-            Dict[str, Dict]: Dictionary of method names and schema. Schema has fields 'fields', 
+            Dict[str, Dict]: Dictionary of method names and schema. Schema has fields 'fields',
                                 'display_name', and 'schema'; the last is the pydantic schema
         """
 
-        return {k: rm.get_schema() for k, rm in self.methods.items()}
+        result = {k: rm.get_schema() for k, rm in self.methods.items()}
+        result.update(self._remote_schemas)
+        return result
     
     def get_method_by_name(self, method_name: str) -> MethodsType:
         """Gets method object by name

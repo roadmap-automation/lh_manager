@@ -13,7 +13,7 @@ from ..gui_api.events import trigger_samples_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
-from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer, BaseMethod
+from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer, BaseMethod, RawMethod, EXCLUDE_FIELDS, method_manager
 from ..liquid_handler.bedlayout import LHBedLayout
 from ..liquid_handler.samplelist import Sample
 from ..liquid_handler.state import samples
@@ -37,7 +37,6 @@ def launch_autocontrol_interface():
     """Register submission/cancel callbacks and send device INIT tasks."""
     submit_handler.submit_callbacks.append(submission_callback)
     submit_handler.cancel_callbacks.append(cancel_callback)
-    init_devices()
 
 def submission_callback(data: dict):
     """Submission handler callback
@@ -97,6 +96,61 @@ class AutocontrolTaskContainer(TaskContainer):
 class AutocontrolItem(Item):
     method_id: str | None = None
 
+def _submit_raw_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Broker-path submission for RawMethod — bypasses legacy render/render_method pipeline."""
+    raw_method_name = m.method_data.get('method_name')
+    schema = method_manager._remote_schemas.get(raw_method_name)
+    if schema is None:
+        logging.error(
+            "Cannot submit RawMethod '%s': no remote schema registered. "
+            "Ensure the device is running and has published device.registered.",
+            raw_method_name,
+        )
+        return
+
+    device_id = schema.get('device_id')
+    if not device_id:
+        logging.error(
+            "Cannot submit RawMethod '%s': schema is missing device_id "
+            "(re-start the device to trigger a fresh device.registered event).",
+            raw_method_name,
+        )
+        return
+
+    device = device_manager.get_device_by_name(device_id)
+    channel = sample.channel if (device is not None and device.multichannel) else None
+
+    # Strip lh_manager tracking / metadata fields — device only needs user parameters.
+    params = {k: v for k, v in m.method_data.items() if k not in EXCLUDE_FIELDS}
+
+    task_data = TaskData(
+        device=device_id,
+        channel=channel,
+        method_data={'method_list': [{'method_name': raw_method_name, 'method_data': params}]},
+    )
+
+    if m.method_type == MethodType.MEASURE:
+        tasktype = TaskType.MEASURE
+    elif m.method_type == MethodType.PREPARE:
+        tasktype = TaskType.PREPARE
+    else:
+        tasktype = TaskType.NOCHANNEL
+
+    new_task = AutocontrolTaskContainer(
+        task=Task(sample_id=sample.id, task_type=tasktype, tasks=[task_data]),
+        status=SampleStatus.INACTIVE,
+    )
+
+    with active_tasks.lock:
+        m.tasks.append(new_task)
+        active_tasks.pending[str(new_task.task.id)] = AutocontrolItem(
+            id=sample.id, stage=stage, method_id=m.id,
+        )
+
+    sample.stages[stage].activate(method_index)
+    submit_tasks([new_task])
+
+
 def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout | None = None) -> List[Task]:
     """Runs all draft methods in an entire stage
     """
@@ -111,6 +165,11 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
 
     # Generate real-time tasks based on layout
     m: MethodsType = sample.stages[stage].methods[method_index]
+
+    if isinstance(m, RawMethod):
+        _submit_raw_method(sample, stage, method_index, m)
+        return []
+
     all_methods: List[MethodsType] = m.get_methods(layout)
 
     # render all the methods. Can be multiple rendered submethod per main method
@@ -213,17 +272,6 @@ def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_mat
         with active_tasks.lock:
             if str(task.id) in active_tasks.active:
                 mark_cancelled(str(task.id))
-
-def init_devices():
-    init_tasks = [Task(task_type=TaskType.INIT,
-                       tasks=[TaskData(device=device.device_name,
-                                       device_type=device.device_type,
-                                       device_address=device.address,
-                                       number_of_channels=(samples.n_channels if device.multichannel else None),
-                                       sample_mixing=device.allow_sample_mixing)])
-                  for device in device_manager.device_list]
-
-    submit_tasks([AutocontrolTaskContainer(task=t) for t in init_tasks])
 
 @trigger_samples_update
 def mark_cancelled(id: str) -> None:
