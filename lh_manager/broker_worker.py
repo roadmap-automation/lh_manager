@@ -305,12 +305,20 @@ class LHManagerBrokerWorker:
             sample_id = captured.get("sample_id")
             step_id = captured.get("step_id")
             if sample_id and step_id and self._protocol_exchange is not None:
+                method_payload: dict = {"step_id": step_id, "status": new_status.value}
+                device_payload = envelope.payload or {}
+                resolved_composition = device_payload.get("resolved_composition")
+                if resolved_composition is not None:
+                    method_payload["resolved_composition"] = resolved_composition
+                retrieval_uri = device_payload.get("retrieval_uri")
+                if retrieval_uri is not None:
+                    method_payload["retrieval_uri"] = retrieval_uri
                 envelope_out = build(
                     device_id="lh_manager",
                     routing_key=SAMPLE_METHOD_COMPLETED,
                     task_id=task_id,
                     sample_id=sample_id,
-                    payload={"step_id": step_id, "status": new_status.value},
+                    payload=method_payload,
                 )
                 await publish(self._protocol_exchange, SAMPLE_METHOD_COMPLETED, envelope_out)
 

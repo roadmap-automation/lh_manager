@@ -159,6 +159,51 @@ def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout | N
     for _ in range(len(sample.stages[stage].methods)):
         prepare_and_submit_method(sample, stage, 0, layout)
 
+def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Broker-path submission for a parallel method group — one Task, multiple TaskData."""
+    method_group = m.method_data["method_group"]
+    taskdata = []
+    for sub in method_group:
+        method_name = sub["method_name"]
+        schema = method_manager._remote_schemas.get(method_name)
+        if schema is None:
+            logging.error(
+                "Cannot submit method group: no remote schema for '%s'. "
+                "Ensure the device is running and has published device.registered.",
+                method_name,
+            )
+            return
+        device_id = schema.get("device_id")
+        if not device_id:
+            logging.error(
+                "Cannot submit method group: schema for '%s' is missing device_id.",
+                method_name,
+            )
+            return
+        device = device_manager.get_device_by_name(device_id)
+        channel = sample.channel if (device is not None and device.multichannel) else None
+        params = {k: v for k, v in sub.items() if k not in ("method_name",) and k not in EXCLUDE_FIELDS}
+        taskdata.append(TaskData(
+            id=str(uuid4()),
+            device=device_id,
+            channel=channel,
+            method_data={"method_list": [{"method_name": method_name, "method_data": params}]},
+            non_channel_storage="vial" if channel is None else None,
+        ))
+
+    new_task = AutocontrolTaskContainer(
+        task=Task(sample_id=sample.id, task_type=TaskType.TRANSFER, tasks=taskdata),
+        status=SampleStatus.INACTIVE,
+    )
+    with active_tasks.lock:
+        m.tasks.append(new_task)
+        active_tasks.pending[str(new_task.task.id)] = AutocontrolItem(
+            id=sample.id, stage=stage, method_id=m.id,
+        )
+    sample.stages[stage].activate(method_index)
+    submit_tasks([new_task])
+
+
 def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout | None = None) -> List[Task]:
     """Runs a specific method by index
     """
@@ -167,7 +212,10 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
     m: MethodsType = sample.stages[stage].methods[method_index]
 
     if isinstance(m, RawMethod):
-        _submit_raw_method(sample, stage, method_index, m)
+        if m.method_data.get("method_group"):
+            _submit_raw_method_group(sample, stage, method_index, m)
+        else:
+            _submit_raw_method(sample, stage, method_index, m)
         return []
 
     all_methods: List[MethodsType] = m.get_methods(layout)
