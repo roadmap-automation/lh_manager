@@ -27,10 +27,12 @@ threading.Event gates all outbound calls until the exchange is connected.
 """
 
 import asyncio
+import json
 import logging
 import queue
 import threading
-from typing import Optional
+import uuid
+from typing import Dict, Optional
 
 import aio_pika
 
@@ -40,6 +42,7 @@ from roadmap_broker_client.envelope import Envelope, build
 from roadmap_broker_client.publisher import publish
 from roadmap_broker_client.topology import declare_node_queue, declare_topology
 from roadmap_broker_client.topics import (
+    CMD_RUN_SUBPROTOCOL,
     DEVICE_ANNOUNCE_REQUEST,
     DEVICE_REGISTERED,
     INSTRUMENT_EXCHANGE,
@@ -49,11 +52,14 @@ from roadmap_broker_client.topics import (
     SCHEDULER_TASK_COMPLETED,
     SCHEDULER_TASK_DISPATCHED,
     SCHEDULER_TASK_FAILED,
+    SUBPROTOCOL_COMPLETED,
+    SUBPROTOCOL_FAILED,
     TASK_ACCEPTED,
     TASK_COMPLETED,
     TASK_FAILED,
     WASTE_GENERATED,
     command_key,
+    command_subscription_pattern,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,6 +86,10 @@ class LHManagerBrokerWorker:
         self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
         self._emit_queue: queue.Queue = queue.Queue()
+        # Subprotocol execution: step_id → asyncio.Event (set by _on_scheduler_event)
+        self._pending_step_completions: Dict[str, asyncio.Event] = {}
+        # Subprotocol execution: step_id → retrieval_uri from completed measurement tasks
+        self._step_retrieval_uris: Dict[str, str] = {}
 
     # ------------------------------------------------------------------
     # Thread-safe public API  (called from sync Flask threads)
@@ -224,9 +234,6 @@ class LHManagerBrokerWorker:
             )
             await layout_queue.bind(self._exchange, routing_key=LAYOUT_UPDATED)
 
-            # Durable command queue for LH jobs dispatched by autocontrol.
-            lh_cmd_queue = await declare_node_queue(channel, "lh", INSTRUMENT_EXCHANGE)
-
             # Transient queue for waste events from devices.
             waste_queue = await channel.declare_queue(
                 "lh_manager.waste_events",
@@ -244,6 +251,18 @@ class LHManagerBrokerWorker:
             )
             await reg_queue.bind(self._exchange, routing_key=DEVICE_REGISTERED)
 
+            # Durable command queue on exchange.protocol for subprotocol execution
+            # commands from Protocol Studio.
+            subprotocol_cmd_queue = await channel.declare_queue(
+                "lh_manager.subprotocol_commands",
+                durable=True,
+                arguments={"x-dead-letter-exchange": "exchange.dead_letter"},
+            )
+            await subprotocol_cmd_queue.bind(
+                self._protocol_exchange,
+                routing_key=command_subscription_pattern("lh_manager"),
+            )
+
             # Request all running devices to re-announce themselves with their current
             # method schemas. This handles the case where lh_manager starts after devices.
             announce_msg = build(
@@ -258,9 +277,9 @@ class LHManagerBrokerWorker:
             await asyncio.gather(
                 consume(task_queue, self._on_scheduler_event),
                 consume(layout_queue, self._on_layout_updated),
-                consume(lh_cmd_queue, self._on_lh_command),
                 consume(waste_queue, self._on_waste_generated),
                 consume(reg_queue, self._on_device_registered),
+                consume(subprotocol_cmd_queue, self._on_lhmanager_command),
             )
 
     # ------------------------------------------------------------------
@@ -304,13 +323,13 @@ class LHManagerBrokerWorker:
         if rk in (SCHEDULER_TASK_COMPLETED, SCHEDULER_TASK_FAILED):
             sample_id = captured.get("sample_id")
             step_id = captured.get("step_id")
+            device_payload = envelope.payload or {}
+            retrieval_uri = device_payload.get("retrieval_uri")
             if sample_id and step_id and self._protocol_exchange is not None:
                 method_payload: dict = {"step_id": step_id, "status": new_status.value}
-                device_payload = envelope.payload or {}
                 resolved_composition = device_payload.get("resolved_composition")
                 if resolved_composition is not None:
                     method_payload["resolved_composition"] = resolved_composition
-                retrieval_uri = device_payload.get("retrieval_uri")
                 if retrieval_uri is not None:
                     method_payload["retrieval_uri"] = retrieval_uri
                 envelope_out = build(
@@ -322,82 +341,145 @@ class LHManagerBrokerWorker:
                 )
                 await publish(self._protocol_exchange, SAMPLE_METHOD_COMPLETED, envelope_out)
 
+            # Unblock any subprotocol executor step awaiting this task's completion.
+            if step_id:
+                if retrieval_uri is not None:
+                    self._step_retrieval_uris[step_id] = retrieval_uri
+                event = self._pending_step_completions.pop(step_id, None)
+                if event is not None:
+                    event.set()
+
     # ------------------------------------------------------------------
-    # Inbound: command.lh.submit_task from autocontrol
+    # Inbound: command.lh_manager.# from Protocol Studio (exchange.protocol)
     # ------------------------------------------------------------------
 
-    async def _on_lh_command(
+    async def _on_lhmanager_command(
         self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
     ) -> None:
-        from .liquid_handler.lhinterface import LHJob, lh_interface, InterfaceStatus
-        from .liquid_handler.job import ResultStatus
-        from .liquid_handler.state import layout
-
         rk = message.routing_key or ""
-        if rk.split(".")[-1] != "submit_task":
-            logger.warning("LH: unknown command verb on key '%s'", rk)
+        if rk == command_key("lh_manager", CMD_RUN_SUBPROTOCOL):
+            asyncio.create_task(self._on_run_subprotocol(envelope))
+        else:
+            logger.debug("Ignoring unknown lh_manager command: %s", rk)
+
+    async def _on_run_subprotocol(self, envelope: Envelope) -> None:
+        """Execute a named subprotocol and publish SUBPROTOCOL_COMPLETED/FAILED.
+
+        All steps are expanded synchronously (resolving $ref/$alloc, flattening
+        nested subprotocols) and then submitted to autocontrol in one shot.
+        autocontrol's per-channel FIFO queue handles sequential ordering.
+        Only the final step's completion is awaited before publishing the result.
+        """
+        from .subprotocol.db import get_subprotocol_by_name
+        from .subprotocol.executor import (
+            expand_subprotocol,
+            _build_method_group,
+            _create_sample_sync,
+            _submit_method_group_sync,
+            _submit_expanded_steps,
+        )
+
+        payload = envelope.payload or {}
+        name: str = payload.get("subprotocol_name", "")
+        run_id: str = payload.get("subprotocol_run_id") or str(uuid.uuid4())
+        sample_id: Optional[str] = payload.get("sample_id") or None
+        channel: int = int(payload.get("channel", 0))
+        params: dict = payload.get("parameters", {})
+
+        defn = await asyncio.to_thread(get_subprotocol_by_name, name)
+        if defn is None:
+            logger.error("Subprotocol %r not found — cannot execute run %s.", name, run_id)
+            await self._publish_protocol(SUBPROTOCOL_FAILED, run_id, sample_id, {
+                "subprotocol_run_id": run_id,
+                "error": f"Subprotocol {name!r} not found in lh_manager DB",
+            })
             return
 
         try:
-            # envelope.task_id is authoritative; autocontrol puts it in the
-            # envelope header only, not in the payload body.
-            job = LHJob(**{**envelope.payload, "id": str(envelope.task_id)})
-        except Exception as exc:
-            logger.error("LH: cannot deserialize job: %s", exc)
-            raise
+            # Build context: allocations minted once, inputs available as $ref.
+            context: dict = {f"input.{k}": v for k, v in params.items()}
+            for alloc_name in json.loads(defn.get("allocations") or "[]"):
+                context[f"alloc.{alloc_name}"] = str(uuid.uuid4())
 
-        if lh_interface.get_status() != InterfaceStatus.UP:
-            logger.error("LH: interface busy, rejecting task %s", envelope.task_id)
-            await self._emit_lh(TASK_FAILED, envelope, {"error": "LH interface busy"})
-            return
+            actual_sample_id = sample_id or await asyncio.to_thread(
+                _create_sample_sync, f"subprotocol {run_id[:8]}", channel
+            )
 
-        await self._emit_lh(TASK_ACCEPTED, envelope, {})
+            outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
+            step_to_output: dict = {v["step_id"]: k for k, v in outputs_defn.items()}
 
-        # One-shot callback: fires on each result update; publishes completed/failed
-        # once the job reaches a terminal state. Uses a flag to prevent double-firing.
-        fired = [False]
+            execution: str = defn.get("execution") or "sequential"
 
-        def _on_result(result_job: LHJob, *args, **kwargs) -> None:
-            if fired[0]:
-                return
-            status = result_job.get_result_status()
-            if status == ResultStatus.SUCCESS:
-                fired[0] = True
-                asyncio.run_coroutine_threadsafe(
-                    self._emit_lh(TASK_COMPLETED, envelope, {}), self._loop
+            if execution == "parallel":
+                # All top-level steps dispatched as one method group.
+                steps = json.loads(defn["steps"])
+                group = _build_method_group(steps, context)
+                method_type = defn.get("method_type") or "prepare"
+                final_step_id = run_id
+                await asyncio.to_thread(
+                    _submit_method_group_sync,
+                    actual_sample_id, run_id, method_type, group,
                 )
-            elif status == ResultStatus.FAIL:
-                fired[0] = True
-                asyncio.run_coroutine_threadsafe(
-                    self._emit_lh(TASK_FAILED, envelope, {"error": "LH job failed"}), self._loop
-                )
+            else:
+                # Pre-expand ALL steps at submission time; autocontrol's FIFO
+                # queue enforces ordering — no need to await each step before
+                # submitting the next.
+                expanded = await asyncio.to_thread(expand_subprotocol, defn, context)
+                if not expanded:
+                    await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
+                        "subprotocol_run_id": run_id,
+                        "sample_id": actual_sample_id,
+                        "outputs": {},
+                    })
+                    return
+                await asyncio.to_thread(_submit_expanded_steps, actual_sample_id, expanded)
+                final_step_id = expanded[-1]["step_id"]
 
-        lh_interface.results_callbacks.append(_on_result)
+            # Wait for the final step to complete (set by _on_scheduler_event).
+            event = asyncio.Event()
+            self._pending_step_completions[final_step_id] = event
+            await event.wait()
+            self._pending_step_completions.pop(final_step_id, None)
 
-        try:
-            lh_interface.activate_job(job, layout)
+            # Collect outputs from any steps that produced a retrieval_uri.
+            outputs: dict = {}
+            for step_id, output_name in step_to_output.items():
+                uri = self._step_retrieval_uris.pop(step_id, None)
+                if uri is not None:
+                    outputs[output_name] = uri
+
+            await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
+                "subprotocol_run_id": run_id,
+                "sample_id": actual_sample_id,
+                "outputs": outputs,
+            })
+            logger.info("Subprotocol %r run %s completed.", name, run_id)
+
         except Exception as exc:
-            lh_interface.results_callbacks.remove(_on_result)
-            logger.error("LH: activate_job failed: %s", exc)
-            await self._emit_lh(TASK_FAILED, envelope, {"error": str(exc)})
-            return
+            logger.exception("Subprotocol %r run %s failed.", name, run_id)
+            await self._publish_protocol(SUBPROTOCOL_FAILED, run_id, sample_id, {
+                "subprotocol_run_id": run_id,
+                "sample_id": sample_id,
+                "error": str(exc),
+            })
 
-        self._sio_emit('job_activation', {'job_id': job.id})
-        self._sio_emit('update_lh_job', {'msg': 'update_lh_job'})
-
-    async def _emit_lh(self, routing_key: str, envelope: Envelope, extra: dict) -> None:
-        if self._exchange is None:
+    async def _publish_protocol(
+        self,
+        routing_key: str,
+        task_id: Optional[str] = None,
+        sample_id: Optional[str] = None,
+        payload: Optional[dict] = None,
+    ) -> None:
+        if self._protocol_exchange is None:
             return
-        msg = build(
+        env = build(
             device_id="lh_manager",
             routing_key=routing_key,
-            task_id=envelope.task_id,
-            sample_id=envelope.sample_id,
-            assigned_channel=envelope.assigned_channel,
-            execution_policy=envelope.execution_policy or "infrastructure",
-            payload=extra,
+            task_id=task_id,
+            sample_id=sample_id,
+            payload=payload or {},
         )
-        await publish(self._exchange, routing_key, msg)
+        await publish(self._protocol_exchange, routing_key, env)
 
     # ------------------------------------------------------------------
     # Inbound: waste.generated events from devices

@@ -36,6 +36,10 @@ from .waste_manager.waste_api import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface, set_broker_worker
 from .autocontrol.autocontrol_api import autocontrol_blueprint
 from .broker_worker import LHManagerBrokerWorker
+from .subprotocol.api import blueprint as subprotocol_blueprint
+from .subprotocol import db as subprotocol_db
+from .method_group.api import blueprint as method_group_blueprint
+from .method_group import db as method_group_db
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -54,7 +58,12 @@ app.register_blueprint(lh_blueprint)
 app.register_blueprint(autocontrol_blueprint)
 app.register_blueprint(material_db_blueprint)
 app.register_blueprint(waste_blueprint)
+app.register_blueprint(subprotocol_blueprint)
+app.register_blueprint(method_group_blueprint)
 socketio.init_app(app)
+
+subprotocol_db.init_db()
+method_group_db.init_db()
 
 #@app.route('/')
 #def root():

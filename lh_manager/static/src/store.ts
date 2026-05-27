@@ -907,6 +907,185 @@ export async function lh_pauseresume() {
 export const active_lh_job = ref<object | null>(null);
 export const lh_status = ref<StatusType | null>(null);
 
+// ---------------------------------------------------------------------------
+// SubProtocol types and store
+// ---------------------------------------------------------------------------
+
+export interface SubprotocolStep {
+  id: string;
+  type: 'method' | 'method_group' | 'subprotocol';
+  method_name?: string;
+  method_group_name?: string;
+  subprotocol_name?: string;
+  parameters?: Record<string, any>;
+  output_alias?: Record<string, string>;
+}
+
+export interface Subprotocol {
+  id: string;
+  name: string;
+  steps: SubprotocolStep[];
+  execution: 'sequential' | 'parallel';
+  allocations: string[];
+  inputs: Record<string, any>;
+  outputs: Record<string, any>;
+  method_type: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SubprotocolSummary {
+  id: string;
+  name: string;
+  inputs: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const subprotocols = ref<SubprotocolSummary[]>([]);
+
+export type SubprotocolInputDef = {
+  type: string;
+  display_name: string;
+  is_static?: boolean;
+  static_value?: any;
+};
+
+export const subprotocol_schemas = ref<Record<string, Record<string, SubprotocolInputDef>>>({});
+
+export async function refreshSubprotocols() {
+  const { subprotocols: data } = await (await fetch('/subprotocols/')).json();
+  subprotocols.value = data;
+  const schemas: Record<string, Record<string, SubprotocolInputDef>> = {};
+  for (const sp of data as SubprotocolSummary[]) {
+    try { schemas[sp.name] = JSON.parse(sp.inputs || '{}'); }
+    catch { schemas[sp.name] = {}; }
+  }
+  subprotocol_schemas.value = schemas;
+}
+
+export function add_subprotocol_method(sample_id: string, stage_name: string, sp_name: string) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample === undefined) return;
+  const s: Sample = structuredClone(toRaw(sample));
+  const stage = s.stages[stage_name];
+  const schema = subprotocol_schemas.value[sp_name] ?? {};
+  const defaults: Record<string, any> = {};
+  for (const [field, def] of Object.entries(schema)) {
+    defaults[field] = def.is_static ? (def.static_value ?? null) : null;
+  }
+  const num_methods = stage.methods.push({
+    ...defaults,
+    method_name: '__subprotocol__',
+    display_name: sp_name,
+    subprotocol_name: sp_name,
+    id: null,
+    status: 'inactive',
+    tasks: [],
+  } as any);
+  update_sample(s);
+  active_stage.value = stage_name;
+  active_method_index.value = num_methods - 1;
+}
+
+export async function fetchSubprotocol(id: string): Promise<Subprotocol> {
+  return (await fetch(`/subprotocols/${id}`)).json();
+}
+
+export async function createSubprotocol(sp: Partial<Subprotocol>): Promise<string> {
+  const res = await fetch('/subprotocols/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sp),
+  });
+  const { id } = await res.json();
+  return id;
+}
+
+export async function updateSubprotocol(id: string, sp: Partial<Subprotocol>): Promise<void> {
+  await fetch(`/subprotocols/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sp),
+  });
+}
+
+export async function deleteSubprotocol(id: string): Promise<void> {
+  await fetch(`/subprotocols/${id}`, { method: 'DELETE' });
+}
+
+// ---------------------------------------------------------------------------
+// MethodGroup types and store
+// ---------------------------------------------------------------------------
+
+export interface MethodGroupStep {
+  method_name: string;
+  parameters: Record<string, any>;
+  composition_source: boolean;
+}
+
+export interface ExposedField {
+  field_name: string;
+  type: string;
+  display_name: string;
+  step_index: number;
+  is_static?: boolean;
+  static_value?: any;
+}
+
+export interface MethodGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  steps: MethodGroupStep[];
+  exposed_fields: ExposedField[];
+  method_type: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MethodGroupSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  method_type: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const method_groups = ref<MethodGroupSummary[]>([]);
+
+export async function refreshMethodGroups() {
+  const { method_groups: data } = await (await fetch('/method_groups/')).json();
+  method_groups.value = data;
+}
+
+export async function fetchMethodGroup(id: string): Promise<MethodGroup> {
+  return (await fetch(`/method_groups/${id}`)).json();
+}
+
+export async function createMethodGroup(mg: Partial<MethodGroup>): Promise<string> {
+  const res = await fetch('/method_groups/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mg),
+  });
+  const { id } = await res.json();
+  return id;
+}
+
+export async function updateMethodGroup(id: string, mg: Partial<MethodGroup>): Promise<void> {
+  await fetch(`/method_groups/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mg),
+  });
+}
+
+export async function deleteMethodGroup(id: string): Promise<void> {
+  await fetch(`/method_groups/${id}`, { method: 'DELETE' });
+}
+
 export const source_well = ref<WellLocation | null>(null);
 export const target_well = ref<WellLocation | null>(null);
 

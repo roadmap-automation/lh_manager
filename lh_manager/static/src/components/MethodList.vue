@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks } from '../store';
+import { ref, computed, defineProps, onMounted } from 'vue';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks, subprotocols, refreshSubprotocols, add_subprotocol_method } from '../store';
 import type { MethodType } from '../store';
+
+onMounted(() => { if (subprotocols.value.length === 0) refreshSubprotocols(); });
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
 
@@ -59,6 +61,13 @@ function method_string(method: MethodType) {
     const group = ((method as any).method_group as any[]) ?? [];
     return group.map((m: any) => m.method_name).join(' ‖ ');
   }
+  if (method.method_name === '__subprotocol__') {
+    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks']);
+    return Object.entries(method)
+      .filter(([k, v]) => !excluded.has(k) && v != null)
+      .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join(', ');
+  }
   const param_strings = get_parameters(method)
     .map(({name, value}) => {
       if (value &&  typeof(value) === 'object') {
@@ -90,6 +99,18 @@ function get_parameters(method: MethodType) {
 
 function clone(obj) {
   return (obj === undefined) ? undefined : JSON.parse(JSON.stringify(obj));
+}
+
+function handleAddMethod(event: Event) {
+  const target = event.target as HTMLSelectElement;
+  const value = target.value;
+  if (value.startsWith('__sp__:')) {
+    const sp_name = value.slice(7);
+    add_subprotocol_method(props.sample_id, props.stage_name, sp_name);
+    target.value = '';
+  } else {
+    add_method(props.sample_id, props.stage_name, event);
+  }
 }
 
 const status = computed(() => {
@@ -203,10 +224,13 @@ const status = computed(() => {
       </div>
     </div>
     <select v-if="props.editable" class="form-select form-select-sm text-primary outline-primary"
-      @change="add_method(props.sample_id, props.stage_name, $event)" value="">
+      @change="handleAddMethod($event)" value="">
       <option class="disabled" disabled selected value="">+ Add method</option>
-      <optgroup v-for="(methods, origin) in grouped_method_defs" :label="origin">
+      <optgroup v-for="(methods, origin) in grouped_method_defs" :label="String(origin)">
         <option v-for="[mname, mdef] of methods" :value="mname">{{ mdef.display_name }}</option>
+      </optgroup>
+      <optgroup v-if="subprotocols.length" label="Subprotocols">
+        <option v-for="sp of subprotocols" :value="`__sp__:${sp.name}`">{{ sp.name }}</option>
       </optgroup>
     </select>
   </div>

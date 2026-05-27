@@ -10,6 +10,8 @@ import AddWaste from './AddWaste.vue';
 import WasteManager from './WasteManager.vue';
 import EditRackSettings from './EditRackSettings.vue';
 import BatchWellEditor from './BatchWellEditor.vue';
+import SubProtocols from './SubProtocols.vue';
+import MethodGroups from './MethodGroups.vue';
 
 const props = defineProps({
   msg: String,
@@ -49,6 +51,14 @@ const all_devices = computed(() => {
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="waste-tab" data-bs-toggle="tab" data-bs-target="#Waste" type="button" role="tab"
         aria-controls="Waste" aria-selected="false">Waste</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="subprotocols-tab" data-bs-toggle="tab" data-bs-target="#SubProtocols" type="button" role="tab"
+        aria-controls="SubProtocols" aria-selected="false">SubProtocols</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="method-groups-tab" data-bs-toggle="tab" data-bs-target="#MethodGroups" type="button" role="tab"
+        aria-controls="MethodGroups" aria-selected="false">Method groups</button>
     </li>
   </ul>
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
@@ -96,6 +106,12 @@ const all_devices = computed(() => {
     </div>
     <div class="tab-pane d-flex flex-grow-1 h-100" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
       <WasteManager />
+    </div>
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-hidden" id="SubProtocols" role="tabpanel" aria-labelledby="subprotocols-tab">
+      <SubProtocols />
+    </div>
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-hidden" id="MethodGroups" role="tabpanel" aria-labelledby="method-groups-tab">
+      <MethodGroups />
     </div>
     </div>
 

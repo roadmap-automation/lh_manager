@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, } from '../store';
+import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, subprotocol_schemas } from '../store';
 import json_pointer from 'json-pointer';
 import type { MethodType, Solvent, Solute } from '../store';
 
@@ -42,6 +42,28 @@ const source_components = computed(() => {
 function get_parameters(method: MethodType) {
   if (!method) return [];
   const { method_name } = method;
+
+  if (method_name === '__subprotocol__') {
+    const sp_name = (method as any).subprotocol_name;
+    const sp_schema = subprotocol_schemas.value[sp_name] ?? {};
+    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks']);
+    return Object.entries(sp_schema)
+      .filter(([field_name]) => !excluded.has(field_name))
+      .map(([field_name, input_def]: [string, any]) => {
+        let type = input_def.type ?? 'string';
+        if (type === 'object') type = '#/$defs/Composition';
+        const value = clone((method as any)[field_name]) ?? null;
+        return {
+          name: field_name,
+          value,
+          original_value: clone((method as any)[field_name]),
+          type,
+          schema: { properties: { [field_name]: { type } } },
+          properties: { type },
+        };
+      });
+  }
+
   const method_def = method_defs.value[method_name];
   if (method_def == null) {
     return [];

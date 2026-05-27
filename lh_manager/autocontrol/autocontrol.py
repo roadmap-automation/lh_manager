@@ -204,6 +204,134 @@ def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: R
     submit_tasks([new_task])
 
 
+def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Expand a __subprotocol__ sentinel and attach all tasks directly to it.
+
+    The sentinel RawMethod stays as a single entry in the active list so the
+    GUI sees one subprotocol row with all its tasks. activate() is called once
+    after all tasks are registered so the sentinel moves to active in one shot.
+    """
+    import json as _json
+    from ..subprotocol.db import get_subprotocol_by_name
+    from ..subprotocol.executor import expand_subprotocol
+
+    sp_name: str = m.method_data.get("subprotocol_name", "")
+    defn = get_subprotocol_by_name(sp_name)
+    if defn is None:
+        logging.error("Subprotocol %r not found — cannot submit.", sp_name)
+        return
+
+    _excluded = EXCLUDE_FIELDS | {"subprotocol_name"}
+    context = {
+        f"input.{k}": v
+        for k, v in m.method_data.items()
+        if k not in _excluded
+    }
+    for alloc_name in _json.loads(defn.get("allocations") or "[]"):
+        context[f"alloc.{alloc_name}"] = str(uuid4())
+
+    try:
+        expanded = expand_subprotocol(defn, context)
+    except Exception:
+        logging.exception("Failed to expand subprotocol %r.", sp_name)
+        return
+
+    if not expanded:
+        sample.stages[stage].activate(method_index)
+        return
+
+    all_tasks: List[AutocontrolTaskContainer] = []
+    for step in expanded:
+        if step["type"] == "method":
+            method_name = step["method_name"]
+            schema = method_manager._remote_schemas.get(method_name)
+            if schema is None:
+                logging.error(
+                    "Cannot submit subprotocol step '%s': no remote schema registered.",
+                    method_name,
+                )
+                return
+            device_id = schema.get("device_id")
+            if not device_id:
+                logging.error(
+                    "Cannot submit subprotocol step '%s': schema missing device_id.",
+                    method_name,
+                )
+                return
+            device = device_manager.get_device_by_name(device_id)
+            channel = sample.channel if (device is not None and device.multichannel) else None
+            params = {k: v for k, v in step["params"].items() if k not in EXCLUDE_FIELDS}
+            task_data = TaskData(
+                device=device_id,
+                channel=channel,
+                method_data={"method_list": [{"method_name": method_name, "method_data": params}]},
+            )
+            try:
+                mtype = MethodType(schema.get("method_type", "none"))
+            except ValueError:
+                mtype = MethodType.NONE
+            if mtype == MethodType.MEASURE:
+                tasktype = TaskType.MEASURE
+            elif mtype == MethodType.PREPARE:
+                tasktype = TaskType.PREPARE
+            else:
+                tasktype = TaskType.NOCHANNEL
+            new_task = AutocontrolTaskContainer(
+                task=Task(sample_id=sample.id, task_type=tasktype, tasks=[task_data]),
+                status=SampleStatus.INACTIVE,
+            )
+
+        else:  # method_group
+            taskdata = []
+            ok = True
+            for sub in step["group"]:
+                sub_name = sub["method_name"]
+                schema = method_manager._remote_schemas.get(sub_name)
+                if schema is None:
+                    logging.error(
+                        "Cannot submit subprotocol method group: no remote schema for '%s'.",
+                        sub_name,
+                    )
+                    ok = False
+                    break
+                device_id = schema.get("device_id")
+                if not device_id:
+                    logging.error(
+                        "Cannot submit subprotocol method group: schema for '%s' missing device_id.",
+                        sub_name,
+                    )
+                    ok = False
+                    break
+                device = device_manager.get_device_by_name(device_id)
+                channel = sample.channel if (device is not None and device.multichannel) else None
+                params = {k: v for k, v in sub.items() if k not in ("method_name",) and k not in EXCLUDE_FIELDS}
+                taskdata.append(TaskData(
+                    id=str(uuid4()),
+                    device=device_id,
+                    channel=channel,
+                    method_data={"method_list": [{"method_name": sub_name, "method_data": params}]},
+                    non_channel_storage="vial" if channel is None else None,
+                ))
+            if not ok:
+                return
+            new_task = AutocontrolTaskContainer(
+                task=Task(sample_id=sample.id, task_type=TaskType.TRANSFER, tasks=taskdata),
+                status=SampleStatus.INACTIVE,
+            )
+
+        all_tasks.append(new_task)
+
+    with active_tasks.lock:
+        for new_task in all_tasks:
+            m.tasks.append(new_task)
+            active_tasks.pending[str(new_task.task.id)] = AutocontrolItem(
+                id=sample.id, stage=stage, method_id=m.id,
+            )
+
+    sample.stages[stage].activate(method_index)
+    submit_tasks(all_tasks)
+
+
 def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout | None = None) -> List[Task]:
     """Runs a specific method by index
     """
@@ -212,7 +340,9 @@ def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, lay
     m: MethodsType = sample.stages[stage].methods[method_index]
 
     if isinstance(m, RawMethod):
-        if m.method_data.get("method_group"):
+        if m.method_name == "__subprotocol__":
+            _submit_subprotocol_method(sample, stage, method_index, m)
+        elif m.method_data.get("method_group"):
             _submit_raw_method_group(sample, stage, method_index, m)
         else:
             _submit_raw_method(sample, stage, method_index, m)
