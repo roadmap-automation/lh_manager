@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-DB_FOLDER = os.path.join(os.getcwd(), "history")
+DB_FOLDER = os.path.join(os.getcwd(), "persistent_state")
 DB_FILE = "lh_manager_subprotocols.db"
 
 
