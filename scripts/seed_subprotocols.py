@@ -44,6 +44,73 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from lh_manager.subprotocol import db
+from lh_manager.method_group import db as mg_db
+
+
+METHOD_GROUPS = [
+    {
+        "name": "ROADMAP_LoadLoop_Parallel",
+        "method_type": "transfer",
+        "description": "Parallel LH loop load (ROADMAP_QCMD_LoadLoop) + IS loop load (LoadLoopBubbleSensor), coordinated via broker-mediated GSIOC.",
+        "steps": [
+            {
+                "method_name": "ROADMAP_QCMD_LoadLoop",
+                "parameters": {
+                    "Source":                     {"$ref": "input.Source"},
+                    "Volume":                     {"$ref": "input.Volume"},
+                    "Aspirate_Flow_Rate":         {"$ref": "input.Aspirate_Flow_Rate"},
+                    "Flow_Rate":                  {"$ref": "input.Flow_Rate"},
+                    "Outside_Rinse_Volume":       {"$ref": "input.Outside_Rinse_Volume"},
+                    "Extra_Volume":               {"$ref": "input.Extra_Volume"},
+                    "Air_Gap":                    {"$ref": "input.Air_Gap"},
+                    "Use_Liquid_Level_Detection": {"$ref": "input.Use_Liquid_Level_Detection"},
+                },
+                "composition_source": False,
+            },
+            {
+                "method_name": "LoadLoopBubbleSensor",
+                "parameters": {
+                    "pump_volume":    {"$ref": "input.Volume"},
+                    "pump_flow_rate": {"$ref": "input.Flow_Rate"},
+                },
+                "composition_source": False,
+            },
+        ],
+        "exposed_fields": [],
+    },
+    {
+        "name": "ROADMAP_DirectInject_Parallel",
+        "method_type": "transfer",
+        "description": "Parallel LH direct inject (ROADMAP_QCMD_DirectInject) + IS direct inject (DirectInjectBubbleSensor), coordinated via broker-mediated GSIOC.",
+        "steps": [
+            {
+                "method_name": "ROADMAP_QCMD_DirectInject",
+                "parameters": {
+                    "Source":                     {"$ref": "input.Source"},
+                    "Volume":                     {"$ref": "input.Volume"},
+                    "Injection_Flow_Rate":        {"$ref": "input.Injection_Flow_Rate"},
+                    "Aspirate_Flow_Rate":         {"$ref": "input.Aspirate_Flow_Rate"},
+                    "Load_Flow_Rate":             {"$ref": "input.Load_Flow_Rate"},
+                    "Outside_Rinse_Volume":       {"$ref": "input.Outside_Rinse_Volume"},
+                    "Extra_Volume":               {"$ref": "input.Extra_Volume"},
+                    "Air_Gap":                    {"$ref": "input.Air_Gap"},
+                    "Use_Liquid_Level_Detection": {"$ref": "input.Use_Liquid_Level_Detection"},
+                    "Use_Bubble_Sensors":         {"$ref": "input.Use_Bubble_Sensors"},
+                },
+                "composition_source": False,
+            },
+            {
+                "method_name": "DirectInjectBubbleSensor",
+                "parameters": {
+                    "pump_volume":    {"$ref": "input.Volume"},
+                    "pump_flow_rate": {"$ref": "input.Injection_Flow_Rate"},
+                },
+                "composition_source": False,
+            },
+        ],
+        "exposed_fields": [],
+    },
+]
 
 
 SUBPROTOCOLS = [
@@ -149,18 +216,19 @@ SUBPROTOCOLS = [
             },
             {
                 "id": "step_inject",
-                "method_name": "ROADMAP_QCMD_DirectInject",
+                "type": "method_group",
+                "method_group_name": "ROADMAP_DirectInject_Parallel",
                 "parameters": {
-                    "Source":                 {"id": {"$alloc": "well_id"}},
-                    "Volume":                 {"$ref": "input.volume"},
-                    "Injection_Flow_Rate":    {"$ref": "input.injection_flow_rate"},
-                    "Aspirate_Flow_Rate":     1.0,
-                    "Load_Flow_Rate":         2.0,
-                    "Outside_Rinse_Volume":   0.5,
-                    "Extra_Volume":           0.1,
-                    "Air_Gap":                0.15,
+                    "Source":                     {"id": {"$alloc": "well_id"}},
+                    "Volume":                     {"$ref": "input.volume"},
+                    "Injection_Flow_Rate":        {"$ref": "input.injection_flow_rate"},
+                    "Aspirate_Flow_Rate":         1.0,
+                    "Load_Flow_Rate":             2.0,
+                    "Outside_Rinse_Volume":       0.5,
+                    "Extra_Volume":               0.1,
+                    "Air_Gap":                    0.15,
                     "Use_Liquid_Level_Detection": False,
-                    "Use_Bubble_Sensors":     True,
+                    "Use_Bubble_Sensors":         True,
                 },
             },
             {
@@ -251,18 +319,19 @@ SUBPROTOCOLS = [
             },
             {
                 "id": "step_inject",
-                "method_name": "ROADMAP_QCMD_DirectInject",
+                "type": "method_group",
+                "method_group_name": "ROADMAP_DirectInject_Parallel",
                 "parameters": {
-                    "Source":                 {"id": {"$alloc": "well_id"}},
-                    "Volume":                 {"$ref": "input.volume"},
-                    "Injection_Flow_Rate":    {"$ref": "input.injection_flow_rate"},
-                    "Aspirate_Flow_Rate":     1.0,
-                    "Load_Flow_Rate":         2.0,
-                    "Outside_Rinse_Volume":   0.5,
-                    "Extra_Volume":           0.1,
-                    "Air_Gap":                0.15,
+                    "Source":                     {"id": {"$alloc": "well_id"}},
+                    "Volume":                     {"$ref": "input.volume"},
+                    "Injection_Flow_Rate":        {"$ref": "input.injection_flow_rate"},
+                    "Aspirate_Flow_Rate":         1.0,
+                    "Load_Flow_Rate":             2.0,
+                    "Outside_Rinse_Volume":       0.5,
+                    "Extra_Volume":               0.1,
+                    "Air_Gap":                    0.15,
                     "Use_Liquid_Level_Detection": False,
-                    "Use_Bubble_Sensors":     True,
+                    "Use_Bubble_Sensors":         True,
                 },
             },
             {
@@ -360,15 +429,16 @@ SUBPROTOCOLS = [
             },
             {
                 "id": "step_load_loop",
-                "method_name": "ROADMAP_QCMD_LoadLoop",
+                "type": "method_group",
+                "method_group_name": "ROADMAP_LoadLoop_Parallel",
                 "parameters": {
-                    "Source":                    {"id": {"$alloc": "well_id"}},
-                    "Volume":                    {"$ref": "input.volume"},
-                    "Aspirate_Flow_Rate":        2.5,
-                    "Flow_Rate":                 2.0,
-                    "Outside_Rinse_Volume":      0.5,
-                    "Extra_Volume":              0.1,
-                    "Air_Gap":                   0.15,
+                    "Source":                     {"id": {"$alloc": "well_id"}},
+                    "Volume":                     {"$ref": "input.volume"},
+                    "Aspirate_Flow_Rate":         2.5,
+                    "Flow_Rate":                  2.0,
+                    "Outside_Rinse_Volume":       0.5,
+                    "Extra_Volume":               0.1,
+                    "Air_Gap":                    0.15,
                     "Use_Liquid_Level_Detection": True,
                 },
             },
@@ -662,6 +732,53 @@ SUBPROTOCOLS = [
 ]
 
 
+def seed_method_groups(dry_run: bool = False, update: bool = False) -> None:
+    mg_db.init_db()
+    existing = {row["name"]: row["id"] for row in mg_db.list_method_groups()}
+
+    inserted = updated = skipped = 0
+    for defn in METHOD_GROUPS:
+        name = defn["name"]
+        steps = defn["steps"]
+        description = defn.get("description")
+        exposed_fields = defn.get("exposed_fields", [])
+        method_type = defn.get("method_type")
+
+        if name in existing:
+            if update:
+                if dry_run:
+                    print(f"  DRY UPDATE  {name}")
+                    print(json.dumps({"steps": steps, "method_type": method_type}, indent=2))
+                else:
+                    mg_db.update_method_group(
+                        existing[name], name, steps,
+                        description=description,
+                        exposed_fields=exposed_fields,
+                        method_type=method_type,
+                    )
+                    print(f"  UPDATE {name}  id={existing[name]}")
+                updated += 1
+            else:
+                print(f"  SKIP  {name}  (use --update to overwrite)")
+                skipped += 1
+            continue
+
+        if dry_run:
+            print(f"  DRY   {name}")
+            print(json.dumps({"steps": steps, "method_type": method_type}, indent=2))
+        else:
+            mg_id = mg_db.create_method_group(
+                name, steps,
+                description=description,
+                exposed_fields=exposed_fields,
+                method_type=method_type,
+            )
+            print(f"  INSERT {name}  id={mg_id}")
+        inserted += 1
+
+    print(f"\nMethod groups done: {inserted} inserted, {updated} updated, {skipped} skipped.")
+
+
 def seed(dry_run: bool = False, update: bool = False) -> None:
     db.init_db()
     existing = {row["name"]: row["id"] for row in db.list_subprotocols()}
@@ -725,4 +842,5 @@ if __name__ == "__main__":
     parser.add_argument("--update", action="store_true",
                         help="Overwrite existing subprotocols.")
     args = parser.parse_args()
+    seed_method_groups(dry_run=args.dry_run, update=args.update)
     seed(dry_run=args.dry_run, update=args.update)
