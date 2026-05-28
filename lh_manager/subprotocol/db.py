@@ -1,27 +1,25 @@
 """Subprotocol definition store for lh_manager.
 
 Subprotocols are ROADMAP business logic owned by lh_manager (the Interface Layer).
-This module provides SQLite-backed CRUD.  The DB lives alongside lh_manager's
-other persistent state in the history/ folder.
+This module provides SQLite-backed CRUD.  The DB lives in lh_manager's
+persistent_state/ folder (path from app_config.SUBPROTOCOLS_DB).
 
 Schema is identical to the prototype tables in lh-protocol-studio so existing
 seed data can be re-used without changes.
 """
 
 import json
-import os
 import sqlite3
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-DB_FOLDER = os.path.join(os.getcwd(), "persistent_state")
-DB_FILE = "lh_manager_subprotocols.db"
+from lh_manager.app_config import SUBPROTOCOLS_DB
 
 
 def get_db_path() -> str:
-    os.makedirs(DB_FOLDER, exist_ok=True)
-    return os.path.join(DB_FOLDER, DB_FILE)
+    SUBPROTOCOLS_DB.parent.mkdir(parents=True, exist_ok=True)
+    return str(SUBPROTOCOLS_DB)
 
 
 def init_db() -> None:

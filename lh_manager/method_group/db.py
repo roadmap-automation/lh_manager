@@ -20,19 +20,17 @@ Schema:
 """
 
 import json
-import os
 import sqlite3
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-DB_FOLDER = os.path.join(os.getcwd(), "history")
-DB_FILE = "lh_manager_subprotocols.db"
+from lh_manager.app_config import METHOD_GROUPS_DB
 
 
 def get_db_path() -> str:
-    os.makedirs(DB_FOLDER, exist_ok=True)
-    return os.path.join(DB_FOLDER, DB_FILE)
+    METHOD_GROUPS_DB.parent.mkdir(parents=True, exist_ok=True)
+    return str(METHOD_GROUPS_DB)
 
 
 def init_db() -> None:
