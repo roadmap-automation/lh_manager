@@ -1036,7 +1036,13 @@ class ManagerClient:
             future.result()
 
         if thread_result['result'].get('success', None) is not None:
-            return self.get_task_result(task.id, subtask_id)
+            result = self.get_task_result(task.id, subtask_id)
+            retrieval_uri = result.get('retrieval_uri')
+            if retrieval_uri:
+                resp = requests.get(retrieval_uri)
+                resp.raise_for_status()
+                return resp.json()
+            return result
         else:
             pprint(thread_result)
             return thread_result
