@@ -128,6 +128,8 @@ class LHManagerBrokerWorker:
     # Async publish helpers
     # ------------------------------------------------------------------
 
+    _publish_seq = 0  # diagnostic: remove after ordering is confirmed
+
     async def _emit_command(self, verb: str, payload: dict,
                              task_id=None, sample_id=None) -> None:
         if self._exchange is None:
@@ -140,6 +142,9 @@ class LHManagerBrokerWorker:
             sample_id=sample_id,
             payload=payload,
         )
+        LHManagerBrokerWorker._publish_seq += 1
+        logger.info('[ORDER-ASYNC seq=%d] Publishing %s id=%s',
+                    LHManagerBrokerWorker._publish_seq, verb, task_id)
         await publish(self._exchange, rk, envelope)
 
     # ------------------------------------------------------------------

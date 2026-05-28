@@ -178,6 +178,7 @@ def to_thread(**thread_kwargs):
     return decorator_to_thread
 
 submission_lock = threading.Lock()
+_submit_seq = 0  # diagnostic: remove after ordering is confirmed
 
 @to_thread()
 def submit_tasks(tasks: List[AutocontrolTaskContainer], resubmit=False):
@@ -185,7 +186,10 @@ def submit_tasks(tasks: List[AutocontrolTaskContainer], resubmit=False):
     with submission_lock:
         for taskcontainer in tasks:
             task = taskcontainer.task
-            logging.info('Submitting Task: ' + task.tasks[0].device + ' ' + task.task_type + '\n')
+            global _submit_seq
+            _submit_seq += 1
+            logging.info('[ORDER-SYNC seq=%d] Submitting Task: %s %s id=%s',
+                         _submit_seq, task.tasks[0].device, task.task_type, task.id)
             if _broker_worker is None:
                 logging.error('Broker worker not set — cannot submit task %s', task.id)
                 if task.task_type != TaskType.INIT:
