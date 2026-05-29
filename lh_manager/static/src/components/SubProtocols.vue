@@ -9,6 +9,7 @@ import {
 import type { Subprotocol, SubprotocolStep, ExposedField } from '../store';
 
 const METHOD_TYPES = ['prepare', 'measure', 'transfer', 'init', 'shutdown', 'none'] as const;
+const PARAM_TYPES = ['number', 'boolean', 'Composition'] as const;
 const STEP_TYPES = ['method', 'method_group', 'subprotocol'] as const;
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -469,8 +470,9 @@ const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
             </div>
             <div>
               <label class="form-label small mb-1">Type</label>
-              <input class="form-control form-control-sm" style="width:110px" v-model="new_input.type"
-                placeholder="number" />
+              <select class="form-select form-select-sm" style="width:130px" v-model="new_input.type">
+                <option v-for="t in PARAM_TYPES" :key="t" :value="t">{{ t }}</option>
+              </select>
             </div>
             <div>
               <label class="form-label small mb-1">Display name</label>
