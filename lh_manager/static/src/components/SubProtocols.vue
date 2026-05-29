@@ -19,6 +19,7 @@ interface InputParam {
   display_name: string;
   is_static: boolean;
   static_value: string;
+  default_value: string;
 }
 
 interface StepField {
@@ -40,7 +41,7 @@ const editing = ref<Subprotocol>(blank_subprotocol());
 
 // Parameters (inputs) stored as array for the UI; synced to/from the dict on load/save
 const input_params_list = ref<InputParam[]>([]);
-const new_input = ref<InputParam>({ name: '', type: 'number', display_name: '', is_static: false, static_value: '' });
+const new_input = ref<InputParam>({ name: '', type: 'number', display_name: '', is_static: false, static_value: '', default_value: '' });
 
 // Allocations
 const new_alloc = ref('');
@@ -63,6 +64,7 @@ function sync_inputs_from_editing() {
     display_name: typeof v === 'object' ? (v.display_name ?? '') : '',
     is_static: typeof v === 'object' ? (v.is_static ?? false) : false,
     static_value: typeof v === 'object' ? String(v.static_value ?? '') : '',
+    default_value: typeof v === 'object' ? String(v.default_value ?? '') : '',
   }));
 }
 
@@ -70,7 +72,11 @@ function inputs_to_dict(): Record<string, any> {
   return Object.fromEntries(
     input_params_list.value.map(p => {
       const v: any = { type: p.type, display_name: p.display_name };
-      if (p.is_static) { v.is_static = true; v.static_value = p.static_value; }
+      if (p.is_static) {
+        v.is_static = true; v.static_value = p.static_value;
+      } else if (p.default_value !== '') {
+        v.default_value = p.default_value;
+      }
       return [p.name, v];
     })
   );
@@ -266,13 +272,41 @@ async function remove_subprotocol() {
   input_params_list.value = [];
 }
 
+async function duplicate_subprotocol() {
+  const new_name = prompt('Name for duplicate:', `Copy of ${editing.value.name}`);
+  if (!new_name || !new_name.trim()) return;
+  saving.value = true;
+  error_msg.value = null;
+  try {
+    const payload: Partial<Subprotocol> = {
+      name: new_name.trim(),
+      steps: JSON.parse(JSON.stringify(editing.value.steps)),
+      execution: editing.value.execution,
+      allocations: [...editing.value.allocations],
+      inputs: inputs_to_dict(),
+      outputs: editing.value.outputs,
+      method_type: editing.value.method_type || null,
+    };
+    const new_id = await createSubprotocol(payload);
+    await refreshSubprotocols();
+    is_new.value = false;
+    selected_id.value = new_id;
+    editing.value = await fetchSubprotocol(new_id);
+    sync_inputs_from_editing();
+  } catch (e: any) {
+    error_msg.value = String(e);
+  } finally {
+    saving.value = false;
+  }
+}
+
 // ── Parameters (inputs) ───────────────────────────────────────────────────────
 
 function add_input() {
   const name = new_input.value.name.trim();
   if (!name || input_params_list.value.some(p => p.name === name)) return;
   input_params_list.value.push({ ...new_input.value, name });
-  new_input.value = { name: '', type: 'number', display_name: '' };
+  new_input.value = { name: '', type: 'number', display_name: '', is_static: false, static_value: '', default_value: '' };
 }
 
 function remove_input(i: number) {
@@ -289,6 +323,26 @@ function add_alloc() {
 
 function remove_alloc(i: number) {
   editing.value.allocations.splice(i, 1);
+}
+
+// ── Outputs ───────────────────────────────────────────────────────────────────
+
+const OUTPUT_TYPES = ['QCMDData', 'ReflData', 'ReflAnalysisData', 'FloatWithUncertainty'] as const;
+const new_output = ref({ name: '', step_id: '', type: 'QCMDData' as string });
+
+function add_output() {
+  const name = new_output.value.name.trim();
+  if (!name || !new_output.value.step_id) return;
+  if (!editing.value.outputs) editing.value.outputs = {};
+  editing.value.outputs = { ...editing.value.outputs, [name]: { step_id: new_output.value.step_id, type: new_output.value.type } };
+  new_output.value = { name: '', step_id: '', type: 'QCMDData' };
+}
+
+function remove_output(name: string) {
+  if (!editing.value.outputs) return;
+  const updated = { ...editing.value.outputs };
+  delete updated[name];
+  editing.value.outputs = updated;
 }
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
@@ -376,6 +430,7 @@ const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
             <button class="btn btn-sm btn-primary" :disabled="saving" @click="save">
               {{ saving ? 'Saving…' : 'Save' }}
             </button>
+            <button v-if="!is_new" class="btn btn-sm btn-outline-secondary" :disabled="saving" @click="duplicate_subprotocol">Duplicate</button>
             <button v-if="!is_new" class="btn btn-sm btn-outline-danger" @click="remove_subprotocol">Delete</button>
           </div>
         </div>
@@ -427,7 +482,7 @@ const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
           <div v-if="input_params_list.length === 0" class="text-muted small fst-italic">No parameters defined.</div>
           <table v-else class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
             <thead class="table-light">
-              <tr><th>Name</th><th>Type</th><th>Display name</th><th>Mode</th><th>Value</th><th></th></tr>
+              <tr><th>Name</th><th>Type</th><th>Display name</th><th>Mode</th><th>Value / Default</th><th></th></tr>
             </thead>
             <tbody>
               <tr v-for="(p, i) in input_params_list" :key="i">
@@ -449,9 +504,17 @@ const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
                   <input v-if="p.is_static"
                     class="form-control form-control-sm"
                     :type="p.type === 'number' || p.type === 'integer' ? 'number' : 'text'"
-                    v-model="p.static_value" placeholder="value"
+                    placeholder="value"
+                    title="Static value — baked in, caller cannot override"
+                    v-model="p.static_value"
                   />
-                  <span v-else class="text-muted small fst-italic">caller provides</span>
+                  <input v-else
+                    class="form-control form-control-sm border-secondary-subtle text-muted"
+                    :type="p.type === 'number' || p.type === 'integer' ? 'number' : 'text'"
+                    placeholder="default (optional)"
+                    title="Default — pre-filled for the caller, can be changed"
+                    v-model="p.default_value"
+                  />
                 </td>
                 <td><button class="btn btn-sm btn-outline-danger p-0 px-1" @click="remove_input(i)">✕</button></td>
               </tr>
@@ -475,6 +538,48 @@ const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
               <button type="button" class="btn-close" style="font-size:0.55rem" @click="remove_alloc(i)"></button>
             </span>
           </div>
+        </div>
+
+        <!-- ── Outputs ────────────────────────────────────────────────────── -->
+        <div class="mb-4">
+          <div class="fw-semibold small mb-2">Outputs <span class="text-muted fw-normal">(declare which step produces each retrievable result)</span></div>
+          <div class="d-flex gap-1 mb-2 align-items-end flex-wrap">
+            <div>
+              <label class="form-label small mb-1">Name</label>
+              <input class="form-control form-control-sm" style="width:140px" v-model="new_output.name"
+                placeholder="e.g. measurement" @keydown.enter="add_output" />
+            </div>
+            <div>
+              <label class="form-label small mb-1">Step ID</label>
+              <select class="form-select form-select-sm" style="width:220px" v-model="new_output.step_id">
+                <option value="">— select step —</option>
+                <option v-for="step in editing.steps" :key="step.id" :value="step.id">
+                  {{ step.id }} ({{ step.method_name || step.method_group_name || step.subprotocol_name || '?' }})
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Type</label>
+              <select class="form-select form-select-sm" style="width:190px" v-model="new_output.type">
+                <option v-for="t in OUTPUT_TYPES" :key="t" :value="t">{{ t }}</option>
+              </select>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" style="height:31px" @click="add_output">Add</button>
+          </div>
+          <div v-if="Object.keys(editing.outputs ?? {}).length === 0" class="text-muted small fst-italic">No outputs defined.</div>
+          <table v-else class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+            <thead class="table-light">
+              <tr><th>Name</th><th>Step ID</th><th>Type</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(def, name) in (editing.outputs ?? {})" :key="name">
+                <td class="font-monospace">{{ name }}</td>
+                <td class="font-monospace text-muted">{{ def.step_id }}</td>
+                <td>{{ def.type }}</td>
+                <td><button class="btn btn-sm btn-outline-danger p-0 px-1" @click="remove_output(String(name))">✕</button></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- ── Steps ──────────────────────────────────────────────────────── -->

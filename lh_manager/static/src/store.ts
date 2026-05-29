@@ -949,6 +949,7 @@ export type SubprotocolInputDef = {
   display_name: string;
   is_static?: boolean;
   static_value?: any;
+  default_value?: any;
 };
 
 export const subprotocol_schemas = ref<Record<string, Record<string, SubprotocolInputDef>>>({});
@@ -972,7 +973,7 @@ export function add_subprotocol_method(sample_id: string, stage_name: string, sp
   const schema = subprotocol_schemas.value[sp_name] ?? {};
   const defaults: Record<string, any> = {};
   for (const [field, def] of Object.entries(schema)) {
-    defaults[field] = def.is_static ? (def.static_value ?? null) : null;
+    defaults[field] = def.is_static ? (def.static_value ?? null) : (def.default_value ?? null);
   }
   const num_methods = stage.methods.push({
     ...defaults,
