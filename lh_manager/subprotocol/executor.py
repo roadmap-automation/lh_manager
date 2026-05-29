@@ -3,9 +3,11 @@
 Provides two entry points called from broker_worker._on_run_subprotocol:
 
   expand_subprotocol     — synchronous, pure expansion of a subprotocol
-                           definition into a flat list of ExpandedStep dicts.
-                           DB lookups for nested subprotocol / method_group
-                           steps are synchronous; wrap with asyncio.to_thread.
+                           definition into a flat list of ExpandedStep dicts
+                           and a mapping of output names to prefixed leaf
+                           step_ids.  DB lookups for nested subprotocol /
+                           method_group steps are synchronous; wrap with
+                           asyncio.to_thread.
 
   _submit_expanded_steps — submit all expanded steps to autocontrol in a
                            single synchronous call; wrap with asyncio.to_thread.
@@ -15,15 +17,23 @@ Context resolution:
   $alloc <handle>    — resolved to a UUID minted at subprotocol start
   Nested dicts/lists — resolved recursively
 
-NOTE: output_alias (step N's result feeds step N+1) is not implemented.
-If that feature is ever needed, a separate mechanism will be required because
-all steps are submitted before any complete.
+Step-id prefixing:
+  When recursing into a nested subprotocol step whose parent step_id is
+  "solvent_phase", all child steps are emitted with step_ids prefixed as
+  "solvent_phase.<child_id>".  This eliminates collisions when the same child
+  subprotocol is used multiple times (e.g. three QCMD measurement phases).
+
+output_leaf_map:
+  expand_subprotocol returns a second value mapping each output name declared
+  at this subprotocol level to the fully-prefixed leaf method step_id that
+  will produce the retrieval_uri.  The caller uses this to look up results
+  in _step_retrieval_uris after execution.
 """
 
 import json
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -34,20 +44,27 @@ def expand_subprotocol(
     defn: Dict[str, Any],
     context: Dict[str, Any],
     depth: int = 0,
-) -> List[Dict[str, Any]]:
+    step_prefix: str = "",
+) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """Expand a sequential subprotocol into a flat list of ExpandedStep dicts.
 
-    Each entry has:
+    Returns ``(expanded_steps, output_leaf_map)`` where:
+
+    ``expanded_steps`` — list of dicts, each with:
       - ``type``        : "method" | "method_group"
-      - ``step_id``     : str
+      - ``step_id``     : str  (prefixed to disambiguate repeated child use)
 
-    For ``type == "method"``:
-      - ``method_name`` : str
-      - ``params``      : dict  (all $ref/$alloc resolved)
+      For ``type == "method"``:
+        - ``method_name`` : str
+        - ``params``      : dict  (all $ref/$alloc resolved)
 
-    For ``type == "method_group"``:
-      - ``method_type`` : str
-      - ``group``       : list of {"method_name": ..., ...}
+      For ``type == "method_group"``:
+        - ``method_type`` : str
+        - ``group``       : list of {"method_name": ..., ...}
+
+    ``output_leaf_map`` — maps each declared output name at this subprotocol
+      level to the fully-prefixed leaf method step_id that will produce its
+      retrieval_uri.  Used by the caller to look up results after execution.
 
     Nested sequential subprotocols are recursively flattened into the parent
     list.  Nested parallel subprotocols become a single method_group entry
@@ -59,17 +76,23 @@ def expand_subprotocol(
         )
 
     steps: list = json.loads(defn["steps"])
+    outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
+
     result: List[Dict[str, Any]] = []
+    # Maps output_name (at this level) → fully-prefixed leaf step_id.
+    # Populated bottom-up as nested subprotocols are expanded.
+    output_leaf_map: Dict[str, str] = {}
 
     for step in steps:
         step_type: str = step.get("type", "method")
         step_id: str = step["id"]
+        prefixed_id: str = f"{step_prefix}{step_id}"
         resolved = _resolve_step_params(step, context)
 
         if step_type == "method":
             result.append({
                 "type": "method",
-                "step_id": step_id,
+                "step_id": prefixed_id,
                 "method_name": step["method_name"],
                 "params": resolved,
             })
@@ -103,7 +126,7 @@ def expand_subprotocol(
             group = _build_method_group(mg_steps, mg_context)
             result.append({
                 "type": "method_group",
-                "step_id": step_id,
+                "step_id": prefixed_id,
                 "method_type": mg_defn.get("method_type") or "prepare",
                 "group": group,
             })
@@ -129,21 +152,36 @@ def expand_subprotocol(
                 group = _build_method_group(child_steps, child_context)
                 result.append({
                     "type": "method_group",
-                    "step_id": step_id,
+                    "step_id": prefixed_id,
                     "method_type": child_defn.get("method_type") or "prepare",
                     "group": group,
                 })
             else:
-                # Sequential child: flatten into parent's step list.
-                child_expanded = expand_subprotocol(child_defn, child_context, depth + 1)
+                # Sequential child: flatten into parent's step list, then propagate
+                # its output_leaf_map through output_alias renaming.
+                child_expanded, child_leaf_map = expand_subprotocol(
+                    child_defn, child_context, depth + 1, f"{prefixed_id}."
+                )
                 result.extend(child_expanded)
+
+                alias: dict = step.get("output_alias", {})
+                for child_out_name, leaf_id in child_leaf_map.items():
+                    parent_out_name = alias.get(child_out_name, child_out_name)
+                    output_leaf_map[parent_out_name] = leaf_id
 
         else:
             logger.warning(
                 "Unknown step type %r in step %r — skipping.", step_type, step_id
             )
 
-    return result
+    # Fill in outputs that weren't satisfied by nested subprotocol recursion.
+    # These are direct method step outputs: their step_id names a leaf step at
+    # this level which we can now look up with the current step_prefix.
+    for out_name, out_def in outputs_defn.items():
+        if out_name not in output_leaf_map:
+            output_leaf_map[out_name] = f"{step_prefix}{out_def['step_id']}"
+
+    return result, output_leaf_map
 
 
 def _submit_expanded_steps(

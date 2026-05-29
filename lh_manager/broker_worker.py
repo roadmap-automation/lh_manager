@@ -406,16 +406,17 @@ class LHManagerBrokerWorker:
             )
 
             outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
-            step_to_output: dict = {v["step_id"]: k for k, v in outputs_defn.items()}
-
             execution: str = defn.get("execution") or "sequential"
 
             if execution == "parallel":
                 # All top-level steps dispatched as one method group.
+                # Parallel subprotocols are always PREPARE/TRANSFER type and
+                # never produce retrieval_uris, so outputs are always empty.
                 steps = json.loads(defn["steps"])
                 group = _build_method_group(steps, context)
                 method_type = defn.get("method_type") or "prepare"
                 final_step_id = run_id
+                step_to_output: dict = {}
                 await asyncio.to_thread(
                     _submit_method_group_sync,
                     actual_sample_id, run_id, method_type, group,
@@ -424,7 +425,8 @@ class LHManagerBrokerWorker:
                 # Pre-expand ALL steps at submission time; autocontrol's FIFO
                 # queue enforces ordering — no need to await each step before
                 # submitting the next.
-                expanded = await asyncio.to_thread(expand_subprotocol, defn, context)
+                expanded, output_leaf_map = await asyncio.to_thread(expand_subprotocol, defn, context)
+                step_to_output = {leaf_id: name for name, leaf_id in output_leaf_map.items()}
                 if not expanded:
                     await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
                         "subprotocol_run_id": run_id,
@@ -446,7 +448,10 @@ class LHManagerBrokerWorker:
             for step_id, output_name in step_to_output.items():
                 uri = self._step_retrieval_uris.pop(step_id, None)
                 if uri is not None:
-                    outputs[output_name] = uri
+                    outputs[output_name] = {
+                        "uri": uri,
+                        "type": outputs_defn.get(output_name, {}).get("type", "unknown"),
+                    }
 
             await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
                 "subprotocol_run_id": run_id,

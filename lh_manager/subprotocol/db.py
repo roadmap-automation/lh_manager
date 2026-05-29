@@ -116,7 +116,7 @@ def list_subprotocols() -> List[Dict[str, Any]]:
     conn = _get_conn()
     c = conn.cursor()
     c.execute(
-        "SELECT id, name, inputs, created_at, updated_at "
+        "SELECT id, name, inputs, outputs, created_at, updated_at "
         "FROM subprotocols ORDER BY updated_at DESC"
     )
     rows = c.fetchall()

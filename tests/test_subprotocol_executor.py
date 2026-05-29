@@ -129,40 +129,49 @@ class TestBuildMethodGroup:
 
 class TestExpandSubprotocol:
     def test_empty_steps_returns_empty(self):
-        assert expand_subprotocol(_make_defn(), {}) == []
+        steps, leaf_map = expand_subprotocol(_make_defn(), {})
+        assert steps == []
+        assert leaf_map == {}
 
     def test_single_method_step(self):
-        steps = [{"id": "s1", "type": "method", "method_name": "Rinse", "parameters": {}}]
-        result = expand_subprotocol(_make_defn(steps=steps), {})
-        assert result == [{"type": "method", "step_id": "s1", "method_name": "Rinse", "params": {}}]
+        defn_steps = [{"id": "s1", "type": "method", "method_name": "Rinse", "parameters": {}}]
+        steps, leaf_map = expand_subprotocol(_make_defn(steps=defn_steps), {})
+        assert steps == [{"type": "method", "step_id": "s1", "method_name": "Rinse", "params": {}}]
+
+    def test_single_method_step_with_output(self):
+        defn_steps = [{"id": "s1", "type": "method", "method_name": "Measure", "parameters": {}}]
+        steps, leaf_map = expand_subprotocol(
+            _make_defn(steps=defn_steps, outputs={"my_data": {"step_id": "s1", "type": "QCMDData"}}), {}
+        )
+        assert leaf_map == {"my_data": "s1"}
 
     def test_resolves_ref_in_params(self):
         ctx = {"input.volume": 50.0}
-        steps = [{"id": "s1", "type": "method", "method_name": "Inject",
+        defn_steps = [{"id": "s1", "type": "method", "method_name": "Inject",
                   "parameters": {"volume": {"$ref": "input.volume"}}}]
-        result = expand_subprotocol(_make_defn(steps=steps), ctx)
-        assert result[0]["params"] == {"volume": 50.0}
+        steps, _ = expand_subprotocol(_make_defn(steps=defn_steps), ctx)
+        assert steps[0]["params"] == {"volume": 50.0}
 
     def test_resolves_alloc_in_params(self):
         ctx = {"alloc.well_id": "test-uuid"}
-        steps = [{"id": "s1", "type": "method", "method_name": "Formulate",
+        defn_steps = [{"id": "s1", "type": "method", "method_name": "Formulate",
                   "parameters": {"well": {"$alloc": "well_id"}}}]
-        result = expand_subprotocol(_make_defn(steps=steps), ctx)
-        assert result[0]["params"] == {"well": "test-uuid"}
+        steps, _ = expand_subprotocol(_make_defn(steps=defn_steps), ctx)
+        assert steps[0]["params"] == {"well": "test-uuid"}
 
     def test_multiple_steps_preserved_in_order(self):
-        steps = [
+        defn_steps = [
             {"id": "s1", "type": "method", "method_name": "A", "parameters": {}},
             {"id": "s2", "type": "method", "method_name": "B", "parameters": {}},
         ]
-        result = expand_subprotocol(_make_defn(steps=steps), {})
-        assert [r["step_id"] for r in result] == ["s1", "s2"]
-        assert [r["method_name"] for r in result] == ["A", "B"]
+        steps, _ = expand_subprotocol(_make_defn(steps=defn_steps), {})
+        assert [r["step_id"] for r in steps] == ["s1", "s2"]
+        assert [r["method_name"] for r in steps] == ["A", "B"]
 
     def test_unknown_step_type_is_skipped(self):
-        steps = [{"id": "s1", "type": "unknown_type", "method_name": "Foo", "parameters": {}}]
-        result = expand_subprotocol(_make_defn(steps=steps), {})
-        assert result == []
+        defn_steps = [{"id": "s1", "type": "unknown_type", "method_name": "Foo", "parameters": {}}]
+        steps, _ = expand_subprotocol(_make_defn(steps=defn_steps), {})
+        assert steps == []
 
     def test_method_group_step_expanded(self):
         mg_defn = {
@@ -172,28 +181,28 @@ class TestExpandSubprotocol:
             ]),
             "method_type": "prepare",
         }
-        steps = [{"id": "g1", "type": "method_group", "method_group_name": "LoadAndInject",
+        defn_steps = [{"id": "g1", "type": "method_group", "method_group_name": "LoadAndInject",
                   "parameters": {}}]
-        defn = _make_defn(steps=steps)
+        defn = _make_defn(steps=defn_steps)
 
         with patch("lh_manager.method_group.db.get_method_group_by_name", return_value=mg_defn):
-            result = expand_subprotocol(defn, {})
+            steps, _ = expand_subprotocol(defn, {})
 
-        assert len(result) == 1
-        assert result[0]["type"] == "method_group"
-        assert result[0]["step_id"] == "g1"
-        assert result[0]["method_type"] == "prepare"
-        assert result[0]["group"] == [
+        assert len(steps) == 1
+        assert steps[0]["type"] == "method_group"
+        assert steps[0]["step_id"] == "g1"
+        assert steps[0]["method_type"] == "prepare"
+        assert steps[0]["group"] == [
             {"method_name": "Load", "volume": 10.0},
             {"method_name": "Inject"},
         ]
 
     def test_method_group_not_found_raises(self):
-        steps = [{"id": "g1", "type": "method_group", "method_group_name": "Missing",
+        defn_steps = [{"id": "g1", "type": "method_group", "method_group_name": "Missing",
                   "parameters": {}}]
         with patch("lh_manager.method_group.db.get_method_group_by_name", return_value=None):
             with pytest.raises(ValueError, match="not found"):
-                expand_subprotocol(_make_defn(steps=steps), {})
+                expand_subprotocol(_make_defn(steps=defn_steps), {})
 
 
 # ---------------------------------------------------------------------------
@@ -211,11 +220,11 @@ class TestExpandNestedSubprotocol:
         defn = _make_defn(steps=parent_steps)
 
         with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
-            result = expand_subprotocol(defn, {})
+            steps, _ = expand_subprotocol(defn, {})
 
-        assert len(result) == 1
-        assert result[0]["step_id"] == "c1"
-        assert result[0]["method_name"] == "Rinse"
+        assert len(steps) == 1
+        assert steps[0]["step_id"] == "sp1.c1"
+        assert steps[0]["method_name"] == "Rinse"
 
     def test_sequential_child_steps_ordered_correctly(self):
         child_defn = _make_defn(
@@ -229,9 +238,9 @@ class TestExpandNestedSubprotocol:
                          "subprotocol_name": "child", "parameters": {}, "output_alias": {}}]
 
         with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
-            result = expand_subprotocol(_make_defn(steps=parent_steps), {})
+            steps, _ = expand_subprotocol(_make_defn(steps=parent_steps), {})
 
-        assert [r["step_id"] for r in result] == ["c1", "c2"]
+        assert [r["step_id"] for r in steps] == ["sp1.c1", "sp1.c2"]
 
     def test_parallel_child_becomes_method_group(self):
         child_defn = _make_defn(
@@ -247,13 +256,13 @@ class TestExpandNestedSubprotocol:
                          "subprotocol_name": "child", "parameters": {}, "output_alias": {}}]
 
         with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
-            result = expand_subprotocol(_make_defn(steps=parent_steps), {})
+            steps, _ = expand_subprotocol(_make_defn(steps=parent_steps), {})
 
-        assert len(result) == 1
-        assert result[0]["type"] == "method_group"
-        assert result[0]["step_id"] == "sp1"
-        assert result[0]["method_type"] == "prepare"
-        assert len(result[0]["group"]) == 2
+        assert len(steps) == 1
+        assert steps[0]["type"] == "method_group"
+        assert steps[0]["step_id"] == "sp1"
+        assert steps[0]["method_type"] == "prepare"
+        assert len(steps[0]["group"]) == 2
 
     def test_child_input_params_resolved_from_parent(self):
         child_defn = _make_defn(
@@ -266,9 +275,9 @@ class TestExpandNestedSubprotocol:
         parent_ctx = {"input.vol": 75.0}
 
         with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
-            result = expand_subprotocol(_make_defn(steps=parent_steps), parent_ctx)
+            steps, _ = expand_subprotocol(_make_defn(steps=parent_steps), parent_ctx)
 
-        assert result[0]["params"]["volume"] == 75.0
+        assert steps[0]["params"]["volume"] == 75.0
 
     def test_child_allocations_minted(self):
         child_defn = _make_defn(
@@ -281,9 +290,9 @@ class TestExpandNestedSubprotocol:
                          "subprotocol_name": "child", "parameters": {}, "output_alias": {}}]
 
         with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
-            result = expand_subprotocol(_make_defn(steps=parent_steps), {})
+            steps, _ = expand_subprotocol(_make_defn(steps=parent_steps), {})
 
-        well_val = result[0]["params"]["well"]
+        well_val = steps[0]["params"]["well"]
         uuid.UUID(well_val)  # must be a valid UUID
 
     def test_child_not_found_raises(self):
@@ -320,6 +329,45 @@ class TestExpandNestedSubprotocol:
         ]
 
         with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
-            result = expand_subprotocol(_make_defn(steps=parent_steps), {})
+            steps, _ = expand_subprotocol(_make_defn(steps=parent_steps), {})
 
-        assert [r["step_id"] for r in result] == ["p1", "c1", "c2", "p2"]
+        assert [r["step_id"] for r in steps] == ["p1", "sp1.c1", "sp1.c2", "p2"]
+
+    def test_output_alias_propagated_to_leaf_map(self):
+        """output_alias renames child output names in the parent's output_leaf_map."""
+        child_defn = _make_defn(
+            name="child",
+            steps=[{"id": "step_record", "type": "method", "method_name": "Measure", "parameters": {}}],
+            outputs={"qcmd_data": {"step_id": "step_record", "type": "QCMDData"}},
+        )
+        parent_steps = [{"id": "solvent_phase", "type": "subprotocol",
+                         "subprotocol_name": "child", "parameters": {},
+                         "output_alias": {"qcmd_data": "qcmd_solvent"}}]
+
+        with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
+            steps, leaf_map = expand_subprotocol(_make_defn(steps=parent_steps), {})
+
+        assert leaf_map == {"qcmd_solvent": "solvent_phase.step_record"}
+
+    def test_repeated_child_step_ids_are_disambiguated(self):
+        """Using the same child subprotocol twice must produce distinct prefixed step_ids."""
+        child_defn = _make_defn(
+            name="child",
+            steps=[{"id": "step_record", "type": "method", "method_name": "Measure", "parameters": {}}],
+            outputs={"qcmd_data": {"step_id": "step_record", "type": "QCMDData"}},
+        )
+        parent_steps = [
+            {"id": "phase_a", "type": "subprotocol", "subprotocol_name": "child",
+             "parameters": {}, "output_alias": {"qcmd_data": "qcmd_a"}},
+            {"id": "phase_b", "type": "subprotocol", "subprotocol_name": "child",
+             "parameters": {}, "output_alias": {"qcmd_data": "qcmd_b"}},
+        ]
+
+        with patch("lh_manager.subprotocol.db.get_subprotocol_by_name", return_value=child_defn):
+            steps, leaf_map = expand_subprotocol(_make_defn(steps=parent_steps), {})
+
+        assert [s["step_id"] for s in steps] == ["phase_a.step_record", "phase_b.step_record"]
+        assert leaf_map == {
+            "qcmd_a": "phase_a.step_record",
+            "qcmd_b": "phase_b.step_record",
+        }
