@@ -391,6 +391,7 @@ class LHManagerBrokerWorker:
             logger.error("Subprotocol %r not found — cannot execute run %s.", name, run_id)
             await self._publish_protocol(SUBPROTOCOL_FAILED, run_id, sample_id, {
                 "subprotocol_run_id": run_id,
+                "channel": channel,
                 "error": f"Subprotocol {name!r} not found in lh_manager DB",
             })
             return
@@ -430,6 +431,7 @@ class LHManagerBrokerWorker:
                 if not expanded:
                     await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
                         "subprotocol_run_id": run_id,
+                        "channel": channel,
                         "sample_id": actual_sample_id,
                         "outputs": {},
                     })
@@ -455,6 +457,7 @@ class LHManagerBrokerWorker:
 
             await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
                 "subprotocol_run_id": run_id,
+                "channel": channel,
                 "sample_id": actual_sample_id,
                 "outputs": outputs,
             })
@@ -464,6 +467,7 @@ class LHManagerBrokerWorker:
             logger.exception("Subprotocol %r run %s failed.", name, run_id)
             await self._publish_protocol(SUBPROTOCOL_FAILED, run_id, sample_id, {
                 "subprotocol_run_id": run_id,
+                "channel": channel,
                 "sample_id": sample_id,
                 "error": str(exc),
             })
