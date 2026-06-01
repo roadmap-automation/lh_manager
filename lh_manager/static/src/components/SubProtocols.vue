@@ -105,6 +105,7 @@ async function ensure_sp_inputs(name: string) {
       [name]: Object.entries(inputs).map(([k, v]: [string, any]) => ({
         name: k, type: v?.type ?? '', display_name: v?.display_name ?? '',
         is_static: v?.is_static ?? false, static_value: String(v?.static_value ?? ''),
+        default_value: String(v?.default_value ?? ''),
       })),
     };
   }
@@ -134,14 +135,14 @@ function get_step_fields(step: SubprotocolStep): StepField[] {
     });
   }
   if (step.type === 'method_group' && step.method_group_name) {
-    return (mg_exposed_fields.value[step.method_group_name] ?? []).map(ef => ({
-      name: ef.field_name, display: ef.display_name || ef.field_name, type: ef.type,
-    }));
+    return (mg_exposed_fields.value[step.method_group_name] ?? [])
+      .filter(ef => !ef.is_static)
+      .map(ef => ({ name: ef.field_name, display: ef.display_name || ef.field_name, type: ef.type }));
   }
   if (step.type === 'subprotocol' && step.subprotocol_name) {
-    return (sp_inputs_cache.value[step.subprotocol_name] ?? []).map(p => ({
-      name: p.name, display: p.display_name || p.name, type: p.type,
-    }));
+    return (sp_inputs_cache.value[step.subprotocol_name] ?? [])
+      .filter(p => !p.is_static)
+      .map(p => ({ name: p.name, display: p.display_name || p.name, type: p.type }));
   }
   return [];
 }
@@ -378,8 +379,12 @@ async function on_mg_change(step: SubprotocolStep, name: string) {
 
 async function on_sp_change(step: SubprotocolStep, name: string) {
   step.subprotocol_name = name;
-  step.parameters = {};
   await ensure_sp_inputs(name);
+  const defaults: Record<string, any> = {};
+  for (const p of sp_inputs_cache.value[name] ?? []) {
+    if (!p.is_static && p.default_value !== '') defaults[p.name] = p.default_value;
+  }
+  step.parameters = defaults;
 }
 
 function on_method_change(step: SubprotocolStep) {
@@ -393,6 +398,15 @@ function on_method_change(step: SubprotocolStep) {
 
 const method_group_names = computed(() => method_groups.value.map(mg => mg.name));
 const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
+
+const NUM_TYPES = ['number', 'integer', 'float'];
+
+function compatible_params(field_type: string): InputParam[] {
+  if (NUM_TYPES.includes(field_type)) {
+    return input_params_list.value.filter(p => NUM_TYPES.includes(p.type));
+  }
+  return input_params_list.value.filter(p => p.type === field_type);
+}
 </script>
 
 <template>
@@ -688,7 +702,7 @@ const subprotocol_names = computed(() => subprotocols.value.map(sp => sp.name));
                         :value="get_ref_param(step.parameters?.[field.name])"
                         @change="set_ref_value(step, field.name, ($event.target as HTMLSelectElement).value)">
                         <option value="">— param —</option>
-                        <option v-for="p in input_params_list" :key="p.name" :value="p.name">
+                        <option v-for="p in compatible_params(field.type)" :key="p.name" :value="p.name">
                           {{ p.display_name || p.name }}
                         </option>
                       </select>
