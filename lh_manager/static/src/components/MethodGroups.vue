@@ -168,6 +168,31 @@ async function remove_group() {
   editing.value = blank_group();
 }
 
+async function duplicate_group() {
+  const new_name = prompt('Name for duplicate:', `Copy of ${editing.value.name}`);
+  if (!new_name || !new_name.trim()) return;
+  saving.value = true;
+  error_msg.value = null;
+  try {
+    const payload: Partial<MethodGroup> = {
+      name: new_name.trim(),
+      description: editing.value.description || null,
+      method_type: editing.value.method_type || null,
+      steps: JSON.parse(JSON.stringify(editing.value.steps)),
+      exposed_fields: JSON.parse(JSON.stringify(editing.value.exposed_fields)),
+    };
+    const new_id = await createMethodGroup(payload);
+    await refreshMethodGroups();
+    is_new.value = false;
+    selected_id.value = new_id;
+    editing.value = await fetchMethodGroup(new_id);
+  } catch (e: any) {
+    error_msg.value = String(e);
+  } finally {
+    saving.value = false;
+  }
+}
+
 // ── Steps ───────────────────────────────────────────────────────────────────
 
 function add_step() {
@@ -241,6 +266,7 @@ function on_method_change(step_index: number, step: MethodGroupStep) {
             <button class="btn btn-sm btn-primary" :disabled="saving" @click="save">
               {{ saving ? 'Saving…' : 'Save' }}
             </button>
+            <button v-if="!is_new" class="btn btn-sm btn-outline-secondary" :disabled="saving" @click="duplicate_group">Duplicate</button>
             <button v-if="!is_new" class="btn btn-sm btn-outline-danger" @click="remove_group">Delete</button>
           </div>
         </div>
