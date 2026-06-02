@@ -73,7 +73,7 @@ function clone(obj) {
                 @click.stop="cancel_task(task.task, false, false)">
               </button>
               <button
-                v-if="task.status === 'active'"
+                v-if="task.status === 'active' || task.status === 'error' || task.status === 'failed'"
                 type="button"
                 class="btn-close btn-sm cancel-fill"
                 aria-label="Cancel active task"
@@ -81,13 +81,13 @@ function clone(obj) {
                 @click.stop="cancel_task(task.task, true, false)">
               </button>
               <button
-                v-if="task.status === 'active'"
+                v-if="task.status === 'active' || task.status === 'error' || task.status === 'failed'"
                 type="button"
                 class="btn-close btn-sm dash-circle-fill"
                 aria-label="Cancel active task and drop material"
                 title="Cancel active task and drop material"
                 @click.stop="cancel_task(task.task, true, true)">
-              </button>              
+              </button>
             </div>
         </div>
         <div class="mx-2 row" v-for="(imethod, imethod_index) of task.methods">

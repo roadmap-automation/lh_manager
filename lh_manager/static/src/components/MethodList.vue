@@ -265,6 +265,10 @@ const status = computed(() => {
   color:darkred;
 }
 
+.task-error {
+  color: darkorange;
+}
+
 </style>
 
 <style scoped>

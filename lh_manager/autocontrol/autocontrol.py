@@ -20,7 +20,10 @@ from ..liquid_handler.state import samples
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus, SampleContainer
 
-COMPLETED_STATUS = [SampleStatus.COMPLETED, SampleStatus.FAILED, SampleStatus.CANCELLED, SampleStatus.UNKNOWN]
+# FAILED is intentionally excluded: errored tasks stay in active_tasks so the
+# operator can retry or explicitly cancel them from the GUI before the failure
+# propagates upstream to Protocol Studio.
+COMPLETED_STATUS = [SampleStatus.COMPLETED, SampleStatus.CANCELLED, SampleStatus.UNKNOWN]
 
 active_tasks = ActiveTasks()
 
@@ -456,6 +459,8 @@ def mark_cancelled(id: str) -> None:
     """Mark a task cancelled in the active method tree.
 
     Must be called with active_tasks.lock held by the caller.
+    Signals the broker worker so any subprotocol executor waiting on this
+    task's step is unblocked and can publish SUBPROTOCOL_FAILED.
     """
     parent_item = active_tasks.active.pop(id)
     _, sample = samples.getSampleById(parent_item.id)
@@ -472,10 +477,15 @@ def mark_cancelled(id: str) -> None:
                 m.status = SampleStatus.COMPLETED
             elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
                 m.status = SampleStatus.ACTIVE
-            elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+            elif any(t.status in (SampleStatus.ERROR, SampleStatus.FAILED) for t in m.tasks):
                 m.status = SampleStatus.ERROR
+            elif all(t.status in (SampleStatus.CANCELLED, SampleStatus.COMPLETED) for t in m.tasks):
+                m.status = SampleStatus.CANCELLED
             else:
                 m.status = SampleStatus.PENDING
+
+    if _broker_worker is not None and parent_item.method_id:
+        _broker_worker.signal_step_cancelled(parent_item.method_id)
 
 @trigger_samples_update
 def mark_status(id: str, status: SampleStatus) -> None:
@@ -501,7 +511,7 @@ def mark_status(id: str, status: SampleStatus) -> None:
                     m.status = SampleStatus.COMPLETED
                 elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
                     m.status = SampleStatus.ACTIVE
-                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                elif any(t.status in (SampleStatus.ERROR, SampleStatus.FAILED) for t in m.tasks):
                     m.status = SampleStatus.ERROR
                 else:
                     m.status = SampleStatus.PENDING

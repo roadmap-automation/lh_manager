@@ -90,6 +90,8 @@ class LHManagerBrokerWorker:
         self._pending_step_completions: Dict[str, asyncio.Event] = {}
         # Subprotocol execution: step_id → retrieval_uri from completed measurement tasks
         self._step_retrieval_uris: Dict[str, str] = {}
+        # Tracks step_ids cancelled by operator; checked after event fires in _on_run_subprotocol.
+        self._cancelled_steps: set = set()
 
     # ------------------------------------------------------------------
     # Thread-safe public API  (called from sync Flask threads)
@@ -135,6 +137,16 @@ class LHManagerBrokerWorker:
             logger.warning("Broker loop not running — dropping command.")
             return
         asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    def signal_step_cancelled(self, step_id: str) -> None:
+        """Called from mark_cancelled() (Flask thread) to unblock a waiting subprotocol executor."""
+        self._schedule(self._fire_step_cancelled(step_id))
+
+    async def _fire_step_cancelled(self, step_id: str) -> None:
+        self._cancelled_steps.add(step_id)
+        event = self._pending_step_completions.pop(step_id, None)
+        if event is not None:
+            event.set()
 
     # ------------------------------------------------------------------
     # Async publish helpers
@@ -342,7 +354,9 @@ class LHManagerBrokerWorker:
                 await publish(self._protocol_exchange, SAMPLE_METHOD_COMPLETED, envelope_out)
 
             # Unblock any subprotocol executor step awaiting this task's completion.
-            if step_id:
+            # Only fire on COMPLETED — FAILED leaves the waiter blocked until the
+            # operator either resubmits (success) or cancels (signal_step_cancelled).
+            if step_id and rk == SCHEDULER_TASK_COMPLETED:
                 if retrieval_uri is not None:
                     self._step_retrieval_uris[step_id] = retrieval_uri
                 event = self._pending_step_completions.pop(step_id, None)
@@ -444,6 +458,10 @@ class LHManagerBrokerWorker:
             self._pending_step_completions[final_step_id] = event
             await event.wait()
             self._pending_step_completions.pop(final_step_id, None)
+
+            if final_step_id in self._cancelled_steps:
+                self._cancelled_steps.discard(final_step_id)
+                raise RuntimeError(f"Subprotocol {name!r} was cancelled by operator")
 
             # Collect outputs from any steps that produced a retrieval_uri.
             outputs: dict = {}
