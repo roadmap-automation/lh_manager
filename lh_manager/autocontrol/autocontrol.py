@@ -283,6 +283,9 @@ def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m:
 
 
 def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout | None = None) -> List[Task]:
+    """Runs all draft methods in an entire stage."""
+    for _ in range(len(sample.stages[stage].methods)):
+        prepare_and_submit_method(sample, stage, 0, layout)
 
 
 def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout | None = None) -> List[Task]:
