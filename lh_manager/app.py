@@ -82,7 +82,7 @@ def root():
 
 @app.route('/health')
 def health():
-    return '', 204
+    return '', 200
 
 @app.route('/test_emit/')
 def test_emit():
@@ -96,6 +96,6 @@ if __name__ == '__main__':
     broker_worker.start()
     set_broker_worker(broker_worker)
     launch_autocontrol_interface()
-    socketio.run(app, host='localhost', port=5001, debug=False)
+    socketio.run(app, host='localhost', port=5009, debug=False)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)
