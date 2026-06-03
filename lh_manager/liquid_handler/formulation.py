@@ -299,7 +299,7 @@ class Formulation(MethodContainer):
     def get_all_wells(self, layout):
         return get_all_wells_in_zones(layout, self.include_zones)
 
-@register
+@register(origin=ORIGIN)
 class SoluteFormulation(Formulation):
     """Subclass of Formulation. In target_composition, specify only the solutes
         of interest; any missing volume will be filled in with the diluent."""
