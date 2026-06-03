@@ -78,6 +78,20 @@ def expand_subprotocol(
     steps: list = json.loads(defn["steps"])
     outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
 
+    # Seed static/default inputs not already in the caller-supplied context.
+    # This mirrors the identical seeding done for child subprotocol steps so
+    # that top-level calls (from broker_worker or autocontrol) benefit too.
+    inputs_defn_top: dict = json.loads(defn.get("inputs") or "{}")
+    if inputs_defn_top:
+        context = dict(context)  # don't mutate caller's dict
+        for inp_name, inp_def in inputs_defn_top.items():
+            key = f"input.{inp_name}"
+            if key not in context:
+                if inp_def.get("is_static") and "static_value" in inp_def:
+                    context[key] = inp_def["static_value"]
+                elif "default_value" in inp_def:
+                    context[key] = inp_def["default_value"]
+
     result: List[Dict[str, Any]] = []
     # Maps output_name (at this level) → fully-prefixed leaf step_id.
     # Populated bottom-up as nested subprotocols are expanded.

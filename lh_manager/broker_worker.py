@@ -415,6 +415,14 @@ class LHManagerBrokerWorker:
             context: dict = {f"input.{k}": v for k, v in params.items()}
             for alloc_name in json.loads(defn.get("allocations") or "[]"):
                 context[f"alloc.{alloc_name}"] = str(uuid.uuid4())
+            # Seed static/default inputs not supplied by the caller.
+            for inp_name, inp_def in json.loads(defn.get("inputs") or "{}").items():
+                key = f"input.{inp_name}"
+                if key not in context:
+                    if inp_def.get("is_static") and "static_value" in inp_def:
+                        context[key] = inp_def["static_value"]
+                    elif "default_value" in inp_def:
+                        context[key] = inp_def["default_value"]
 
             actual_sample_id = sample_id or await asyncio.to_thread(
                 _create_sample_sync, f"subprotocol {run_id[:8]}", channel
