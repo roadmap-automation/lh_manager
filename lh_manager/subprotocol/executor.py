@@ -261,6 +261,112 @@ def _build_method_group(steps: list, context: Dict[str, Any]) -> List[Dict[str, 
 
 
 # ---------------------------------------------------------------------------
+# Broker-path sentinel submission
+# (called via asyncio.to_thread from broker_worker._on_run_subprotocol)
+# ---------------------------------------------------------------------------
+
+def _submit_expanded_steps_via_sentinel(
+    sample_id: str,
+    subprotocol_name: str,
+    sentinel_id: str,
+    expanded_steps: List[Dict[str, Any]],
+) -> None:
+    """Create a __subprotocol__ sentinel and submit all expanded steps under it.
+
+    One sentinel RawMethod appears in the sample's method list (matching the GUI
+    path), so the GUI shows a single subprotocol row instead of individual steps.
+
+    Each task's AutocontrolItem.method_id is the individual step_id — NOT the
+    sentinel's id — so broker-path completion events and output URI collection
+    remain accurate for per-step tracking.
+    """
+    from ..liquid_handler.state import samples
+    from ..liquid_handler.samplelist import MethodList
+    from ..liquid_handler.methods import RawMethod, MethodType, method_manager
+    from ..autocontrol.autocontrol import (
+        _build_raw_method_task,
+        _build_method_group_task,
+        _register_and_submit_tasks,
+    )
+
+    _, sample = samples.getSampleById(sample_id)
+    if sample is None:
+        raise RuntimeError(f"Sample {sample_id!r} not found in lh_manager")
+
+    if "methods" not in sample.stages:
+        sample.stages["methods"] = MethodList()
+
+    sentinel = RawMethod(
+        id=sentinel_id,
+        method_name="__subprotocol__",
+        display_name=subprotocol_name,
+        method_type=MethodType.NONE,
+        method_data={"method_name": "__subprotocol__", "subprotocol_name": subprotocol_name},
+    )
+    method_index = len(sample.stages["methods"].methods)
+    sample.stages["methods"].methods.append(sentinel)
+
+    tasks_with_step_ids: List[Tuple[str, Any]] = []
+    for step in expanded_steps:
+        if step["type"] == "method":
+            schema = method_manager._remote_schemas.get(step["method_name"]) or {}
+            try:
+                mtype = MethodType(schema.get("method_type", "none"))
+            except ValueError:
+                mtype = MethodType.NONE
+            task = _build_raw_method_task(sample, step["method_name"], mtype, step["params"])
+        elif step["type"] == "method_group":
+            task = _build_method_group_task(sample, step["group"])
+        else:
+            task = None
+        if task is None:
+            raise RuntimeError(f"Failed to build task for step {step.get('step_id')!r}")
+        tasks_with_step_ids.append((step["step_id"], task))  # individual step_ids — broker path
+
+    _register_and_submit_tasks(sample, "methods", method_index, sentinel, tasks_with_step_ids)
+
+
+def _submit_parallel_subprotocol_via_sentinel(
+    sample_id: str,
+    subprotocol_name: str,
+    sentinel_id: str,
+    step_id: str,
+    group: List[Dict[str, Any]],
+) -> None:
+    """Create a __subprotocol__ sentinel and submit a single parallel method-group task.
+
+    Mirrors _submit_expanded_steps_via_sentinel for top-level parallel subprotocols.
+    step_id is used as the AutocontrolItem.method_id for completion tracking.
+    """
+    from ..liquid_handler.state import samples
+    from ..liquid_handler.samplelist import MethodList
+    from ..liquid_handler.methods import RawMethod, MethodType
+    from ..autocontrol.autocontrol import _build_method_group_task, _register_and_submit_tasks
+
+    _, sample = samples.getSampleById(sample_id)
+    if sample is None:
+        raise RuntimeError(f"Sample {sample_id!r} not found in lh_manager")
+
+    if "methods" not in sample.stages:
+        sample.stages["methods"] = MethodList()
+
+    sentinel = RawMethod(
+        id=sentinel_id,
+        method_name="__subprotocol__",
+        display_name=subprotocol_name,
+        method_type=MethodType.NONE,
+        method_data={"method_name": "__subprotocol__", "subprotocol_name": subprotocol_name},
+    )
+    method_index = len(sample.stages["methods"].methods)
+    sample.stages["methods"].methods.append(sentinel)
+
+    task = _build_method_group_task(sample, group)
+    if task is None:
+        raise RuntimeError(f"Failed to build parallel task for subprotocol {subprotocol_name!r}")
+    _register_and_submit_tasks(sample, "methods", method_index, sentinel, [(step_id, task)])
+
+
+# ---------------------------------------------------------------------------
 # Sync helpers — called from _submit_expanded_steps (via asyncio.to_thread)
 # ---------------------------------------------------------------------------
 

@@ -389,8 +389,8 @@ class LHManagerBrokerWorker:
             expand_subprotocol,
             _build_method_group,
             _create_sample_sync,
-            _submit_method_group_sync,
-            _submit_expanded_steps,
+            _submit_expanded_steps_via_sentinel,
+            _submit_parallel_subprotocol_via_sentinel,
         )
 
         payload = envelope.payload or {}
@@ -431,18 +431,17 @@ class LHManagerBrokerWorker:
             outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
             execution: str = defn.get("execution") or "sequential"
 
+            sentinel_id = str(uuid.uuid4())
             if execution == "parallel":
-                # All top-level steps dispatched as one method group.
-                # Parallel subprotocols are always PREPARE/TRANSFER type and
-                # never produce retrieval_uris, so outputs are always empty.
+                # All top-level steps dispatched as one method group under a sentinel.
+                # Parallel subprotocols never produce retrieval_uris, so outputs are empty.
                 steps = json.loads(defn["steps"])
                 group = _build_method_group(steps, context)
-                method_type = defn.get("method_type") or "prepare"
                 final_step_id = run_id
                 step_to_output: dict = {}
                 await asyncio.to_thread(
-                    _submit_method_group_sync,
-                    actual_sample_id, run_id, method_type, group,
+                    _submit_parallel_subprotocol_via_sentinel,
+                    actual_sample_id, name, sentinel_id, run_id, group,
                 )
             else:
                 # Pre-expand ALL steps at submission time; autocontrol's FIFO
@@ -458,7 +457,9 @@ class LHManagerBrokerWorker:
                         "outputs": {},
                     })
                     return
-                await asyncio.to_thread(_submit_expanded_steps, actual_sample_id, expanded)
+                await asyncio.to_thread(
+                    _submit_expanded_steps_via_sentinel, actual_sample_id, name, sentinel_id, expanded
+                )
                 final_step_id = expanded[-1]["step_id"]
 
             # Wait for the final step to complete (set by _on_scheduler_event).

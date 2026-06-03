@@ -3,7 +3,7 @@
 import logging
 import threading
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from uuid import uuid4
 
 from autocontrol.task_struct import Task, TaskData, TaskType
@@ -99,90 +99,77 @@ class AutocontrolTaskContainer(TaskContainer):
 class AutocontrolItem(Item):
     method_id: str | None = None
 
-def _submit_raw_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
-    """Broker-path submission for RawMethod — bypasses legacy render/render_method pipeline."""
-    raw_method_name = m.method_data.get('method_name')
-    schema = method_manager._remote_schemas.get(raw_method_name)
+# ---------------------------------------------------------------------------
+# Task-building primitives (pure — no side effects, no submission)
+# ---------------------------------------------------------------------------
+
+def _build_raw_method_task(
+    sample: Sample,
+    method_name: str,
+    method_type: MethodType,
+    params: dict,
+) -> Optional[AutocontrolTaskContainer]:
+    """Build a Task for a single raw method. Returns None and logs on schema error."""
+    schema = method_manager._remote_schemas.get(method_name)
     if schema is None:
         logging.error(
-            "Cannot submit RawMethod '%s': no remote schema registered. "
+            "Cannot build task for '%s': no remote schema. "
             "Ensure the device is running and has published device.registered.",
-            raw_method_name,
+            method_name,
         )
-        return
-
-    device_id = schema.get('device_id')
+        return None
+    device_id = schema.get("device_id")
     if not device_id:
         logging.error(
-            "Cannot submit RawMethod '%s': schema is missing device_id "
+            "Cannot build task for '%s': schema missing device_id "
             "(re-start the device to trigger a fresh device.registered event).",
-            raw_method_name,
+            method_name,
         )
-        return
-
+        return None
     device = device_manager.get_device_by_name(device_id)
     channel = sample.channel if (device is not None and device.multichannel) else None
-
-    # Strip lh_manager tracking / metadata fields — device only needs user parameters.
-    params = {k: v for k, v in m.method_data.items() if k not in EXCLUDE_FIELDS}
-
+    clean_params = {k: v for k, v in params.items() if k not in EXCLUDE_FIELDS}
     task_data = TaskData(
         device=device_id,
         channel=channel,
-        method_data={'method_list': [{'method_name': raw_method_name, 'method_data': params}]},
+        method_data={"method_list": [{"method_name": method_name, "method_data": clean_params}]},
     )
-
-    if m.method_type == MethodType.MEASURE:
+    if method_type == MethodType.MEASURE:
         tasktype = TaskType.MEASURE
-    elif m.method_type == MethodType.PREPARE:
+    elif method_type == MethodType.PREPARE:
         tasktype = TaskType.PREPARE
     else:
         tasktype = TaskType.NOCHANNEL
-
-    new_task = AutocontrolTaskContainer(
+    return AutocontrolTaskContainer(
         task=Task(sample_id=sample.id, task_type=tasktype, tasks=[task_data]),
         status=SampleStatus.INACTIVE,
     )
 
-    with active_tasks.lock:
-        m.tasks.append(new_task)
-        active_tasks.pending[str(new_task.task.id)] = AutocontrolItem(
-            id=sample.id, stage=stage, method_id=m.id,
-        )
 
-    sample.stages[stage].activate(method_index)
-    submit_tasks([new_task])
+def _build_method_group_task(
+    sample: Sample,
+    group: List[dict],
+) -> Optional[AutocontrolTaskContainer]:
+    """Build a parallel method-group Task. Returns None and logs on schema error.
 
-
-def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout | None = None) -> List[Task]:
-    """Runs all draft methods in an entire stage
+    Each entry in group is ``{"method_name": ..., <params>...}``.
+    TaskType is always TRANSFER (multi-device coordination).
     """
-
-    # Generate real-time tasks based on layout
-    for _ in range(len(sample.stages[stage].methods)):
-        prepare_and_submit_method(sample, stage, 0, layout)
-
-def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
-    """Broker-path submission for a parallel method group — one Task, multiple TaskData."""
-    method_group = m.method_data["method_group"]
     taskdata = []
-    for sub in method_group:
+    for sub in group:
         method_name = sub["method_name"]
         schema = method_manager._remote_schemas.get(method_name)
         if schema is None:
             logging.error(
-                "Cannot submit method group: no remote schema for '%s'. "
+                "Cannot build group task: no remote schema for '%s'. "
                 "Ensure the device is running and has published device.registered.",
                 method_name,
             )
-            return
+            return None
         device_id = schema.get("device_id")
         if not device_id:
-            logging.error(
-                "Cannot submit method group: schema for '%s' is missing device_id.",
-                method_name,
-            )
-            return
+            logging.error("Cannot build group task: schema for '%s' missing device_id.", method_name)
+            return None
         device = device_manager.get_device_by_name(device_id)
         channel = sample.channel if (device is not None and device.multichannel) else None
         params = {k: v for k, v in sub.items() if k not in ("method_name",) and k not in EXCLUDE_FIELDS}
@@ -193,26 +180,64 @@ def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: R
             method_data={"method_list": [{"method_name": method_name, "method_data": params}]},
             non_channel_storage="vial" if channel is None else None,
         ))
-
-    new_task = AutocontrolTaskContainer(
+    return AutocontrolTaskContainer(
         task=Task(sample_id=sample.id, task_type=TaskType.TRANSFER, tasks=taskdata),
         status=SampleStatus.INACTIVE,
     )
+
+
+def _register_and_submit_tasks(
+    sample: Sample,
+    stage: str,
+    method_index: int,
+    owner_method: RawMethod,
+    tasks_with_step_ids: List[Tuple[str, AutocontrolTaskContainer]],
+) -> None:
+    """Register tasks, activate the owning method, and submit in one shot.
+
+    ``step_id`` (first element of each pair) becomes ``AutocontrolItem.method_id``,
+    which is echoed back in scheduler events for completion tracking.
+
+    Pass ``owner_method.id`` as every step_id (GUI path) to group all completions
+    under the sentinel. Pass individual step identifiers (broker path) to track
+    each expanded step separately for output-URI collection.
+    """
     with active_tasks.lock:
-        m.tasks.append(new_task)
-        active_tasks.pending[str(new_task.task.id)] = AutocontrolItem(
-            id=sample.id, stage=stage, method_id=m.id,
-        )
+        for step_id, task in tasks_with_step_ids:
+            owner_method.tasks.append(task)
+            active_tasks.pending[str(task.task.id)] = AutocontrolItem(
+                id=sample.id, stage=stage, method_id=step_id,
+            )
     sample.stages[stage].activate(method_index)
-    submit_tasks([new_task])
+    submit_tasks([task for _, task in tasks_with_step_ids])
+
+
+# ---------------------------------------------------------------------------
+# High-level submit functions — thin wrappers around the primitives above
+# ---------------------------------------------------------------------------
+
+def _submit_raw_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Broker-path submission for a single RawMethod."""
+    task = _build_raw_method_task(sample, m.method_data.get("method_name"), m.method_type, m.method_data)
+    if task is None:
+        return
+    _register_and_submit_tasks(sample, stage, method_index, m, [(m.id, task)])
+
+
+def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Broker-path submission for a parallel method group."""
+    task = _build_method_group_task(sample, m.method_data["method_group"])
+    if task is None:
+        return
+    _register_and_submit_tasks(sample, stage, method_index, m, [(m.id, task)])
 
 
 def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
-    """Expand a __subprotocol__ sentinel and attach all tasks directly to it.
+    """Expand a __subprotocol__ sentinel and submit all tasks under it.
 
-    The sentinel RawMethod stays as a single entry in the active list so the
-    GUI sees one subprotocol row with all its tasks. activate() is called once
-    after all tasks are registered so the sentinel moves to active in one shot.
+    The sentinel RawMethod stays as a single GUI row. All tasks share the
+    sentinel's id as their method_id (GUI path — completions are not tracked
+    per-step by the broker).
     """
     import json as _json
     from ..subprotocol.db import get_subprotocol_by_name
@@ -225,11 +250,7 @@ def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m:
         return
 
     _excluded = EXCLUDE_FIELDS | {"subprotocol_name"}
-    context = {
-        f"input.{k}": v
-        for k, v in m.method_data.items()
-        if k not in _excluded
-    }
+    context = {f"input.{k}": v for k, v in m.method_data.items() if k not in _excluded}
     for alloc_name in _json.loads(defn.get("allocations") or "[]"):
         context[f"alloc.{alloc_name}"] = str(uuid4())
 
@@ -243,96 +264,25 @@ def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m:
         sample.stages[stage].activate(method_index)
         return
 
-    all_tasks: List[AutocontrolTaskContainer] = []
+    tasks_with_ids: List[Tuple[str, AutocontrolTaskContainer]] = []
     for step in expanded:
         if step["type"] == "method":
-            method_name = step["method_name"]
-            schema = method_manager._remote_schemas.get(method_name)
-            if schema is None:
-                logging.error(
-                    "Cannot submit subprotocol step '%s': no remote schema registered.",
-                    method_name,
-                )
-                return
-            device_id = schema.get("device_id")
-            if not device_id:
-                logging.error(
-                    "Cannot submit subprotocol step '%s': schema missing device_id.",
-                    method_name,
-                )
-                return
-            device = device_manager.get_device_by_name(device_id)
-            channel = sample.channel if (device is not None and device.multichannel) else None
-            params = {k: v for k, v in step["params"].items() if k not in EXCLUDE_FIELDS}
-            task_data = TaskData(
-                device=device_id,
-                channel=channel,
-                method_data={"method_list": [{"method_name": method_name, "method_data": params}]},
-            )
+            schema = method_manager._remote_schemas.get(step["method_name"]) or {}
             try:
                 mtype = MethodType(schema.get("method_type", "none"))
             except ValueError:
                 mtype = MethodType.NONE
-            if mtype == MethodType.MEASURE:
-                tasktype = TaskType.MEASURE
-            elif mtype == MethodType.PREPARE:
-                tasktype = TaskType.PREPARE
-            else:
-                tasktype = TaskType.NOCHANNEL
-            new_task = AutocontrolTaskContainer(
-                task=Task(sample_id=sample.id, task_type=tasktype, tasks=[task_data]),
-                status=SampleStatus.INACTIVE,
-            )
-
+            task = _build_raw_method_task(sample, step["method_name"], mtype, step["params"])
         else:  # method_group
-            taskdata = []
-            ok = True
-            for sub in step["group"]:
-                sub_name = sub["method_name"]
-                schema = method_manager._remote_schemas.get(sub_name)
-                if schema is None:
-                    logging.error(
-                        "Cannot submit subprotocol method group: no remote schema for '%s'.",
-                        sub_name,
-                    )
-                    ok = False
-                    break
-                device_id = schema.get("device_id")
-                if not device_id:
-                    logging.error(
-                        "Cannot submit subprotocol method group: schema for '%s' missing device_id.",
-                        sub_name,
-                    )
-                    ok = False
-                    break
-                device = device_manager.get_device_by_name(device_id)
-                channel = sample.channel if (device is not None and device.multichannel) else None
-                params = {k: v for k, v in sub.items() if k not in ("method_name",) and k not in EXCLUDE_FIELDS}
-                taskdata.append(TaskData(
-                    id=str(uuid4()),
-                    device=device_id,
-                    channel=channel,
-                    method_data={"method_list": [{"method_name": sub_name, "method_data": params}]},
-                    non_channel_storage="vial" if channel is None else None,
-                ))
-            if not ok:
-                return
-            new_task = AutocontrolTaskContainer(
-                task=Task(sample_id=sample.id, task_type=TaskType.TRANSFER, tasks=taskdata),
-                status=SampleStatus.INACTIVE,
-            )
+            task = _build_method_group_task(sample, step["group"])
+        if task is None:
+            return
+        tasks_with_ids.append((m.id, task))  # all use sentinel's id — GUI path
 
-        all_tasks.append(new_task)
+    _register_and_submit_tasks(sample, stage, method_index, m, tasks_with_ids)
 
-    with active_tasks.lock:
-        for new_task in all_tasks:
-            m.tasks.append(new_task)
-            active_tasks.pending[str(new_task.task.id)] = AutocontrolItem(
-                id=sample.id, stage=stage, method_id=m.id,
-            )
 
-    sample.stages[stage].activate(method_index)
-    submit_tasks(all_tasks)
+def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout | None = None) -> List[Task]:
 
 
 def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout | None = None) -> List[Task]:
