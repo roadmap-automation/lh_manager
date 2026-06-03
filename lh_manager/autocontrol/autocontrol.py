@@ -149,11 +149,12 @@ def _build_raw_method_task(
 def _build_method_group_task(
     sample: Sample,
     group: List[dict],
+    method_type: MethodType = MethodType.PREPARE,
 ) -> Optional[AutocontrolTaskContainer]:
     """Build a parallel method-group Task. Returns None and logs on schema error.
 
     Each entry in group is ``{"method_name": ..., <params>...}``.
-    TaskType is always TRANSFER (multi-device coordination).
+    TaskType is NOCHANNEL when method_type is NONE, otherwise TRANSFER.
     """
     taskdata = []
     for sub in group:
@@ -180,8 +181,9 @@ def _build_method_group_task(
             method_data={"method_list": [{"method_name": method_name, "method_data": params}]},
             non_channel_storage="vial" if channel is None else None,
         ))
+    tasktype = TaskType.NOCHANNEL if method_type == MethodType.NONE else TaskType.TRANSFER
     return AutocontrolTaskContainer(
-        task=Task(sample_id=sample.id, task_type=TaskType.TRANSFER, tasks=taskdata),
+        task=Task(sample_id=sample.id, task_type=tasktype, tasks=taskdata),
         status=SampleStatus.INACTIVE,
     )
 
@@ -226,7 +228,7 @@ def _submit_raw_method(sample: Sample, stage: str, method_index: int, m: RawMeth
 
 def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
     """Broker-path submission for a parallel method group."""
-    task = _build_method_group_task(sample, m.method_data["method_group"])
+    task = _build_method_group_task(sample, m.method_data["method_group"], m.method_type)
     if task is None:
         return
     _register_and_submit_tasks(sample, stage, method_index, m, [(m.id, task)])
@@ -274,7 +276,11 @@ def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m:
                 mtype = MethodType.NONE
             task = _build_raw_method_task(sample, step["method_name"], mtype, step["params"])
         else:  # method_group
-            task = _build_method_group_task(sample, step["group"])
+            try:
+                mtype = MethodType(step.get("method_type", "none"))
+            except ValueError:
+                mtype = MethodType.NONE
+            task = _build_method_group_task(sample, step["group"], mtype)
         if task is None:
             return
         tasks_with_ids.append((m.id, task))  # all use sentinel's id — GUI path
