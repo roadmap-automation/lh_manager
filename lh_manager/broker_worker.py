@@ -399,6 +399,7 @@ class LHManagerBrokerWorker:
         sample_id: Optional[str] = payload.get("sample_id") or None
         channel: int = int(payload.get("channel", 0))
         params: dict = payload.get("parameters", {})
+        sample_name: str = payload.get("sample_name") or f"subprotocol {run_id[:8]}"
 
         defn = await asyncio.to_thread(get_subprotocol_by_name, name)
         if defn is None:
@@ -425,8 +426,11 @@ class LHManagerBrokerWorker:
                         context[key] = inp_def["default_value"]
 
             actual_sample_id = sample_id or await asyncio.to_thread(
-                _create_sample_sync, f"subprotocol {run_id[:8]}", channel
+                _create_sample_sync, sample_name, channel
             )
+
+            # Extract all resolved input values so the GUI sentinel shows them.
+            full_params = {k[6:]: v for k, v in context.items() if k.startswith("input.")}
 
             outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
             execution: str = defn.get("execution") or "sequential"
@@ -442,6 +446,8 @@ class LHManagerBrokerWorker:
                 await asyncio.to_thread(
                     _submit_parallel_subprotocol_via_sentinel,
                     actual_sample_id, name, sentinel_id, run_id, group,
+                    defn.get("method_type") or "prepare",
+                    full_params,
                 )
             else:
                 # Pre-expand ALL steps at submission time; autocontrol's FIFO
@@ -458,7 +464,8 @@ class LHManagerBrokerWorker:
                     })
                     return
                 await asyncio.to_thread(
-                    _submit_expanded_steps_via_sentinel, actual_sample_id, name, sentinel_id, expanded
+                    _submit_expanded_steps_via_sentinel, actual_sample_id, name, sentinel_id, expanded,
+                    full_params,
                 )
                 final_step_id = expanded[-1]["step_id"]
 

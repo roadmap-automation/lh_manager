@@ -270,6 +270,7 @@ def _submit_expanded_steps_via_sentinel(
     subprotocol_name: str,
     sentinel_id: str,
     expanded_steps: List[Dict[str, Any]],
+    input_params: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Create a __subprotocol__ sentinel and submit all expanded steps under it.
 
@@ -301,7 +302,12 @@ def _submit_expanded_steps_via_sentinel(
         method_name="__subprotocol__",
         display_name=subprotocol_name,
         method_type=MethodType.NONE,
-        method_data={"method_name": "__subprotocol__", "subprotocol_name": subprotocol_name},
+        method_data={
+            "method_name": "__subprotocol__",
+            "display_name": subprotocol_name,
+            "subprotocol_name": subprotocol_name,
+            **(input_params or {}),
+        },
     )
     method_index = len(sample.stages["methods"].methods)
     sample.stages["methods"].methods.append(sentinel)
@@ -316,7 +322,11 @@ def _submit_expanded_steps_via_sentinel(
                 mtype = MethodType.NONE
             task = _build_raw_method_task(sample, step["method_name"], mtype, step["params"])
         elif step["type"] == "method_group":
-            task = _build_method_group_task(sample, step["group"])
+            try:
+                mtype = MethodType(step.get("method_type", "none"))
+            except ValueError:
+                mtype = MethodType.NONE
+            task = _build_method_group_task(sample, step["group"], mtype)
         else:
             task = None
         if task is None:
@@ -332,6 +342,8 @@ def _submit_parallel_subprotocol_via_sentinel(
     sentinel_id: str,
     step_id: str,
     group: List[Dict[str, Any]],
+    method_type_str: str = "prepare",
+    input_params: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Create a __subprotocol__ sentinel and submit a single parallel method-group task.
 
@@ -355,12 +367,21 @@ def _submit_parallel_subprotocol_via_sentinel(
         method_name="__subprotocol__",
         display_name=subprotocol_name,
         method_type=MethodType.NONE,
-        method_data={"method_name": "__subprotocol__", "subprotocol_name": subprotocol_name},
+        method_data={
+            "method_name": "__subprotocol__",
+            "display_name": subprotocol_name,
+            "subprotocol_name": subprotocol_name,
+            **(input_params or {}),
+        },
     )
     method_index = len(sample.stages["methods"].methods)
     sample.stages["methods"].methods.append(sentinel)
 
-    task = _build_method_group_task(sample, group)
+    try:
+        mtype = MethodType(method_type_str)
+    except ValueError:
+        mtype = MethodType.NONE
+    task = _build_method_group_task(sample, group, mtype)
     if task is None:
         raise RuntimeError(f"Failed to build parallel task for subprotocol {subprotocol_name!r}")
     _register_and_submit_tasks(sample, "methods", method_index, sentinel, [(step_id, task)])

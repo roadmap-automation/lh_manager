@@ -363,7 +363,9 @@ export function move_method(sample_id: string, stage_name: string, method_index:
       const method = stage.methods[method_index];
       const new_method = structuredClone(toRaw(method))
       new_method.id = null
-      stage.methods.splice(method_index + 1, 0, method);
+      new_method.status = 'inactive'
+      new_method.tasks = []
+      stage.methods.splice(method_index + 1, 0, new_method);
       update_sample(s);
       active_stage.value = stage_name;
       active_method_index.value = method_index + 1;
