@@ -234,7 +234,7 @@ def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m:
         context[f"alloc.{alloc_name}"] = str(uuid4())
 
     try:
-        expanded = expand_subprotocol(defn, context)
+        expanded, _ = expand_subprotocol(defn, context)
     except Exception:
         logging.exception("Failed to expand subprotocol %r.", sp_name)
         return

@@ -145,6 +145,17 @@ def expand_subprotocol(
             child_context.update({f"input.{k}": v for k, v in resolved.items()})
             for alloc_name in json.loads(child_defn.get("allocations") or "[]"):
                 child_context[f"alloc.{alloc_name}"] = str(uuid.uuid4())
+            # Seed static_value / default_value for inputs not explicitly passed by
+            # the parent step.  is_static inputs are caller-opaque fixed values;
+            # default_value inputs are optional with a caller-overridable default.
+            child_inputs = json.loads(child_defn.get("inputs") or "{}")
+            for inp_name, inp_def in child_inputs.items():
+                key = f"input.{inp_name}"
+                if key not in child_context:
+                    if inp_def.get("is_static") and "static_value" in inp_def:
+                        child_context[key] = inp_def["static_value"]
+                    elif "default_value" in inp_def:
+                        child_context[key] = inp_def["default_value"]
 
             child_execution: str = child_defn.get("execution") or "sequential"
             if child_execution == "parallel":
