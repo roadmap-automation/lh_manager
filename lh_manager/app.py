@@ -1,4 +1,5 @@
 import datetime
+import logging
 from flask import Flask, render_template, redirect
 from logging.config import dictConfig
 
@@ -27,6 +28,12 @@ dictConfig({
         'handlers': ['stream', 'file']
     }
 })
+
+class _HealthCheckFilter(logging.Filter):
+    def filter(self, record):
+        return 'GET /health HTTP' not in record.getMessage()
+
+logging.getLogger('werkzeug').addFilter(_HealthCheckFilter())
 
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
@@ -72,6 +79,10 @@ method_group_db.init_db()
 @app.route('/')
 def root():
     return redirect('/static/dist/index.html')
+
+@app.route('/health')
+def health():
+    return '', 204
 
 @app.route('/test_emit/')
 def test_emit():
