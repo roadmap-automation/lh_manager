@@ -78,18 +78,19 @@ def expand_subprotocol(
     steps: list = json.loads(defn["steps"])
     outputs_defn: dict = json.loads(defn.get("outputs") or "{}")
 
-    # Seed static/default inputs not already in the caller-supplied context.
-    # This mirrors the identical seeding done for child subprotocol steps so
-    # that top-level calls (from broker_worker or autocontrol) benefit too.
+    # Seed static/default inputs.  is_static inputs are caller-opaque: their
+    # static_value is always applied unconditionally, even if the caller already
+    # set the key, because callers must never override a static input.
+    # default_value inputs fill gaps only (caller-supplied values win).
     inputs_defn_top: dict = json.loads(defn.get("inputs") or "{}")
     if inputs_defn_top:
         context = dict(context)  # don't mutate caller's dict
         for inp_name, inp_def in inputs_defn_top.items():
             key = f"input.{inp_name}"
-            if key not in context:
-                if inp_def.get("is_static") and "static_value" in inp_def:
-                    context[key] = inp_def["static_value"]
-                elif "default_value" in inp_def:
+            if isinstance(inp_def, dict) and inp_def.get("is_static") and "static_value" in inp_def:
+                context[key] = inp_def["static_value"]  # always wins
+            elif key not in context:
+                if isinstance(inp_def, dict) and "default_value" in inp_def:
                     context[key] = inp_def["default_value"]
 
     result: List[Dict[str, Any]] = []
@@ -159,16 +160,17 @@ def expand_subprotocol(
             child_context.update({f"input.{k}": v for k, v in resolved.items()})
             for alloc_name in json.loads(child_defn.get("allocations") or "[]"):
                 child_context[f"alloc.{alloc_name}"] = str(uuid.uuid4())
-            # Seed static_value / default_value for inputs not explicitly passed by
-            # the parent step.  is_static inputs are caller-opaque fixed values;
-            # default_value inputs are optional with a caller-overridable default.
+            # Seed static_value / default_value for child inputs.
+            # is_static inputs are caller-opaque: always applied unconditionally so
+            # a parent that accidentally passes an empty or wrong value cannot win.
+            # default_value inputs fill gaps only (parent-supplied values win).
             child_inputs = json.loads(child_defn.get("inputs") or "{}")
             for inp_name, inp_def in child_inputs.items():
                 key = f"input.{inp_name}"
-                if key not in child_context:
-                    if inp_def.get("is_static") and "static_value" in inp_def:
-                        child_context[key] = inp_def["static_value"]
-                    elif "default_value" in inp_def:
+                if isinstance(inp_def, dict) and inp_def.get("is_static") and "static_value" in inp_def:
+                    child_context[key] = inp_def["static_value"]  # always wins
+                elif key not in child_context:
+                    if isinstance(inp_def, dict) and "default_value" in inp_def:
                         child_context[key] = inp_def["default_value"]
 
             child_execution: str = child_defn.get("execution") or "sequential"
