@@ -4,11 +4,13 @@ Runs an asyncio event loop in a dedicated daemon thread alongside the
 synchronous Flask/SocketIO server.  Provides:
 
   Inbound (broker → lh_manager):
-    scheduler.task_dispatched  — task is now active on a device
-    scheduler.task_completed   — task has finished successfully
-    scheduler.task_failed      — task has finished with an error
-    layout.updated             — a device's bed layout has changed
-    command.lh.submit_task     — autocontrol dispatching an LH job
+    scheduler.task_dispatched              — task is now active on a device
+    scheduler.task_completed               — task has finished successfully
+    scheduler.task_failed                  — task has finished with an error
+    layout.updated                         — a device's bed layout has changed
+    command.lh.submit_task                 — autocontrol dispatching an LH job
+    command.lh_manager.run_subprotocol     — run a named subprotocol
+    command.lh_manager.cancel_subprotocol  — cancel a running subprotocol by run_id
 
   Outbound (lh_manager → broker):
     command.autocontrol.submit_task    — replaces POST /put
@@ -42,6 +44,7 @@ from roadmap_broker_client.envelope import Envelope, build
 from roadmap_broker_client.publisher import publish
 from roadmap_broker_client.topology import declare_node_queue, declare_topology
 from roadmap_broker_client.topics import (
+    CMD_CANCEL_SUBPROTOCOL,
     CMD_RUN_SUBPROTOCOL,
     DEVICE_ANNOUNCE_REQUEST,
     DEVICE_REGISTERED,
@@ -92,6 +95,8 @@ class LHManagerBrokerWorker:
         self._step_retrieval_uris: Dict[str, str] = {}
         # Tracks step_ids cancelled by operator; checked after event fires in _on_run_subprotocol.
         self._cancelled_steps: set = set()
+        # run_id → {"final_step_id": str, "all_step_ids": list[str]}
+        self._active_subprotocols: Dict[str, dict] = {}
 
     # ------------------------------------------------------------------
     # Thread-safe public API  (called from sync Flask threads)
@@ -147,6 +152,41 @@ class LHManagerBrokerWorker:
         event = self._pending_step_completions.pop(step_id, None)
         if event is not None:
             event.set()
+
+    async def _on_cancel_subprotocol(self, run_id: str) -> None:
+        """Cancel all queued autocontrol tasks for a running subprotocol.
+
+        Finds every pending/active autocontrol task whose method_id matches one
+        of the subprotocol's step_ids, cancels them via the broker, then fires
+        the final-step cancel signal so the executor coroutine wakes and exits.
+        """
+        from .autocontrol.autocontrol import active_tasks
+
+        info = self._active_subprotocols.get(run_id)
+        if info is None:
+            logger.warning("cancel_subprotocol: run_id %r not active — ignoring.", run_id)
+            return
+
+        all_step_ids: set = set(info["all_step_ids"])
+        final_step_id: str = info["final_step_id"]
+
+        # Collect autocontrol task IDs whose method_id matches a step in this run.
+        task_ids_to_cancel: list = []
+        with active_tasks.lock:
+            for task_id, item in list(active_tasks.pending.items()):
+                if item.method_id in all_step_ids:
+                    task_ids_to_cancel.append(task_id)
+            for task_id, item in list(active_tasks.active.items()):
+                if item.method_id in all_step_ids:
+                    task_ids_to_cancel.append(task_id)
+
+        for task_id in task_ids_to_cancel:
+            self.cancel_task(task_id, include_active_queue=True, drop_material=False)
+            logger.info("cancel_subprotocol %r: cancelled autocontrol task %s", run_id, task_id)
+
+        # Unblock the waiting executor so it raises the cancelled RuntimeError.
+        await self._fire_step_cancelled(final_step_id)
+        logger.info("cancel_subprotocol %r: signalled final step %s as cancelled.", run_id, final_step_id)
 
     # ------------------------------------------------------------------
     # Async publish helpers
@@ -373,6 +413,9 @@ class LHManagerBrokerWorker:
         rk = message.routing_key or ""
         if rk == command_key("lh_manager", CMD_RUN_SUBPROTOCOL):
             asyncio.create_task(self._on_run_subprotocol(envelope))
+        elif rk == command_key("lh_manager", CMD_CANCEL_SUBPROTOCOL):
+            run_id = (envelope.payload or {}).get("subprotocol_run_id", "")
+            asyncio.create_task(self._on_cancel_subprotocol(run_id))
         else:
             logger.debug("Ignoring unknown lh_manager command: %s", rk)
 
@@ -436,6 +479,7 @@ class LHManagerBrokerWorker:
             execution: str = defn.get("execution") or "sequential"
 
             sentinel_id = str(uuid.uuid4())
+            all_step_ids: list
             if execution == "parallel":
                 # All top-level steps dispatched as one method group under a sentinel.
                 # Parallel subprotocols never produce retrieval_uris, so outputs are empty.
@@ -443,6 +487,7 @@ class LHManagerBrokerWorker:
                 group = _build_method_group(steps, context)
                 final_step_id = run_id
                 step_to_output: dict = {}
+                all_step_ids = [run_id]
                 await asyncio.to_thread(
                     _submit_parallel_subprotocol_via_sentinel,
                     actual_sample_id, name, sentinel_id, run_id, group,
@@ -463,16 +508,24 @@ class LHManagerBrokerWorker:
                         "outputs": {},
                     })
                     return
+                all_step_ids = [s["step_id"] for s in expanded]
                 await asyncio.to_thread(
                     _submit_expanded_steps_via_sentinel, actual_sample_id, name, sentinel_id, expanded,
                     full_params,
                 )
                 final_step_id = expanded[-1]["step_id"]
 
+            # Register so cancel_subprotocol can find this run's steps.
+            self._active_subprotocols[run_id] = {
+                "final_step_id": final_step_id,
+                "all_step_ids": all_step_ids,
+            }
+
             # Wait for the final step to complete (set by _on_scheduler_event).
             event = asyncio.Event()
             self._pending_step_completions[final_step_id] = event
             await event.wait()
+            self._active_subprotocols.pop(run_id, None)
             self._pending_step_completions.pop(final_step_id, None)
 
             if final_step_id in self._cancelled_steps:
@@ -498,6 +551,7 @@ class LHManagerBrokerWorker:
             logger.info("Subprotocol %r run %s completed.", name, run_id)
 
         except Exception as exc:
+            self._active_subprotocols.pop(run_id, None)
             logger.exception("Subprotocol %r run %s failed.", name, run_id)
             await self._publish_protocol(SUBPROTOCOL_FAILED, run_id, sample_id, {
                 "subprotocol_run_id": run_id,
