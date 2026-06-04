@@ -9,7 +9,7 @@ import {
 import type { Subprotocol, SubprotocolStep, ExposedField } from '../store';
 
 const METHOD_TYPES = ['prepare', 'measure', 'transfer', 'init', 'shutdown', 'none'] as const;
-const PARAM_TYPES = ['number', 'boolean', 'Composition'] as const;
+const PARAM_TYPES = ['number', 'boolean', 'string', 'Composition'] as const;
 const STEP_TYPES = ['method', 'method_group', 'subprotocol'] as const;
 
 // ── Types ────────────────────────────────────────────────────────────────────
