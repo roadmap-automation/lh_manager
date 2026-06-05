@@ -946,6 +946,41 @@ export interface SubprotocolSummary {
 
 export const subprotocols = ref<SubprotocolSummary[]>([]);
 
+export type MethodGroupSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  method_type: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const method_groups = ref<MethodGroupSummary[]>([]);
+
+export async function refreshMethodGroups() {
+  const { method_groups: data } = await (await fetch('/method_groups/')).json();
+  method_groups.value = data;
+}
+
+export async function add_method_group_method(sample_id: string, stage_name: string, mg_id: string) {
+  const sample = get_sample_by_id(sample_id);
+  if (sample === undefined) return;
+  const mg = await (await fetch(`/method_groups/${mg_id}`)).json();
+  const s: Sample = structuredClone(toRaw(sample));
+  const stage = s.stages[stage_name];
+  const num_methods = stage.methods.push({
+    method_name: '__method_group__',
+    display_name: mg.name,
+    method_group: mg.steps,
+    id: null,
+    status: 'inactive',
+    tasks: [],
+  } as any);
+  update_sample(s);
+  active_stage.value = stage_name;
+  active_method_index.value = num_methods - 1;
+}
+
 export type SubprotocolInputDef = {
   type: string;
   display_name: string;

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, defineProps, onMounted } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks, subprotocols, refreshSubprotocols, add_subprotocol_method } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks, subprotocols, refreshSubprotocols, add_subprotocol_method, method_groups, refreshMethodGroups, add_method_group_method } from '../store';
 import type { MethodType } from '../store';
 
-onMounted(() => { if (subprotocols.value.length === 0) refreshSubprotocols(); });
+onMounted(() => {
+  if (subprotocols.value.length === 0) refreshSubprotocols();
+  if (method_groups.value.length === 0) refreshMethodGroups();
+});
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
 
@@ -103,6 +106,10 @@ function handleAddMethod(event: Event) {
   if (value.startsWith('__sp__:')) {
     const sp_name = value.slice(7);
     add_subprotocol_method(props.sample_id, props.stage_name, sp_name);
+    target.value = '';
+  } else if (value.startsWith('__mg__:')) {
+    const mg_id = value.slice(7);
+    add_method_group_method(props.sample_id, props.stage_name, mg_id);
     target.value = '';
   } else {
     add_method(props.sample_id, props.stage_name, event);
@@ -226,6 +233,9 @@ const status = computed(() => {
       </optgroup>
       <optgroup v-if="subprotocols.length" label="Subprotocols">
         <option v-for="sp of subprotocols" :value="`__sp__:${sp.name}`">{{ sp.name }}</option>
+      </optgroup>
+      <optgroup v-if="method_groups.length" label="Method Groups">
+        <option v-for="mg of method_groups" :value="`__mg__:${mg.id}`">{{ mg.name }}</option>
       </optgroup>
     </select>
   </div>
