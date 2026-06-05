@@ -227,8 +227,17 @@ def _submit_raw_method(sample: Sample, stage: str, method_index: int, m: RawMeth
 
 
 def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
-    """Broker-path submission for a parallel method group."""
-    task = _build_method_group_task(sample, m.method_data["method_group"], m.method_type)
+    """GUI-path submission for a parallel method group with $ref resolution."""
+    from ..subprotocol.executor import _build_method_group
+    _excluded = {"method_name", "display_name", "method_group", "exposed_fields",
+                 "id", "status", "tasks", "method_type"}
+    context = {f"input.{k}": v for k, v in m.method_data.items() if k not in _excluded}
+    try:
+        resolved = _build_method_group(m.method_data["method_group"], context)
+    except (ValueError, KeyError):
+        logging.exception("Failed to resolve method group refs for sample %r", sample.id)
+        return
+    task = _build_method_group_task(sample, resolved, m.method_type)
     if task is None:
         return
     _register_and_submit_tasks(sample, stage, method_index, m, [(m.id, task)])

@@ -1106,6 +1106,7 @@ export async function add_method_group_method(sample_id: string, stage_name: str
     display_name: mg.name,
     method_group: mg.steps,
     exposed_fields,
+    method_type: mg.method_type ?? 'none',
     id: null,
     status: 'inactive',
     tasks: [],
