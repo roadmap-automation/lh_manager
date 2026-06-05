@@ -1095,10 +1095,17 @@ export async function add_method_group_method(sample_id: string, stage_name: str
   const mg = await (await fetch(`/method_groups/${mg_id}`)).json();
   const s: Sample = structuredClone(toRaw(sample));
   const stage = s.stages[stage_name];
+  const exposed_fields: any[] = mg.exposed_fields ?? [];
+  const field_defaults: Record<string, any> = {};
+  for (const ef of exposed_fields) {
+    field_defaults[ef.field_name] = null;
+  }
   const num_methods = stage.methods.push({
+    ...field_defaults,
     method_name: '__method_group__',
     display_name: mg.name,
     method_group: mg.steps,
+    exposed_fields,
     id: null,
     status: 'inactive',
     tasks: [],

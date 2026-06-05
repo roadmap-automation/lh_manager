@@ -60,8 +60,18 @@ function any_method_tasks_pending(method: MethodType) {
 }
 
 function method_string(method: MethodType) {
-  if (method.method_name === '__method_group__' || method.method_name === '__subprotocol__') {
-    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'method_group', 'id', 'status', 'tasks']);
+  if (method.method_name === '__method_group__') {
+    const exposed_fields: any[] = (method as any).exposed_fields ?? [];
+    if (exposed_fields.length > 0) {
+      return exposed_fields
+        .map((ef: any) => `${ef.field_name}=${(method as any)[ef.field_name] ?? ''}`)
+        .join(', ');
+    }
+    const group = ((method as any).method_group as any[]) ?? [];
+    return group.map((m: any) => m.method_name).join(', ');
+  }
+  if (method.method_name === '__subprotocol__') {
+    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks']);
     return Object.entries(method)
       .filter(([k, v]) => !excluded.has(k) && v != null)
       .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)

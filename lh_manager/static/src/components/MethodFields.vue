@@ -43,6 +43,25 @@ function get_parameters(method: MethodType) {
   if (!method) return [];
   const { method_name } = method;
 
+  if (method_name === '__method_group__') {
+    const exposed_fields: any[] = (method as any).exposed_fields ?? [];
+    return exposed_fields.map((ef: any) => {
+      const type = ef.type ?? 'string';
+      let value = clone((method as any)[ef.field_name]) ?? null;
+      if (isWellLocationType(type) && value == null) {
+        value = { rack_id: null, well_number: 0 };
+      }
+      return {
+        name: ef.field_name,
+        value,
+        original_value: clone((method as any)[ef.field_name]),
+        type,
+        schema: { properties: { [ef.field_name]: { type } } },
+        properties: { type },
+      };
+    });
+  }
+
   if (method_name === '__subprotocol__') {
     const sp_name = (method as any).subprotocol_name;
     const sp_schema = subprotocol_schemas.value[sp_name] ?? {};
