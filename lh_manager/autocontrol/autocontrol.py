@@ -138,6 +138,8 @@ def _build_raw_method_task(
         tasktype = TaskType.MEASURE
     elif method_type == MethodType.PREPARE:
         tasktype = TaskType.PREPARE
+    elif method_type in (MethodType.TRANSFER, MethodType.INJECT):
+        tasktype = TaskType.TRANSFER
     else:
         tasktype = TaskType.NOCHANNEL
     return AutocontrolTaskContainer(

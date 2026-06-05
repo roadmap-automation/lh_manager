@@ -96,13 +96,15 @@ class RawMethod(BaseMethod):
         Uses @model_serializer so this is called by parent models (e.g. MethodList)
         as well as direct model_dump() calls. The frontend reads method[field_name]
         directly, so device-specific fields must be at the top level. Tracking fields
-        (id, status, tasks) overlay
-        whatever is in method_data so the backend round-trip is lossless.
+        (id, status, tasks, method_type) overlay whatever is in method_data so the
+        backend round-trip is lossless — method_type must survive so that
+        __method_group__ RawMethods retain their TaskType after deserialization.
         """
         base = dict(self.method_data)
         base['id'] = self.id
         base['status'] = self.status
         base['tasks'] = [t.model_dump() for t in self.tasks]
+        base['method_type'] = self.method_type.value if isinstance(self.method_type, MethodType) else str(self.method_type)
         return base
 
     def render_method(self,
