@@ -234,11 +234,7 @@ def expand_subprotocol(
                             step_id, len(parent_out_names), child_name, len(child_leaves),
                         )
                 else:
-                    # No outputs_defn claim for this step: use output_alias (legacy).
-                    alias = step.get("output_alias", {})
-                    for child_out_name, leaf_id in child_leaf_map.items():
-                        parent_out_name = alias.get(child_out_name, child_out_name)
-                        output_leaf_map[parent_out_name] = leaf_id
+                    pass  # Not in outputs_defn — outputs not collected.
 
         else:
             logger.warning(
