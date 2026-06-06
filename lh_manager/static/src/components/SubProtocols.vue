@@ -148,10 +148,16 @@ function get_step_fields(step: SubprotocolStep): StepField[] {
 }
 
 // Field value mode detection
-function get_field_mode(value: any): FieldMode {
+
+function isWellLocType(type: string) {
+  return type === 'WellLocation' || type === '#/$defs/WellLocation';
+}
+
+function get_field_mode(value: any, field_type?: string): FieldMode {
   if (value && typeof value === 'object') {
     if ('$ref' in value) return 'ref';
     if ('$alloc' in value) return 'alloc';
+    if (field_type && isWellLocType(field_type) && value.id && typeof value.id === 'object' && '$alloc' in value.id) return 'alloc';
   }
   return 'literal';
 }
@@ -161,11 +167,14 @@ function get_ref_param(value: any): string {
   return ref.startsWith('input.') ? ref.slice(6) : ref;
 }
 
-function get_alloc_name(value: any): string {
+function get_alloc_name(value: any, field_type?: string): string {
+  if (field_type && isWellLocType(field_type) && value?.id && typeof value.id === 'object') {
+    return value.id.$alloc ?? '';
+  }
   return value?.$alloc ?? '';
 }
 
-function set_field_mode(step: SubprotocolStep, field: string, mode: FieldMode) {
+function set_field_mode(step: SubprotocolStep, field: string, mode: FieldMode, field_type?: string) {
   if (!step.parameters) step.parameters = {};
   if (mode === 'literal') {
     step.parameters[field] = '';
@@ -174,7 +183,9 @@ function set_field_mode(step: SubprotocolStep, field: string, mode: FieldMode) {
     step.parameters[field] = { '$ref': `input.${first}` };
   } else {
     const first = editing.value.allocations[0] ?? '';
-    step.parameters[field] = { '$alloc': first };
+    step.parameters[field] = field_type && isWellLocType(field_type)
+      ? { id: { '$alloc': first } }
+      : { '$alloc': first };
   }
   step.parameters = { ...step.parameters };
 }
@@ -198,9 +209,11 @@ function set_ref_value(step: SubprotocolStep, field: string, param_name: string)
   step.parameters = { ...step.parameters };
 }
 
-function set_alloc_value(step: SubprotocolStep, field: string, alloc_name: string) {
+function set_alloc_value(step: SubprotocolStep, field: string, alloc_name: string, field_type?: string) {
   if (!step.parameters) step.parameters = {};
-  step.parameters[field] = { '$alloc': alloc_name };
+  step.parameters[field] = field_type && isWellLocType(field_type)
+    ? { id: { '$alloc': alloc_name } }
+    : { '$alloc': alloc_name };
   step.parameters = { ...step.parameters };
 }
 
@@ -676,28 +689,28 @@ function compatible_params(field_type: string): InputParam[] {
                     <td style="width:145px;">
                       <div class="btn-group btn-group-sm">
                         <button class="btn" style="font-size:0.7rem; padding:1px 6px;"
-                          :class="get_field_mode(step.parameters?.[field.name]) === 'literal' ? 'btn-dark' : 'btn-outline-secondary'"
-                          @click="set_field_mode(step, field.name, 'literal')" title="Literal value">val</button>
+                          :class="get_field_mode(step.parameters?.[field.name], field.type) === 'literal' ? 'btn-dark' : 'btn-outline-secondary'"
+                          @click="set_field_mode(step, field.name, 'literal', field.type)" title="Literal value">val</button>
                         <button class="btn" style="font-size:0.7rem; padding:1px 6px;"
-                          :class="get_field_mode(step.parameters?.[field.name]) === 'ref' ? 'btn-success' : 'btn-outline-success'"
-                          @click="set_field_mode(step, field.name, 'ref')" title="Reference a parameter">→ param</button>
+                          :class="get_field_mode(step.parameters?.[field.name], field.type) === 'ref' ? 'btn-success' : 'btn-outline-success'"
+                          @click="set_field_mode(step, field.name, 'ref', field.type)" title="Reference a parameter">→ param</button>
                         <button class="btn" style="font-size:0.7rem; padding:1px 6px;"
-                          :class="get_field_mode(step.parameters?.[field.name]) === 'alloc' ? 'btn-warning' : 'btn-outline-warning'"
-                          @click="set_field_mode(step, field.name, 'alloc')" title="Reference an allocation">⊕ alloc</button>
+                          :class="get_field_mode(step.parameters?.[field.name], field.type) === 'alloc' ? 'btn-warning' : 'btn-outline-warning'"
+                          @click="set_field_mode(step, field.name, 'alloc', field.type)" title="Reference an allocation">⊕ alloc</button>
                       </div>
                     </td>
 
                     <!-- Value input -->
                     <td>
                       <!-- literal -->
-                      <input v-if="get_field_mode(step.parameters?.[field.name]) === 'literal'"
+                      <input v-if="get_field_mode(step.parameters?.[field.name], field.type) === 'literal'"
                         class="form-control form-control-sm"
                         :type="field.type === 'number' || field.type === 'integer' ? 'number' : 'text'"
                         :value="Array.isArray(step.parameters?.[field.name]) ? JSON.stringify(step.parameters?.[field.name]) : (step.parameters?.[field.name] ?? '')"
                         @input="set_literal_value(step, field.name, ($event.target as HTMLInputElement).value, field.type)"
                       />
                       <!-- param ref -->
-                      <select v-else-if="get_field_mode(step.parameters?.[field.name]) === 'ref'"
+                      <select v-else-if="get_field_mode(step.parameters?.[field.name], field.type) === 'ref'"
                         class="form-select form-select-sm"
                         :value="get_ref_param(step.parameters?.[field.name])"
                         @change="set_ref_value(step, field.name, ($event.target as HTMLSelectElement).value)">
@@ -709,8 +722,8 @@ function compatible_params(field_type: string): InputParam[] {
                       <!-- alloc ref -->
                       <select v-else
                         class="form-select form-select-sm"
-                        :value="get_alloc_name(step.parameters?.[field.name])"
-                        @change="set_alloc_value(step, field.name, ($event.target as HTMLSelectElement).value)">
+                        :value="get_alloc_name(step.parameters?.[field.name], field.type)"
+                        @change="set_alloc_value(step, field.name, ($event.target as HTMLSelectElement).value, field.type)">
                         <option value="">— allocation —</option>
                         <option v-for="a in editing.allocations" :key="a" :value="a">{{ a }}</option>
                       </select>
