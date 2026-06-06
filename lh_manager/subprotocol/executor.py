@@ -98,6 +98,16 @@ def expand_subprotocol(
     # Populated bottom-up as nested subprotocols are expanded.
     output_leaf_map: Dict[str, str] = {}
 
+    # outputs_defn is the GUI-editable source of truth.  Build a reverse lookup
+    # so we know which parent output name(s) each step is declared to produce.
+    # output_alias on individual steps is a legacy field that is NOT updated by
+    # the GUI; outputs_defn takes priority whenever it claims a step.
+    step_to_parent_outputs: Dict[str, List[str]] = {}
+    for out_name, out_def in outputs_defn.items():
+        sid = out_def.get("step_id") if isinstance(out_def, dict) else None
+        if sid:
+            step_to_parent_outputs.setdefault(sid, []).append(out_name)
+
     for step in steps:
         step_type: str = step.get("type", "method")
         step_id: str = step["id"]
@@ -184,29 +194,67 @@ def expand_subprotocol(
                     "group": group,
                 })
             else:
-                # Sequential child: flatten into parent's step list, then propagate
-                # its output_leaf_map through output_alias renaming.
+                # Sequential child: flatten into parent's step list, then map
+                # its outputs to parent-level names.
+                #
+                # Priority: outputs_defn at THIS level (GUI-editable) wins over
+                # output_alias on the step (legacy, not updated by GUI).
                 child_expanded, child_leaf_map = expand_subprotocol(
                     child_defn, child_context, depth + 1, f"{prefixed_id}."
                 )
                 result.extend(child_expanded)
 
-                alias: dict = step.get("output_alias", {})
-                for child_out_name, leaf_id in child_leaf_map.items():
-                    parent_out_name = alias.get(child_out_name, child_out_name)
-                    output_leaf_map[parent_out_name] = leaf_id
+                parent_out_names: List[str] = step_to_parent_outputs.get(step_id, [])
+                if parent_out_names:
+                    # outputs_defn claims this step.  Map child outputs to the
+                    # declared parent name(s).
+                    child_leaves = list(child_leaf_map.items())  # [(name, leaf), ...]
+                    if len(parent_out_names) == 1 and len(child_leaves) == 1:
+                        # Common case: one declared output, one child output — 1:1.
+                        output_leaf_map[parent_out_names[0]] = child_leaves[0][1]
+                    elif len(parent_out_names) == len(child_leaves):
+                        # Same count but ambiguous which child output is which.
+                        # Fall back to output_alias for the renaming, then remap
+                        # to the parent names by matching via alias result.
+                        alias: dict = step.get("output_alias", {})
+                        aliased = {alias.get(cn, cn): leaf for cn, leaf in child_leaves}
+                        for p_name in parent_out_names:
+                            if p_name in aliased:
+                                output_leaf_map[p_name] = aliased[p_name]
+                            else:
+                                logger.warning(
+                                    "Step %r: outputs_defn declares %r but output_alias "
+                                    "has no matching key; output will be missing.",
+                                    step_id, p_name,
+                                )
+                    else:
+                        logger.warning(
+                            "Step %r: outputs_defn declares %d output(s) but child "
+                            "subprotocol %r produced %d — skipping output mapping.",
+                            step_id, len(parent_out_names), child_name, len(child_leaves),
+                        )
+                else:
+                    # No outputs_defn claim for this step: use output_alias (legacy).
+                    alias = step.get("output_alias", {})
+                    for child_out_name, leaf_id in child_leaf_map.items():
+                        parent_out_name = alias.get(child_out_name, child_out_name)
+                        output_leaf_map[parent_out_name] = leaf_id
 
         else:
             logger.warning(
                 "Unknown step type %r in step %r — skipping.", step_type, step_id
             )
 
-    # Fill in outputs that weren't satisfied by nested subprotocol recursion.
-    # These are direct method step outputs: their step_id names a leaf step at
-    # this level which we can now look up with the current step_prefix.
+    # Fill in outputs from direct method/method_group steps at this level that
+    # are not yet in output_leaf_map.  Subprotocol steps are handled above
+    # during expansion and must not use this fallback (their step_id is not a
+    # leaf method step — it's an intermediate grouping id).
+    subprotocol_step_ids = {s["id"] for s in steps if s.get("type") == "subprotocol"}
     for out_name, out_def in outputs_defn.items():
         if out_name not in output_leaf_map:
-            output_leaf_map[out_name] = f"{step_prefix}{out_def['step_id']}"
+            declared_sid = out_def.get("step_id") if isinstance(out_def, dict) else None
+            if declared_sid and declared_sid not in subprotocol_step_ids:
+                output_leaf_map[out_name] = f"{step_prefix}{declared_sid}"
 
     return result, output_leaf_map
 
