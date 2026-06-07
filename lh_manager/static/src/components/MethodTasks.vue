@@ -57,7 +57,7 @@ function clone(obj) {
           </h6>
           <div class="col">
               <button
-                v-if="(task.status === 'pending') || (task.status === 'error')"
+                v-if="(task.status === 'pending') || (task.status === 'error') || (task.status === 'failed')"
                 type="button"
                 class="btn-close btn-sm arrow-repeat"
                 aria-label="Resubmit task"

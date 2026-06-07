@@ -533,7 +533,7 @@ export async function resubmit_all_tasks(sample_id: string, stage: string, metho
   if (sample !== undefined) {
     const s: Sample = structuredClone(toRaw(sample));
     const method = s.stages[stage].active[method_index];
-    const incomplete_tasks = method.tasks.filter((task) => (task.status === 'pending') || (task.status === 'error'));
+    const incomplete_tasks = method.tasks.filter((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'failed'));
     const tasklist = incomplete_tasks.map((task) => {
       return task.task;
     });
@@ -557,7 +557,7 @@ export async function cancel_all_tasks(sample_id: string, stage: string, method_
     const s: Sample = structuredClone(toRaw(sample));
     const methods = method_index ? [s.stages[stage].active[method_index]] : s.stages[stage].active;
     const incomplete_tasks = methods.map((method) => {
-      return method.tasks.filter((task) => (task.status === 'pending') || (task.status === 'error'))
+      return method.tasks.filter((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'failed'))
     });
     const tasklist = incomplete_tasks.flat().map((task) => {
       return task.task;

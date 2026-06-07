@@ -56,7 +56,7 @@ function any_methodlist_tasks_pending() {
 }
 
 function any_method_tasks_pending(method: MethodType) {
-  return method.tasks.some((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'active'));
+  return method.tasks.some((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'active') || (task.status === 'failed'));
 }
 
 function method_string(method: MethodType) {
