@@ -98,7 +98,7 @@ function clone(obj) {
                   class="btn-close btn-sm align-middle gear"
                   aria-label="View/edit task data"
                   title="View/edit task data"
-                  @click.stop="edit_task({'sample_id': props.sample_id, 'title': ((task.status === 'pending') ? 'Edit' : 'View') + ' task data', 'device': imethod.device, 'editable': (task.status === 'pending'), 'pointer': `${props.pointer}/tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list`, 'task_id': task.id, 'task': imethod.value ?? null})">
+                  @click.stop="edit_task({'sample_id': props.sample_id, 'title': ((task.status === 'pending' || task.status === 'failed') ? 'Edit' : 'View') + ' task data', 'device': imethod.device, 'editable': (task.status === 'pending' || task.status === 'failed'), 'pointer': `${props.pointer}/tasks/${task_index}/task/tasks/${imethod_index}/method_data/method_list`, 'task_id': task.id, 'task': imethod.value ?? null})">
               </button>                
             </div>
             <div class="col">
