@@ -94,7 +94,7 @@ function set_static_value(step: MethodGroupStep, field_name: string, raw: string
   const numTypes = ['number', 'integer', 'float'];
   if (numTypes.includes(field_type)) {
     step.parameters[field_name] = parseFloat(raw) || raw;
-  } else if (field_type === 'array') {
+  } else if (field_type === 'array' || field_type === 'Composition') {
     try { step.parameters[field_name] = JSON.parse(raw); } catch { step.parameters[field_name] = raw; }
   } else {
     step.parameters[field_name] = raw;
@@ -368,7 +368,7 @@ function on_method_change(step_index: number, step: MethodGroupStep) {
                       <input v-if="!is_exposed(step, field.name)"
                         class="form-control form-control-sm"
                         :type="field.type === 'number' || field.type === 'integer' ? 'number' : 'text'"
-                        :value="Array.isArray(step.parameters?.[field.name]) ? JSON.stringify(step.parameters?.[field.name]) : (step.parameters?.[field.name] ?? '')"
+                        :value="(Array.isArray(step.parameters?.[field.name]) || (field.type === 'Composition' && step.parameters?.[field.name] !== null && typeof step.parameters?.[field.name] === 'object')) ? JSON.stringify(step.parameters?.[field.name]) : (step.parameters?.[field.name] ?? '')"
                         @input="set_static_value(step, field.name, ($event.target as HTMLInputElement).value, field.type)"
                       />
                       <code v-else class="small text-success">

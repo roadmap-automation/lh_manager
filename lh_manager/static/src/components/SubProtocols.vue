@@ -64,8 +64,8 @@ function sync_inputs_from_editing() {
     type: typeof v === 'object' ? (v.type ?? '') : '',
     display_name: typeof v === 'object' ? (v.display_name ?? '') : '',
     is_static: typeof v === 'object' ? (v.is_static ?? false) : false,
-    static_value: typeof v === 'object' ? String(v.static_value ?? '') : '',
-    default_value: typeof v === 'object' ? String(v.default_value ?? '') : '',
+    static_value: typeof v === 'object' ? (typeof v.static_value === 'object' && v.static_value !== null ? JSON.stringify(v.static_value) : String(v.static_value ?? '')) : '',
+    default_value: typeof v === 'object' ? (typeof v.default_value === 'object' && v.default_value !== null ? JSON.stringify(v.default_value) : String(v.default_value ?? '')) : '',
   }));
 }
 
@@ -73,10 +73,14 @@ function inputs_to_dict(): Record<string, any> {
   return Object.fromEntries(
     input_params_list.value.map(p => {
       const v: any = { type: p.type, display_name: p.display_name };
+      const parse_val = (s: string) => {
+        if (p.type === 'Composition') { try { return JSON.parse(s); } catch { return s; } }
+        return s;
+      };
       if (p.is_static) {
-        v.is_static = true; v.static_value = p.static_value;
+        v.is_static = true; v.static_value = parse_val(p.static_value);
       } else if (p.default_value !== '') {
-        v.default_value = p.default_value;
+        v.default_value = parse_val(p.default_value);
       }
       return [p.name, v];
     })
@@ -195,7 +199,7 @@ function set_literal_value(step: SubprotocolStep, field: string, raw: string, fi
   const numTypes = ['number', 'integer', 'float'];
   if (numTypes.includes(field_type)) {
     step.parameters[field] = parseFloat(raw) || raw;
-  } else if (field_type === 'array') {
+  } else if (field_type === 'array' || field_type === 'Composition') {
     try { step.parameters[field] = JSON.parse(raw); } catch { step.parameters[field] = raw; }
   } else {
     step.parameters[field] = raw;
@@ -706,7 +710,7 @@ function compatible_params(field_type: string): InputParam[] {
                       <input v-if="get_field_mode(step.parameters?.[field.name], field.type) === 'literal'"
                         class="form-control form-control-sm"
                         :type="field.type === 'number' || field.type === 'integer' ? 'number' : 'text'"
-                        :value="Array.isArray(step.parameters?.[field.name]) ? JSON.stringify(step.parameters?.[field.name]) : (step.parameters?.[field.name] ?? '')"
+                        :value="(Array.isArray(step.parameters?.[field.name]) || (field.type === 'Composition' && step.parameters?.[field.name] !== null && typeof step.parameters?.[field.name] === 'object')) ? JSON.stringify(step.parameters?.[field.name]) : (step.parameters?.[field.name] ?? '')"
                         @input="set_literal_value(step, field.name, ($event.target as HTMLInputElement).value, field.type)"
                       />
                       <!-- param ref -->
