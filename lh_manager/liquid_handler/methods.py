@@ -158,6 +158,24 @@ class MethodContainer(BaseMethod):
 
 MethodsType = Union[BaseMethod, MethodContainer]
 
+
+def _flatten_allof_refs(schema: dict) -> None:
+    """In-place: replace allOf([{$ref: X}]) with {$ref: X} in schema properties.
+
+    Pydantic v2 wraps a $ref in allOf when the field carries extra keywords
+    (e.g. a default value).  JSON Schema allows allOf([A]) ≡ A, so flattening
+    is semantically correct and makes the frontend '$ref' in prop check work.
+    """
+    for prop in schema.get('properties', {}).values():
+        if (isinstance(prop, dict)
+                and 'allOf' in prop
+                and len(prop['allOf']) == 1
+                and '$ref' in prop['allOf'][0]):
+            ref = prop['allOf'][0]['$ref']
+            prop.clear()
+            prop['$ref'] = ref
+
+
 class RegisteredMethod:
 
     def __init__(self, method: MethodsType, display: bool = True, origin: str | None = None) -> None:
@@ -174,12 +192,13 @@ class RegisteredMethod:
         return self.method.model_fields['method_name'].default
 
     def get_schema(self):
-
+        schema = self.method.model_json_schema(mode='serialization')
+        _flatten_allof_refs(schema)
         return {'fields': [name for name in self.method.model_fields.keys() if name not in EXCLUDE_FIELDS],
                 'display': self.display,
                 'display_name': self.display_name,
                 'origin': self.origin,
-                'schema': self.method.model_json_schema(mode='serialization')}
+                'schema': schema}
 
 class MethodManager:
     """Convenience class for managing methods."""

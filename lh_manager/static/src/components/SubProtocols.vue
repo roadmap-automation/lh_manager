@@ -6,7 +6,7 @@ import {
   method_defs, grouped_method_defs, method_groups, refreshMethodGroups,
   fetchMethodGroup,
 } from '../store';
-import type { Subprotocol, SubprotocolStep, ExposedField } from '../store';
+import type { Subprotocol, SubprotocolStep, ExposedField, MethodGroupStep } from '../store';
 
 const METHOD_TYPES = ['prepare', 'measure', 'transfer', 'init', 'shutdown', 'none'] as const;
 const PARAM_TYPES = ['number', 'boolean', 'string', 'Composition'] as const;
@@ -49,6 +49,7 @@ const new_alloc = ref('');
 
 // On-demand caches for foreign schemas
 const mg_exposed_fields = ref<Record<string, ExposedField[]>>({});      // keyed by mg name
+const mg_steps_cache = ref<Record<string, MethodGroupStep[]>>({});      // keyed by mg name
 const sp_inputs_cache = ref<Record<string, InputParam[]>>({});           // keyed by sp name
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -87,13 +88,14 @@ function inputs_to_dict(): Record<string, any> {
   );
 }
 
-// Fetch exposed fields for a method_group (idempotent)
+// Fetch exposed fields and steps for a method_group (idempotent)
 async function ensure_mg_fields(name: string) {
   if (!name || name in mg_exposed_fields.value) return;
   const mg = method_groups.value.find(m => m.name === name);
   if (mg) {
     const full = await fetchMethodGroup(mg.id);
     mg_exposed_fields.value = { ...mg_exposed_fields.value, [name]: full.exposed_fields };
+    mg_steps_cache.value = { ...mg_steps_cache.value, [name]: full.steps };
   }
 }
 
@@ -123,25 +125,47 @@ async function prefetch_step_schemas(steps: SubprotocolStep[]) {
   }
 }
 
+// Extract the WellLocation (or scalar) type string from a Pydantic JSON Schema property.
+// Handles direct $ref, anyOf (Optional), and allOf (field with default) patterns.
+function prop_type(prop: any): string {
+  if (!prop) return '';
+  if ('$ref' in prop) return (prop['$ref'] as string).replace('#/$defs/', '');
+  if (Array.isArray(prop.allOf) && prop.allOf.length > 0 && '$ref' in prop.allOf[0])
+    return (prop.allOf[0]['$ref'] as string).replace('#/$defs/', '');
+  if (Array.isArray(prop.anyOf)) {
+    const rs = prop.anyOf.find((s: any) => '$ref' in s);
+    if (rs) return (rs['$ref'] as string).replace('#/$defs/', '');
+  }
+  return prop.type ?? '';
+}
+
 // Return the renderable fields for a step based on its type and selected name
 function get_step_fields(step: SubprotocolStep): StepField[] {
   if (step.type === 'method' && step.method_name) {
     const mdef = method_defs.value[step.method_name];
     if (!mdef) return [];
-    return mdef.fields.map(f => {
-      const prop = mdef.schema?.properties?.[f] as any;
-      let type = '';
-      if (prop) {
-        if ('$ref' in prop) type = prop['$ref'].replace('#/$defs/', '');
-        else type = prop.type ?? '';
-      }
-      return { name: f, display: f, type };
-    });
+    return mdef.fields.map(f => ({
+      name: f, display: f,
+      type: prop_type(mdef.schema?.properties?.[f] as any),
+    }));
   }
   if (step.type === 'method_group' && step.method_group_name) {
-    return (mg_exposed_fields.value[step.method_group_name] ?? [])
+    const exposed = mg_exposed_fields.value[step.method_group_name] ?? [];
+    const mg_steps = mg_steps_cache.value[step.method_group_name] ?? [];
+    return exposed
       .filter(ef => !ef.is_static)
-      .map(ef => ({ name: ef.field_name, display: ef.display_name || ef.field_name, type: ef.type }));
+      .map(ef => {
+        let type = ef.type || '';
+        // ef.type may be empty if device was offline when the method group was saved —
+        // fall back to the live device method schema.
+        if (!type) {
+          const mg_step = mg_steps[ef.step_index];
+          if (mg_step?.method_name) {
+            type = prop_type((method_defs.value[mg_step.method_name]?.schema?.properties as any)?.[ef.field_name]);
+          }
+        }
+        return { name: ef.field_name, display: ef.display_name || ef.field_name, type };
+      });
   }
   if (step.type === 'subprotocol' && step.subprotocol_name) {
     return (sp_inputs_cache.value[step.subprotocol_name] ?? [])

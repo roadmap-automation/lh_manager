@@ -25,29 +25,35 @@ const editing = ref<MethodGroup>(blank_group());
 
 // ── Schema helpers ──────────────────────────────────────────────────────────
 
+// Extract the WellLocation (or scalar) type string from a Pydantic JSON Schema property.
+// Handles direct $ref, anyOf (Optional), and allOf (field with default) patterns.
+function prop_type(prop: any): string {
+  if (!prop) return '';
+  if ('$ref' in prop) return (prop['$ref'] as string).replace('#/$defs/', '');
+  if (Array.isArray(prop.allOf) && prop.allOf.length > 0 && '$ref' in prop.allOf[0])
+    return (prop.allOf[0]['$ref'] as string).replace('#/$defs/', '');
+  if (Array.isArray(prop.anyOf)) {
+    const rs = prop.anyOf.find((s: any) => '$ref' in s);
+    if (rs) return (rs['$ref'] as string).replace('#/$defs/', '');
+  }
+  return prop.type ?? '';
+}
+
 function fields_for_step(step_index: number): StepField[] {
   const step = editing.value.steps[step_index];
   if (!step?.method_name) return [];
   const mdef = method_defs.value[step.method_name];
   if (!mdef) return [];
-  return mdef.fields.map(f => {
-    const prop = mdef.schema?.properties?.[f] as any;
-    let type = '';
-    if (prop) {
-      if ('$ref' in prop) type = prop['$ref'].replace('#/$defs/', '');
-      else type = prop.type ?? '';
-    }
-    return { name: f, display: f, type };
-  });
+  return mdef.fields.map(f => ({
+    name: f, display: f,
+    type: prop_type(mdef.schema?.properties?.[f] as any),
+  }));
 }
 
 function infer_field_type(step_index: number, field_name: string): string {
   const step = editing.value.steps[step_index];
   if (!step?.method_name || !field_name) return '';
-  const prop = method_defs.value[step.method_name]?.schema?.properties?.[field_name] as any;
-  if (!prop) return '';
-  if ('$ref' in prop) return prop['$ref'].replace('#/$defs/', '');
-  return prop.type ?? '';
+  return prop_type((method_defs.value[step.method_name]?.schema?.properties as any)?.[field_name]);
 }
 
 // ── Field binding helpers ───────────────────────────────────────────────────
