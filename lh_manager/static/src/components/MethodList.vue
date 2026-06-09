@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, defineProps } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks } from '../store';
+import { ref, computed, defineProps, onMounted } from 'vue';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks, subprotocols, refreshSubprotocols, add_subprotocol_method, method_groups, refreshMethodGroups, add_method_group_method } from '../store';
 import type { MethodType } from '../store';
+
+onMounted(() => {
+  if (subprotocols.value.length === 0) refreshSubprotocols();
+  if (method_groups.value.length === 0) refreshMethodGroups();
+});
 import MethodFields from './MethodFields.vue';
 import MethodTasks from './MethodTasks.vue';
 
@@ -51,10 +56,27 @@ function any_methodlist_tasks_pending() {
 }
 
 function any_method_tasks_pending(method: MethodType) {
-  return method.tasks.some((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'active'));
+  return method.tasks.some((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'active') || (task.status === 'failed'));
 }
 
 function method_string(method: MethodType) {
+  if (method.method_name === '__method_group__') {
+    const exposed_fields: any[] = (method as any).exposed_fields ?? [];
+    if (exposed_fields.length > 0) {
+      return exposed_fields
+        .map((ef: any) => `${ef.field_name}=${(method as any)[ef.field_name] ?? ''}`)
+        .join(', ');
+    }
+    const group = ((method as any).method_group as any[]) ?? [];
+    return group.map((m: any) => m.method_name).join(', ');
+  }
+  if (method.method_name === '__subprotocol__') {
+    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks']);
+    return Object.entries(method)
+      .filter(([k, v]) => !excluded.has(k) && v != null)
+      .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join(', ');
+  }
   const param_strings = get_parameters(method)
     .map(({name, value}) => {
       if (value &&  typeof(value) === 'object') {
@@ -88,6 +110,22 @@ function clone(obj) {
   return (obj === undefined) ? undefined : JSON.parse(JSON.stringify(obj));
 }
 
+function handleAddMethod(event: Event) {
+  const target = event.target as HTMLSelectElement;
+  const value = target.value;
+  if (value.startsWith('__sp__:')) {
+    const sp_name = value.slice(7);
+    add_subprotocol_method(props.sample_id, props.stage_name, sp_name);
+    target.value = '';
+  } else if (value.startsWith('__mg__:')) {
+    const mg_id = value.slice(7);
+    add_method_group_method(props.sample_id, props.stage_name, mg_id);
+    target.value = '';
+  } else {
+    add_method(props.sample_id, props.stage_name, event);
+  }
+}
+
 const status = computed(() => {
   return sample_status.value[props.sample_id]?.stages?.[props.stage_name];
 })
@@ -115,7 +153,7 @@ const status = computed(() => {
     </button>    
   </div>
   <div class="accordion accordion-flush">
-    <div class="accordion-item" v-for="(method, index) of methods" :key="index">
+    <div class="accordion-item" :class="{ 'method-group': method.method_name === '__method_group__' }" v-for="(method, index) of methods" :key="index">
       <h2 class="accordion-header">
         <button class="accordion-button p-1" :class="{ collapsed: stage_name !== active_stage || index !== active_method_index || props.stage_label !== active_stage_label}" type="button"
           @click="toggleItem(index)" :aria-expanded="index === active_method_index">
@@ -198,10 +236,16 @@ const status = computed(() => {
       </div>
     </div>
     <select v-if="props.editable" class="form-select form-select-sm text-primary outline-primary"
-      @change="add_method(props.sample_id, props.stage_name, $event)" value="">
+      @change="handleAddMethod($event)" value="">
       <option class="disabled" disabled selected value="">+ Add method</option>
-      <optgroup v-for="(methods, origin) in grouped_method_defs" :label="origin">
+      <optgroup v-for="(methods, origin) in grouped_method_defs" :label="String(origin)">
         <option v-for="[mname, mdef] of methods" :value="mname">{{ mdef.display_name }}</option>
+      </optgroup>
+      <optgroup v-if="subprotocols.length" label="Subprotocols">
+        <option v-for="sp of subprotocols" :value="`__sp__:${sp.name}`">{{ sp.name }}</option>
+      </optgroup>
+      <optgroup v-if="method_groups.length" label="Method Groups">
+        <option v-for="mg of method_groups" :value="`__mg__:${mg.id}`">{{ mg.name }}</option>
       </optgroup>
     </select>
   </div>
@@ -210,6 +254,10 @@ const status = computed(() => {
 <style>
 .btn-close.arrow-repeat {
   background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-arrow-repeat' viewBox='0 0 16 16'><path d='M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9'/><path fill-rule='evenodd' d='M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z'/></svg>");
+}
+
+.accordion-item.method-group {
+  border-left: 3px solid #0dcaf0;
 }
 
 .task-active {
@@ -226,6 +274,10 @@ const status = computed(() => {
 
 .task-failed {
   color:darkred;
+}
+
+.task-error {
+  color: darkorange;
 }
 
 </style>

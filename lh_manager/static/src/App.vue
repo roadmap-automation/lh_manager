@@ -4,7 +4,7 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref } from 'vue';
 import { io } from 'socket.io-client';
-import { refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, refreshLHStatus } from './store';
+import { refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts } from './store';
 
 const connected = ref(false);
 
@@ -18,7 +18,6 @@ socket.on('connect', () => {
   refreshSampleStatus();
   refreshMethodDefs();
   refreshMaterials();
-  refreshLHStatus();
   refreshDeviceLayouts();
   refreshWaste();
 });
@@ -57,7 +56,11 @@ socket.on('update_layout', (payload: {device_name: string, retrieval_uri?: strin
 });
 
 socket.on('update_lh_job', () => {
-  refreshLHStatus();
+  // LH job status via broker — no longer polled via /LH/GetState/
+});
+
+socket.on('update_methods', () => {
+  refreshMethodDefs();
 });
 
 

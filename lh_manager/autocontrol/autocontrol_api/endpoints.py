@@ -5,7 +5,6 @@ from flask import make_response, Response, request, redirect
 
 from . import autocontrol_blueprint
 from autocontrol.status import Status
-from ..autocontrol import init_devices
 
 AUTOCONTROL_URL = 'http://localhost:5004'
 from ...liquid_handler.lhinterface import InterfaceStatus, lh_interface
@@ -25,16 +24,6 @@ def GetStatus() -> Response:
     return make_response(dict(status=status,
                               channel_status=[status] * samples.n_channels)
                               , 200)
-
-@autocontrol_blueprint.route('/autocontrol/InitializeDevices/', methods=['POST'])
-def InitializeDevices() -> Response:
-    """Triggers initialization of devices
-        NOTE: Could use JobRunner to do this, but this is much simpler"""
-    #data: dict = request.get_json(force=True)
-
-    init_devices()
-
-    return make_response({'result': 'success'}, 200)
 
 @autocontrol_blueprint.route('/autocontrol/GetTaskResult', methods=['GET'])
 def GetTaskResult() -> Response:

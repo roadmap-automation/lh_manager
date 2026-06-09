@@ -3,7 +3,7 @@
 import logging
 import threading
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from uuid import uuid4
 
 from autocontrol.task_struct import Task, TaskData, TaskType
@@ -13,14 +13,17 @@ from ..gui_api.events import trigger_samples_update, trigger_layout_update
 
 from ..liquid_handler.devices import device_manager
 from ..liquid_handler.lhqueue import submit_handler, ActiveTasks
-from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer, BaseMethod
+from ..liquid_handler.methods import MethodsType, MethodType, TaskContainer, BaseMethod, RawMethod, EXCLUDE_FIELDS, method_manager
 from ..liquid_handler.bedlayout import LHBedLayout
 from ..liquid_handler.samplelist import Sample
-from ..liquid_handler.state import samples, layout
+from ..liquid_handler.state import samples
 from ..liquid_handler.items import Item
 from ..liquid_handler.samplecontainer import SampleStatus, SampleContainer
 
-COMPLETED_STATUS = [SampleStatus.COMPLETED, SampleStatus.FAILED, SampleStatus.CANCELLED, SampleStatus.UNKNOWN]
+# FAILED is intentionally excluded: errored tasks stay in active_tasks so the
+# operator can retry or explicitly cancel them from the GUI before the failure
+# propagates upstream to Protocol Studio.
+COMPLETED_STATUS = [SampleStatus.COMPLETED, SampleStatus.CANCELLED, SampleStatus.UNKNOWN]
 
 active_tasks = ActiveTasks()
 
@@ -37,7 +40,6 @@ def launch_autocontrol_interface():
     """Register submission/cancel callbacks and send device INIT tasks."""
     submit_handler.submit_callbacks.append(submission_callback)
     submit_handler.cancel_callbacks.append(cancel_callback)
-    init_devices()
 
 def submission_callback(data: dict):
     """Submission handler callback
@@ -63,12 +65,11 @@ def submission_callback(data: dict):
             if 'method_id' in data.keys():
                 prepare_and_submit_method(sample=sample,
                                         stage=data['stage'],
-                                        method_index=[m.id for m in sample.stages[data['stage']].methods].index(data['method_id']),
-                                        layout=layout)
+                                        method_index=[m.id for m in sample.stages[data['stage']].methods].index(data['method_id']))
 
             else:
                 for stage in data['stage']:
-                    prepare_and_submit_stage(sample, stage, layout)
+                    prepare_and_submit_stage(sample, stage)
 
             return
 
@@ -98,20 +99,228 @@ class AutocontrolTaskContainer(TaskContainer):
 class AutocontrolItem(Item):
     method_id: str | None = None
 
-def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout) -> List[Task]:
-    """Runs all draft methods in an entire stage
-    """
+# ---------------------------------------------------------------------------
+# Task-building primitives (pure — no side effects, no submission)
+# ---------------------------------------------------------------------------
 
-    # Generate real-time tasks based on layout
+def _build_raw_method_task(
+    sample: Sample,
+    method_name: str,
+    method_type: MethodType,
+    params: dict,
+) -> Optional[AutocontrolTaskContainer]:
+    """Build a Task for a single raw method. Returns None and logs on schema error."""
+    schema = method_manager._remote_schemas.get(method_name)
+    if schema is None:
+        logging.error(
+            "Cannot build task for '%s': no remote schema. "
+            "Ensure the device is running and has published device.registered.",
+            method_name,
+        )
+        return None
+    device_id = schema.get("device_id")
+    if not device_id:
+        logging.error(
+            "Cannot build task for '%s': schema missing device_id "
+            "(re-start the device to trigger a fresh device.registered event).",
+            method_name,
+        )
+        return None
+    device = device_manager.get_device_by_name(device_id)
+    channel = sample.channel if (device is not None and device.multichannel) else None
+    clean_params = {k: v for k, v in params.items() if k not in EXCLUDE_FIELDS}
+    task_data = TaskData(
+        device=device_id,
+        channel=channel,
+        method_data={"method_list": [{"method_name": method_name, "method_data": clean_params}]},
+    )
+    if method_type == MethodType.MEASURE:
+        tasktype = TaskType.MEASURE
+    elif method_type == MethodType.PREPARE:
+        tasktype = TaskType.PREPARE
+    elif method_type in (MethodType.TRANSFER, MethodType.INJECT):
+        tasktype = TaskType.TRANSFER
+    else:
+        tasktype = TaskType.NOCHANNEL
+    return AutocontrolTaskContainer(
+        task=Task(sample_id=sample.id, task_type=tasktype, tasks=[task_data]),
+        status=SampleStatus.INACTIVE,
+    )
+
+
+def _build_method_group_task(
+    sample: Sample,
+    group: List[dict],
+    method_type: MethodType = MethodType.PREPARE,
+) -> Optional[AutocontrolTaskContainer]:
+    """Build a parallel method-group Task. Returns None and logs on schema error.
+
+    Each entry in group is ``{"method_name": ..., <params>...}``.
+    TaskType is NOCHANNEL when method_type is NONE, otherwise TRANSFER.
+    """
+    taskdata = []
+    for sub in group:
+        method_name = sub["method_name"]
+        schema = method_manager._remote_schemas.get(method_name)
+        if schema is None:
+            logging.error(
+                "Cannot build group task: no remote schema for '%s'. "
+                "Ensure the device is running and has published device.registered.",
+                method_name,
+            )
+            return None
+        device_id = schema.get("device_id")
+        if not device_id:
+            logging.error("Cannot build group task: schema for '%s' missing device_id.", method_name)
+            return None
+        device = device_manager.get_device_by_name(device_id)
+        channel = sample.channel if (device is not None and device.multichannel) else None
+        params = {k: v for k, v in sub.items() if k not in ("method_name",) and k not in EXCLUDE_FIELDS}
+        taskdata.append(TaskData(
+            id=str(uuid4()),
+            device=device_id,
+            channel=channel,
+            method_data={"method_list": [{"method_name": method_name, "method_data": params}]},
+            non_channel_storage="vial" if channel is None else None,
+        ))
+    tasktype = TaskType.NOCHANNEL if method_type == MethodType.NONE else TaskType.TRANSFER
+    return AutocontrolTaskContainer(
+        task=Task(sample_id=sample.id, task_type=tasktype, tasks=taskdata),
+        status=SampleStatus.INACTIVE,
+    )
+
+
+def _register_and_submit_tasks(
+    sample: Sample,
+    stage: str,
+    method_index: int,
+    owner_method: RawMethod,
+    tasks_with_step_ids: List[Tuple[str, AutocontrolTaskContainer]],
+) -> None:
+    """Register tasks, activate the owning method, and submit in one shot.
+
+    ``step_id`` (first element of each pair) becomes ``AutocontrolItem.method_id``,
+    which is echoed back in scheduler events for completion tracking.
+
+    Pass ``owner_method.id`` as every step_id (GUI path) to group all completions
+    under the sentinel. Pass individual step identifiers (broker path) to track
+    each expanded step separately for output-URI collection.
+    """
+    with active_tasks.lock:
+        for step_id, task in tasks_with_step_ids:
+            owner_method.tasks.append(task)
+            active_tasks.pending[str(task.task.id)] = AutocontrolItem(
+                id=sample.id, stage=stage, method_id=step_id,
+            )
+    sample.stages[stage].activate(method_index)
+    submit_tasks([task for _, task in tasks_with_step_ids])
+
+
+# ---------------------------------------------------------------------------
+# High-level submit functions — thin wrappers around the primitives above
+# ---------------------------------------------------------------------------
+
+def _submit_raw_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Broker-path submission for a single RawMethod."""
+    task = _build_raw_method_task(sample, m.method_data.get("method_name"), m.method_type, m.method_data)
+    if task is None:
+        return
+    _register_and_submit_tasks(sample, stage, method_index, m, [(m.id, task)])
+
+
+def _submit_raw_method_group(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """GUI-path submission for a parallel method group with $ref resolution."""
+    from ..subprotocol.executor import _build_method_group
+    _excluded = {"method_name", "display_name", "method_group", "exposed_fields",
+                 "id", "status", "tasks", "method_type"}
+    context = {f"input.{k}": v for k, v in m.method_data.items() if k not in _excluded}
+    try:
+        resolved = _build_method_group(m.method_data["method_group"], context)
+    except (ValueError, KeyError):
+        logging.exception("Failed to resolve method group refs for sample %r", sample.id)
+        return
+    task = _build_method_group_task(sample, resolved, m.method_type)
+    if task is None:
+        return
+    _register_and_submit_tasks(sample, stage, method_index, m, [(m.id, task)])
+
+
+def _submit_subprotocol_method(sample: Sample, stage: str, method_index: int, m: RawMethod) -> None:
+    """Expand a __subprotocol__ sentinel and submit all tasks under it.
+
+    The sentinel RawMethod stays as a single GUI row. All tasks share the
+    sentinel's id as their method_id (GUI path — completions are not tracked
+    per-step by the broker).
+    """
+    import json as _json
+    from ..subprotocol.db import get_subprotocol_by_name
+    from ..subprotocol.executor import expand_subprotocol
+
+    sp_name: str = m.method_data.get("subprotocol_name", "")
+    defn = get_subprotocol_by_name(sp_name)
+    if defn is None:
+        logging.error("Subprotocol %r not found — cannot submit.", sp_name)
+        return
+
+    _excluded = EXCLUDE_FIELDS | {"subprotocol_name"}
+    context = {f"input.{k}": v for k, v in m.method_data.items() if k not in _excluded}
+    for alloc_name in _json.loads(defn.get("allocations") or "[]"):
+        context[f"alloc.{alloc_name}"] = str(uuid4())
+
+    try:
+        expanded, _ = expand_subprotocol(defn, context)
+    except Exception:
+        logging.exception("Failed to expand subprotocol %r.", sp_name)
+        return
+
+    if not expanded:
+        sample.stages[stage].activate(method_index)
+        return
+
+    tasks_with_ids: List[Tuple[str, AutocontrolTaskContainer]] = []
+    for step in expanded:
+        if step["type"] == "method":
+            schema = method_manager._remote_schemas.get(step["method_name"]) or {}
+            try:
+                mtype = MethodType(schema.get("method_type", "none"))
+            except ValueError:
+                mtype = MethodType.NONE
+            task = _build_raw_method_task(sample, step["method_name"], mtype, step["params"])
+        else:  # method_group
+            try:
+                mtype = MethodType(step.get("method_type", "none"))
+            except ValueError:
+                mtype = MethodType.NONE
+            task = _build_method_group_task(sample, step["group"], mtype)
+        if task is None:
+            return
+        tasks_with_ids.append((m.id, task))  # all use sentinel's id — GUI path
+
+    _register_and_submit_tasks(sample, stage, method_index, m, tasks_with_ids)
+
+
+def prepare_and_submit_stage(sample: Sample, stage: str, layout: LHBedLayout | None = None) -> List[Task]:
+    """Runs all draft methods in an entire stage."""
     for _ in range(len(sample.stages[stage].methods)):
         prepare_and_submit_method(sample, stage, 0, layout)
 
-def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout) -> List[Task]:
+
+def prepare_and_submit_method(sample: Sample, stage: str, method_index: int, layout: LHBedLayout | None = None) -> List[Task]:
     """Runs a specific method by index
     """
 
     # Generate real-time tasks based on layout
     m: MethodsType = sample.stages[stage].methods[method_index]
+
+    if isinstance(m, RawMethod):
+        if m.method_name == "__subprotocol__":
+            _submit_subprotocol_method(sample, stage, method_index, m)
+        elif m.method_data.get("method_group"):
+            _submit_raw_method_group(sample, stage, method_index, m)
+        else:
+            _submit_raw_method(sample, stage, method_index, m)
+        return []
+
     all_methods: List[MethodsType] = m.get_methods(layout)
 
     # render all the methods. Can be multiple rendered submethod per main method
@@ -219,22 +428,13 @@ def cancel_tasks(tasks: List[Task], include_active_queue: bool = False, drop_mat
             if str(task.id) in active_tasks.active:
                 mark_cancelled(str(task.id))
 
-def init_devices():
-    init_tasks = [Task(task_type=TaskType.INIT,
-                       tasks=[TaskData(device=device.device_name,
-                                       device_type=device.device_type,
-                                       device_address=device.address,
-                                       number_of_channels=(samples.n_channels if device.multichannel else None),
-                                       sample_mixing=device.allow_sample_mixing)])
-                  for device in device_manager.device_list]
-
-    submit_tasks([AutocontrolTaskContainer(task=t) for t in init_tasks])
-
 @trigger_samples_update
 def mark_cancelled(id: str) -> None:
     """Mark a task cancelled in the active method tree.
 
     Must be called with active_tasks.lock held by the caller.
+    Signals the broker worker so any subprotocol executor waiting on this
+    task's step is unblocked and can publish SUBPROTOCOL_FAILED.
     """
     parent_item = active_tasks.active.pop(id)
     _, sample = samples.getSampleById(parent_item.id)
@@ -251,10 +451,15 @@ def mark_cancelled(id: str) -> None:
                 m.status = SampleStatus.COMPLETED
             elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
                 m.status = SampleStatus.ACTIVE
-            elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+            elif any(t.status in (SampleStatus.ERROR, SampleStatus.FAILED) for t in m.tasks):
                 m.status = SampleStatus.ERROR
+            elif all(t.status in (SampleStatus.CANCELLED, SampleStatus.COMPLETED) for t in m.tasks):
+                m.status = SampleStatus.CANCELLED
             else:
                 m.status = SampleStatus.PENDING
+
+    if _broker_worker is not None and parent_item.method_id:
+        _broker_worker.signal_step_cancelled(parent_item.method_id)
 
 @trigger_samples_update
 def mark_status(id: str, status: SampleStatus) -> None:
@@ -280,7 +485,7 @@ def mark_status(id: str, status: SampleStatus) -> None:
                     m.status = SampleStatus.COMPLETED
                 elif any(t.status == SampleStatus.ACTIVE for t in m.tasks):
                     m.status = SampleStatus.ACTIVE
-                elif any(t.status == SampleStatus.ERROR for t in m.tasks):
+                elif any(t.status in (SampleStatus.ERROR, SampleStatus.FAILED) for t in m.tasks):
                     m.status = SampleStatus.ERROR
                 else:
                     m.status = SampleStatus.PENDING

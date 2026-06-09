@@ -15,11 +15,11 @@ from .methods import MethodContainer, MethodsType, register, method_manager
 ORIGIN = None
 ZERO_VOLUME_TOLERANCE = 1e-3
 
-def get_all_wells_in_zones(layout: LHBedLayout, include_zones: List[Zone]) -> List[Well]:
-    """Gets all wells in the layout belonging to specific zones"""
+def get_all_wells_in_zones(layout: LHBedLayout, include_zones: List[str]) -> List[Well]:
+    """Gets all wells in the layout belonging to specific zones (matched by rack_id)."""
     return [w for rack in layout.racks.values()
             for w in rack.wells
-            if LayoutWell2ZoneWell(w.rack_id, w.well_number)[0] in include_zones]
+            if w.rack_id in include_zones]
 
 def make_target_vector(target_composition: Composition) -> Tuple[List[str], List[float], Dict[str, str]]:
     """Makes target vector for formulations"""
@@ -71,7 +71,7 @@ def solve_formulation(layout: LHBedLayout,
                       target_composition: Composition,
                       target_volume: float,
                       exact_match: bool = True,
-                      include_zones: List[Zone] = [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]) -> Dict[str, Any]:
+                      include_zones: List[str] = ['Solvent', 'Stock', 'Samples']) -> Dict[str, Any]:
     """
     Calculates the formulation logic and returns a result dictionary.
     
@@ -159,8 +159,8 @@ class Formulation(MethodContainer):
     target_composition: Composition = Field(default_factory=Composition)
     target_volume: float = 0.0
     Target: WellLocation = Field(default_factory=WellLocation)
-    include_zones: List[Zone] = Field(default_factory=lambda: [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE])
-    """include_zones (List[Zone]): list of zones to include for calculating formulations. Defaults to [Zone.SOLVENT, Zone.STOCK, Zone.SAMPLE]"""
+    include_zones: List[str] = Field(default_factory=lambda: ['Solvent', 'Stock', 'Samples'])
+    """include_zones: rack_id names to include when searching for source wells."""
     exact_match: bool = True
     """exact_match(bool, optional): Require an exact match between target composition and what
                 is created. If False, allows other components to be added as long as the target composition

@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Mixture from './Mixture.vue';
-import DeviceList from './DeviceList.vue';
 import BedLayout from './BedLayout.vue';
 import SampleChannels from './SampleChannels.vue';
 import { device_defs, device_layouts } from '../store';
@@ -9,27 +8,31 @@ import EditWellContents from './EditWellContents.vue';
 import MaterialManager from './MaterialManager.vue';
 import AddWaste from './AddWaste.vue';
 import WasteManager from './WasteManager.vue';
-import LHInterface from './LHInterface.vue';
 import EditRackSettings from './EditRackSettings.vue';
 import BatchWellEditor from './BatchWellEditor.vue';
+import SubProtocols from './SubProtocols.vue';
+import MethodGroups from './MethodGroups.vue';
 
 const props = defineProps({
   msg: String,
-  // samples: Array,
-  // sample_status: Object,
 })
 
 const emit = defineEmits(['remove_sample', 'add_sample']);
 
-onMounted(() => {
-  console.log(props.sample_status);
-});
-
-const filtered_layouts = computed(()=> {
-  const layouts = Object.entries(device_layouts.value).filter(([device_name, layout]) => (layout.layout !== null));
-  return layouts.map(([device_name, layout]) => {
-    const display_name = device_defs.value[device_name]?.display_name || device_name;
-    return { device_name, display_name, layout };
+const all_devices = computed(() => {
+  const keys = new Set([...Object.keys(device_defs.value), ...Object.keys(device_layouts.value)]);
+  return Array.from(keys).map((device_name) => {
+    const def = device_defs.value[device_name] ?? {};
+    const dl = device_layouts.value[device_name];
+    return {
+      device_name,
+      display_name: def.display_name || device_name,
+      address: def.address ?? null,
+      device_type: def.device_type ?? null,
+      num_channels: def.num_channels ?? null,
+      allow_sample_mixing: def.allow_sample_mixing ?? null,
+      layout: (dl?.layout != null) ? dl : null,
+    };
   });
 });
 
@@ -42,14 +45,6 @@ const filtered_layouts = computed(()=> {
         role="tab" aria-controls="Layout" aria-selected="true">Main</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="devices-tab" data-bs-toggle="tab" data-bs-target="#Devices" type="button" role="tab"
-        aria-controls="Devices" aria-selected="false">Devices</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="lh-tab" data-bs-toggle="tab" data-bs-target="#LHInterface" type="button" role="tab"
-        aria-controls="LHInterface" aria-selected="false">LH Controls</button>
-    </li>
-    <li class="nav-item" role="presentation">
       <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#Materials" type="button" role="tab"
         aria-controls="Materials" aria-selected="false">Materials</button>
     </li>
@@ -57,11 +52,16 @@ const filtered_layouts = computed(()=> {
       <button class="nav-link" id="waste-tab" data-bs-toggle="tab" data-bs-target="#Waste" type="button" role="tab"
         aria-controls="Waste" aria-selected="false">Waste</button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="subprotocols-tab" data-bs-toggle="tab" data-bs-target="#SubProtocols" type="button" role="tab"
+        aria-controls="SubProtocols" aria-selected="false">SubProtocols</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="method-groups-tab" data-bs-toggle="tab" data-bs-target="#MethodGroups" type="button" role="tab"
+        aria-controls="MethodGroups" aria-selected="false">Method groups</button>
+    </li>
   </ul>
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
-    <div class="tab-pane d-flex flex-column align-items-stretch overflow-auto" id="Devices" role="tabpanel" aria-labelledby="home-tab">
-      <DeviceList :devices="device_defs"></DeviceList>
-    </div>
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
       role="tabpanel" aria-labelledby="layout-tab">
       <div class="overflow-auto">
@@ -75,28 +75,43 @@ const filtered_layouts = computed(()=> {
 
       <div class="flex-grow-1">
         <ul class="nav nav-tabs" id="layout-tabs" role="tablist">
-          <li v-for="(layout, index) in filtered_layouts" :key="layout.device_name" class="nav-item" role="presentation">
-            <button class="nav-link" :id="layout.device_name + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + layout.device_name + '-div'" type="button" role="tab"
-        :aria-controls="layout.device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ layout.display_name }}</button>
+          <li v-for="(device, index) in all_devices" :key="device.device_name" class="nav-item" role="presentation">
+            <button class="nav-link" :id="device.device_name + '-tab'" data-bs-toggle="tab" :data-bs-target="'#' + device.device_name + '-div'" type="button" role="tab"
+              :aria-controls="device.device_name" :class="{ active: (index==0) }" :aria-selected="(index == 0) ? true : false">{{ device.display_name }}</button>
           </li>
         </ul>
         <div class="tab-content d-flex flex-fill" style="height:90%; width:90%" id="layoutTabContent">
-          <div v-for="(layout, index) in filtered_layouts" :key="layout.device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="layout.device_name + '-div'">
-            <BedLayout :device_name="layout.device_name" :layout="layout.layout"/>
-          </div>        
+          <div v-for="(device, index) in all_devices" :key="device.device_name" class="tab-pane bedlayout" :class="{ active: (index==0), show: (index==0) }" :id="device.device_name + '-div'">
+            <div class="device-info d-flex align-items-center gap-2 px-3 py-2">
+              <a v-if="device.address" :href="device.address" target="_blank" class="fw-semibold text-decoration-none">{{ device.display_name }}</a>
+              <span v-else class="fw-semibold">{{ device.display_name }}</span>
+              <span v-if="device.device_type" class="badge bg-light text-dark border">{{ device.device_type }}</span>
+              <span v-if="device.num_channels != null" class="badge bg-light text-dark border">{{ device.num_channels }} ch</span>
+              <span v-if="device.allow_sample_mixing != null" class="badge border"
+                :class="device.allow_sample_mixing ? 'bg-success-subtle text-success-emphasis border-success-subtle' : 'bg-secondary-subtle text-secondary-emphasis border-secondary-subtle'">
+                {{ device.allow_sample_mixing ? 'mixing ok' : 'no mixing' }}
+              </span>
+              <a v-if="device.address" :href="device.address" target="_blank" class="ms-auto text-muted small font-monospace text-decoration-none">{{ device.address }}</a>
+            </div>
+            <BedLayout v-if="device.layout !== null" :device_name="device.device_name" :layout="device.layout"/>
+            <p v-else class="text-muted p-3 small">No layout available.</p>
+          </div>
         </div>
       </div>
 
 
     </div>
-    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="LHInterface" role="tabpanel" aria-labelledby="lh-tab">
-      <LHInterface />
-    </div>    
     <div class="tab-pane d-flex flex-grow-1 h-100 overflow-auto" id="Materials" role="tabpanel" aria-labelledby="materials-tab">
       <MaterialManager />
     </div>
     <div class="tab-pane d-flex flex-grow-1 h-100" id="Waste" role="tabpanel" aria-labelledby="waste-tab">
       <WasteManager />
+    </div>
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-hidden" id="SubProtocols" role="tabpanel" aria-labelledby="subprotocols-tab">
+      <SubProtocols />
+    </div>
+    <div class="tab-pane d-flex flex-grow-1 h-100 overflow-hidden" id="MethodGroups" role="tabpanel" aria-labelledby="method-groups-tab">
+      <MethodGroups />
     </div>
     </div>
 
@@ -115,6 +130,13 @@ const filtered_layouts = computed(()=> {
 .bedlayout {
   height: 100%;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.device-info {
+  flex-shrink: 0;
+  border-bottom: 1px solid #dee2e6;
 }
 
 .list-move,

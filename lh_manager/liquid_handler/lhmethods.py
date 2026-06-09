@@ -3,11 +3,11 @@ import logging
 from .bedlayout import LHBedLayout, WellLocation, Well
 from .status import MethodError
 from .layoutmap import LayoutWell2ZoneWell, Zone
-from .methods import BaseMethod, MethodType, register, MethodsType, method_manager, UnknownMethod
+from .methods import BaseMethod, MethodType, MethodsType, RawMethod
 from .devices import DeviceBase, device_manager
 from ..waste_manager.wastedata import WasteItem, WATER
 
-from pydantic import BaseModel, validator, ValidationError
+from pydantic import BaseModel, validator
 
 from dataclasses import field
 from typing import List, Literal, ClassVar
@@ -30,10 +30,9 @@ class LHDevice(DeviceBase):
     address: str = 'http://localhost:5001'
 
 lhdevice = LHDevice()
-device_manager.register(lhdevice)
+# No longer registered here — gilson_lh self-registers via device.registered broker event.
 
 EXCLUDE_FIELDS = ['status', 'tasks']
-ORIGIN = str(lhdevice.device_name)
 
 class BaseLHMethod(BaseMethod):
     """Base class for LH methods"""
@@ -126,14 +125,17 @@ class LHMethodCluster(BaseLHMethod):
 
         for i, iv in enumerate(v):
             if isinstance(iv, dict):
-                try:
-                    v[i] = method_manager.get_method_by_name(iv['method_name']).model_validate(iv)
-                except ValidationError:
-                    logging.warning(f'Attempted to process unknown method with data {iv}')
-                    v[i] = UnknownMethod(method_data=iv)
-            else:
-                if not (isinstance(iv, BaseMethod)):
-                    raise ValueError(f"{iv} must be derived from BaseMethod")
+                v[i] = RawMethod(
+                    id=iv.get('id'),
+                    method_name=iv.get('method_name', 'RawMethod'),
+                    display_name=iv.get('display_name', iv.get('method_name', 'RawMethod')),
+                    status=iv.get('status', 'inactive'),
+                    tasks=iv.get('tasks', []),
+                    method_type=iv.get('method_type', 'none'),
+                    method_data=iv,
+                )
+            elif not isinstance(iv, BaseMethod):
+                raise ValueError(f"{iv} must be derived from BaseMethod")
 
         return v
 
@@ -275,7 +277,6 @@ class TransferMethod(BaseLHMethod):
         target_well.mix_with(self.Volume, source_well.composition)
 
 
-@register(origin=ORIGIN)
 class TransferWithRinse(TransferMethod):
     """Transfer with rinse"""
 
@@ -359,7 +360,6 @@ class TransferWithRinse(TransferMethod):
 
         return new_waste
 
-@register(origin=ORIGIN)
 class MixWithRinse(MixMethod):
     """Inject with rinse"""
     # Target and Volume defined in MixMethod
@@ -447,7 +447,6 @@ class MixWithRinse(MixMethod):
         return self.Repeats * (self.Volume / self.Flow_Rate + self.Volume / self.Aspirate_Flow_Rate) + self.Air_Gap / 0.3 + base_time + rinse_time
 
 
-@register(origin=ORIGIN)
 class InjectWithRinse(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -521,7 +520,6 @@ class InjectWithRinse(InjectMethod):
 
         return new_waste
 
-@register(origin=ORIGIN)
 class Sleep(BaseLHMethod):
     """Sleep"""
 
@@ -548,7 +546,6 @@ class Sleep(BaseLHMethod):
         base_time = super().estimated_time(layout)
         return float(self.Time) + base_time
 
-@register(origin=ORIGIN)
 class Prime(BaseLHMethod):
     """Prime"""
 
@@ -586,7 +583,6 @@ class Prime(BaseLHMethod):
     def waste(self, layout: LHBedLayout) -> WasteItem:
         return WasteItem(volume=self.Volume * self.Repeats, composition=layout.carrier_well.composition)
 
-@register(origin=ORIGIN)
 class ROADMAP_QCMD_LoadLoop(InjectMethod):
     """Inject with rinse"""
     #Source: WellLocation defined in InjectMethod
@@ -661,7 +657,6 @@ class ROADMAP_QCMD_LoadLoop(InjectMethod):
     def sample_volume(self):
         return self.Volume + self.Extra_Volume
 
-@register(origin=ORIGIN)
 class ROADMAP_QCMD_DirectInject(InjectMethod):
     """Direct Inject with rinse"""
     #Source: WellLocation defined in InjectMethod

@@ -1,4 +1,5 @@
 import datetime
+import logging
 from flask import Flask, render_template, redirect
 from logging.config import dictConfig
 
@@ -28,6 +29,12 @@ dictConfig({
     }
 })
 
+class _HealthCheckFilter(logging.Filter):
+    def filter(self, record):
+        return 'GET /health HTTP' not in record.getMessage()
+
+logging.getLogger('werkzeug').addFilter(_HealthCheckFilter())
+
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
 from .sio import socketio
@@ -36,6 +43,10 @@ from .waste_manager.waste_api import blueprint as waste_blueprint
 from .autocontrol.autocontrol import launch_autocontrol_interface, set_broker_worker
 from .autocontrol.autocontrol_api import autocontrol_blueprint
 from .broker_worker import LHManagerBrokerWorker
+from .subprotocol.api import blueprint as subprotocol_blueprint
+from .subprotocol import db as subprotocol_db
+from .method_group.api import blueprint as method_group_blueprint
+from .method_group import db as method_group_db
 
 import mimetypes
 mimetypes.add_type("text/css", ".css")
@@ -54,7 +65,12 @@ app.register_blueprint(lh_blueprint)
 app.register_blueprint(autocontrol_blueprint)
 app.register_blueprint(material_db_blueprint)
 app.register_blueprint(waste_blueprint)
+app.register_blueprint(subprotocol_blueprint)
+app.register_blueprint(method_group_blueprint)
 socketio.init_app(app)
+
+subprotocol_db.init_db()
+method_group_db.init_db()
 
 #@app.route('/')
 #def root():
@@ -63,6 +79,10 @@ socketio.init_app(app)
 @app.route('/')
 def root():
     return redirect('/static/dist/index.html')
+
+@app.route('/health')
+def health():
+    return '', 200
 
 @app.route('/test_emit/')
 def test_emit():
@@ -76,6 +96,6 @@ if __name__ == '__main__':
     broker_worker.start()
     set_broker_worker(broker_worker)
     launch_autocontrol_interface()
-    socketio.run(app, host='localhost', port=5001, debug=False)
+    socketio.run(app, host='localhost', port=5009, debug=False)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)

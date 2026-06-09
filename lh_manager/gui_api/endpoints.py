@@ -1,7 +1,7 @@
 """HTTP Endpoints for GUI API"""
 import warnings
 from copy import deepcopy
-from flask import make_response, request, Response, redirect, url_for, current_app
+from flask import make_response, request, Response, url_for, current_app
 from typing import List, Tuple, Optional
 
 from ..liquid_handler.devices import device_manager
@@ -353,19 +353,13 @@ def UpdateDevice() -> Response:
     device_manager.register(device.model_copy(update={data['param_name']: data['param_value']}))
     return make_response({'device updated': device.device_name}, 200)
 
-@gui_blueprint.route('/GUI/InitializeDevices/', methods=['POST'])
-def InitializeDevices() -> Response:
-    """Triggers initialization of devices
-        NOTE: Could use JobRunner to do this, but this is much simpler"""
-    #data: dict = request.get_json(force=True)
-
-    return redirect('/autocontrol/InitializeDevices/', 307)
-
 @gui_blueprint.route('/GUI/GetLayout', methods=['GET'])
 @gui_blueprint.route('/GUI/GetLayout/', methods=['GET'])
 def GetLayout() -> Response:
     """Gets list of sample names, IDs, and status"""
 
+    if layout is None:
+        return make_response({}, 200)
     return make_response(layout.model_dump(), 200)
 
 def _get_component_zones(wells: List[Well]) -> Tuple[List[Tuple[str, Zone]], List[Tuple[str, Zone]]]:

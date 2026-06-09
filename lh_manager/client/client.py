@@ -324,10 +324,6 @@ class AsyncManagerClient:
         data = {'device_name': device_name, 'param_name': param_name, 'param_value': param_value}
         return await self._request('POST', '/GUI/UpdateDevice/', json=data)
 
-    async def initialize_devices(self):
-        """Triggers device initialization."""
-        return await self._request('POST', '/GUI/InitializeDevices/')
-
     async def get_all_methods(self) -> Dict:
         """Gets schema for all methods."""
         return await self._request('GET', '/GUI/GetAllMethods/')
@@ -829,10 +825,6 @@ class ManagerClient:
         """Updates a parameter of a device."""
         data = {'device_name': device_name, 'param_name': param_name, 'param_value': param_value}
         return self._request('POST', '/GUI/UpdateDevice/', json=data)
-
-    def initialize_devices(self):
-        """Triggers device initialization."""
-        return self._request('POST', '/GUI/InitializeDevices/')
 
     def get_all_methods(self) -> Dict:
         """Gets schema for all methods."""

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps } from 'vue';
-import { device_defs, initialize_devices, update_device } from '../store';
+import { device_defs, update_device } from '../store';
 import type { DeviceType } from '../store';
 
 const excluded_fields = ['device_name', 'display_name', 'device_type'];
@@ -33,9 +33,6 @@ function clone(obj) {
 </script>
 
 <template>
-  <div class="row-sm-auto">
-    <button type="button" class="btn btn-primary m-8" @click="initialize_devices">Initialize devices</button>
-  </div>
   <div class="row-sm-auto">
     <div class="col d-flex flex-wrap">
       <div class="card" v-for="(device, device_name) of props.devices" :key="device_name">

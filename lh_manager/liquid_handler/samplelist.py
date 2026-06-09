@@ -1,6 +1,6 @@
 import logging
 
-from pydantic import BaseModel, validator, Field, ValidationError
+from pydantic import BaseModel, validator, Field
 from enum import Enum
 from uuid import uuid4
 from typing import Dict, List, Union, Any
@@ -10,7 +10,7 @@ from .lhmethods import Sleep
 from .bedlayout import LHBedLayout
 from .lhinterface import DATE_FORMAT
 from .status import MethodError, SampleStatus
-from .methods import MethodsType, BaseMethod, method_manager, UnknownMethod
+from .methods import MethodsType, BaseMethod, RawMethod
 from datetime import datetime
 
 class MethodList(BaseModel):
@@ -29,14 +29,17 @@ class MethodList(BaseModel):
 
         for i, iv in enumerate(v):
             if isinstance(iv, dict):
-                try:
-                    v[i] = method_manager.get_method_by_name(iv['method_name']).model_validate(iv)
-                except ValidationError:
-                    logging.warning(f'Attempted to process unknown method with data {iv}')
-                    v[i] = UnknownMethod(method_data=iv)
-            else:
-                if not (isinstance(iv, BaseMethod)):
-                    raise ValueError(f"{iv} must be derived from BaseMethod")
+                v[i] = RawMethod(
+                    id=iv.get('id'),
+                    method_name=iv.get('method_name', 'RawMethod'),
+                    display_name=iv.get('display_name', iv.get('method_name', 'RawMethod')),
+                    status=iv.get('status', SampleStatus.INACTIVE),
+                    tasks=iv.get('tasks', []),
+                    method_type=iv.get('method_type', 'none'),
+                    method_data=iv,
+                )
+            elif not isinstance(iv, BaseMethod):
+                raise ValueError(f"{iv} must be derived from BaseMethod")
 
         return v
 

@@ -16,6 +16,8 @@ LAYOUT_LOG = PERSISTENT_PATH / 'layout.json'
 SAMPLES_LOG = PERSISTENT_PATH / 'samples.json'
 DEVICES_LOG = PERSISTENT_PATH / 'devices.json'
 HISTORY_LOG = PERSISTENT_PATH / 'completed_samples.sqlite'
+SUBPROTOCOLS_DB = PERSISTENT_PATH / 'lh_manager_subprotocols.db'
+METHOD_GROUPS_DB = PERSISTENT_PATH / 'lh_manager_method_groups.db'
 
 class Config:
 
