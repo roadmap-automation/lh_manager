@@ -160,7 +160,8 @@ class LHManagerBrokerWorker:
         of the subprotocol's step_ids, cancels them via the broker, then fires
         the final-step cancel signal so the executor coroutine wakes and exits.
         """
-        from .autocontrol.autocontrol import active_tasks
+        from .autocontrol.autocontrol import active_tasks, mark_status
+        from .liquid_handler.samplecontainer import SampleStatus
 
         info = self._active_subprotocols.get(run_id)
         if info is None:
@@ -187,6 +188,23 @@ class LHManagerBrokerWorker:
         # Unblock the waiting executor so it raises the cancelled RuntimeError.
         await self._fire_step_cancelled(final_step_id)
         logger.info("cancel_subprotocol %r: signalled final step %s as cancelled.", run_id, final_step_id)
+
+        # Clean up lh_manager's task tracking so cancelled tasks don't linger in
+        # active_tasks as orphans.  If an orphaned task were later cancelled via
+        # the GUI, mark_cancelled would fire signal_step_cancelled(final_step_id)
+        # with no executor waiting, leaving a stale _cancelled_steps entry that
+        # would poison the next run of the same subprotocol.
+        # Use mark_status(CANCELLED) rather than mark_cancelled to avoid re-firing
+        # signal_step_cancelled (which we already did above via _fire_step_cancelled).
+        def _cleanup_orphaned_tasks() -> None:
+            with active_tasks.lock:
+                for task_id in task_ids_to_cancel:
+                    if task_id in active_tasks.active:
+                        mark_status(task_id, SampleStatus.CANCELLED)
+                    elif task_id in active_tasks.pending:
+                        active_tasks.pending.pop(task_id, None)
+
+        await asyncio.to_thread(_cleanup_orphaned_tasks)
 
     # ------------------------------------------------------------------
     # Async publish helpers
@@ -522,6 +540,10 @@ class LHManagerBrokerWorker:
             }
 
             # Wait for the final step to complete (set by _on_scheduler_event).
+            # Discard any stale entry left from a prior cancelled run of this same
+            # subprotocol (same deterministic step IDs) before registering the new
+            # event, so an old cancellation signal can never poison a new run.
+            self._cancelled_steps.discard(final_step_id)
             event = asyncio.Event()
             self._pending_step_completions[final_step_id] = event
             await event.wait()
