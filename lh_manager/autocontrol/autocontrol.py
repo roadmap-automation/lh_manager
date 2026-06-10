@@ -459,7 +459,7 @@ def mark_cancelled(id: str) -> None:
                 m.status = SampleStatus.PENDING
 
     if _broker_worker is not None and parent_item.method_id:
-        _broker_worker.signal_step_cancelled(parent_item.method_id)
+        _broker_worker.signal_step_cancelled(parent_item.method_id, parent_item.id)
 
 @trigger_samples_update
 def mark_status(id: str, status: SampleStatus) -> None:

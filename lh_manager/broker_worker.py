@@ -34,7 +34,7 @@ import logging
 import queue
 import threading
 import uuid
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import aio_pika
 
@@ -89,11 +89,14 @@ class LHManagerBrokerWorker:
         self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
         self._emit_queue: queue.Queue = queue.Queue()
-        # Subprotocol execution: step_id → asyncio.Event (set by _on_scheduler_event)
-        self._pending_step_completions: Dict[str, asyncio.Event] = {}
+        # Subprotocol execution: (sample_id, final_step_id) → asyncio.Event
+        # Keyed by composite tuple so concurrent runs of the same subprotocol on
+        # different channels (same final_step_id, different sample_id) each get their
+        # own event and don't overwrite each other.
+        self._pending_step_completions: Dict[Tuple[str, str], asyncio.Event] = {}
         # Subprotocol execution: step_id → retrieval_uri from completed measurement tasks
         self._step_retrieval_uris: Dict[str, str] = {}
-        # Tracks step_ids cancelled by operator; checked after event fires in _on_run_subprotocol.
+        # Tracks event_keys cancelled by operator; checked after event fires in _on_run_subprotocol.
         self._cancelled_steps: set = set()
         # run_id → {"final_step_id": str, "all_step_ids": list[str]}
         self._active_subprotocols: Dict[str, dict] = {}
@@ -143,13 +146,14 @@ class LHManagerBrokerWorker:
             return
         asyncio.run_coroutine_threadsafe(coro, self._loop)
 
-    def signal_step_cancelled(self, step_id: str) -> None:
+    def signal_step_cancelled(self, step_id: str, sample_id: str) -> None:
         """Called from mark_cancelled() (Flask thread) to unblock a waiting subprotocol executor."""
-        self._schedule(self._fire_step_cancelled(step_id))
+        self._schedule(self._fire_step_cancelled(step_id, sample_id))
 
-    async def _fire_step_cancelled(self, step_id: str) -> None:
-        self._cancelled_steps.add(step_id)
-        event = self._pending_step_completions.pop(step_id, None)
+    async def _fire_step_cancelled(self, step_id: str, sample_id: str) -> None:
+        event_key = (sample_id, step_id)
+        self._cancelled_steps.add(event_key)
+        event = self._pending_step_completions.pop(event_key, None)
         if event is not None:
             event.set()
 
@@ -170,6 +174,7 @@ class LHManagerBrokerWorker:
 
         all_step_ids: set = set(info["all_step_ids"])
         final_step_id: str = info["final_step_id"]
+        sample_id: str = info["sample_id"]
 
         # Collect autocontrol task IDs whose method_id matches a step in this run.
         task_ids_to_cancel: list = []
@@ -186,7 +191,7 @@ class LHManagerBrokerWorker:
             logger.info("cancel_subprotocol %r: cancelled autocontrol task %s", run_id, task_id)
 
         # Unblock the waiting executor so it raises the cancelled RuntimeError.
-        await self._fire_step_cancelled(final_step_id)
+        await self._fire_step_cancelled(final_step_id, sample_id)
         logger.info("cancel_subprotocol %r: signalled final step %s as cancelled.", run_id, final_step_id)
 
         # Clean up lh_manager's task tracking so cancelled tasks don't linger in
@@ -422,7 +427,11 @@ class LHManagerBrokerWorker:
             if step_id and rk == SCHEDULER_TASK_COMPLETED:
                 if retrieval_uri is not None:
                     self._step_retrieval_uris[step_id] = retrieval_uri
-                event = self._pending_step_completions.pop(step_id, None)
+                # Composite key (sample_id, step_id) matches how the event was
+                # registered in _on_run_subprotocol; prevents concurrent runs of the
+                # same subprotocol on different channels from sharing an event slot.
+                event_key = (captured.get("sample_id"), step_id)
+                event = self._pending_step_completions.pop(event_key, None)
                 if event is not None:
                     event.set()
 
@@ -542,21 +551,24 @@ class LHManagerBrokerWorker:
             self._active_subprotocols[run_id] = {
                 "final_step_id": final_step_id,
                 "all_step_ids": all_step_ids,
+                "sample_id": actual_sample_id,
             }
 
-            # Wait for the final step to complete (set by _on_scheduler_event).
-            # Discard any stale entry left from a prior cancelled run of this same
-            # subprotocol (same deterministic step IDs) before registering the new
-            # event, so an old cancellation signal can never poison a new run.
-            self._cancelled_steps.discard(final_step_id)
+            # Composite key: (sample_id, final_step_id) is unique per invocation even
+            # when two channels execute the same subprotocol concurrently (same
+            # final_step_id derived from the static DB definition, but different
+            # sample_id per run).  Keying by final_step_id alone would let one
+            # channel's event overwrite the other's, leaving one runner deadlocked.
+            event_key = (actual_sample_id, final_step_id)
+            self._cancelled_steps.discard(event_key)
             event = asyncio.Event()
-            self._pending_step_completions[final_step_id] = event
+            self._pending_step_completions[event_key] = event
             await event.wait()
             self._active_subprotocols.pop(run_id, None)
-            self._pending_step_completions.pop(final_step_id, None)
+            self._pending_step_completions.pop(event_key, None)
 
-            if final_step_id in self._cancelled_steps:
-                self._cancelled_steps.discard(final_step_id)
+            if event_key in self._cancelled_steps:
+                self._cancelled_steps.discard(event_key)
                 raise RuntimeError(f"Subprotocol {name!r} was cancelled by operator")
 
             # Collect outputs from any steps that produced a retrieval_uri.
