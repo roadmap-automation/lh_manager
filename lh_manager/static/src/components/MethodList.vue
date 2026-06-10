@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, defineProps, onMounted } from 'vue';
-import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks, subprotocols, refreshSubprotocols, add_subprotocol_method, method_groups, refreshMethodGroups, add_method_group_method } from '../store';
+import { active_well_field, active_method_index, active_stage, add_method, remove_method, move_method, get_number_of_methods, method_defs, grouped_method_defs, source_components, source_well, target_well, layout, sample_status, update_method, active_sample_index, reuse_method, copy_method, run_method, resubmit_all_tasks, active_stage_label, reuse_all_methods, cancel_all_tasks, subprotocols, refreshSubprotocols, add_subprotocol_method, method_groups, refreshMethodGroups, add_method_group_method, SUBPROTOCOL_EXCLUDED_FIELDS } from '../store';
 import type { MethodType } from '../store';
 
 onMounted(() => {
@@ -71,7 +71,7 @@ function method_string(method: MethodType) {
     return group.map((m: any) => m.method_name).join(', ');
   }
   if (method.method_name === '__subprotocol__') {
-    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks']);
+    const excluded = SUBPROTOCOL_EXCLUDED_FIELDS;
     return Object.entries(method)
       .filter(([k, v]) => !excluded.has(k) && v != null)
       .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)

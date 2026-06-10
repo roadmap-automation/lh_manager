@@ -142,6 +142,8 @@ interface SourceComponents {
   solvents: { [name: string]: (Solvent & { zone: string })[] },
 }
 
+export const SUBPROTOCOL_EXCLUDED_FIELDS = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks', 'method_type']);
+
 export const materialType = ["solvent", "solute", "lipid", "protein"] as const;
 export type MaterialType = typeof materialType[number];
 export const soluteMassUnits = ["mg/mL", "mg/L"] as const;

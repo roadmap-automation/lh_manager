@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
-import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, subprotocol_schemas } from '../store';
+import { active_well_field, method_defs, soluteMassUnits, soluteVolumeUnits, materials, source_well, target_well, device_layouts, update_at_pointer, subprotocol_schemas, SUBPROTOCOL_EXCLUDED_FIELDS } from '../store';
 import json_pointer from 'json-pointer';
 import type { MethodType, Solvent, Solute } from '../store';
 
@@ -65,7 +65,7 @@ function get_parameters(method: MethodType) {
   if (method_name === '__subprotocol__') {
     const sp_name = (method as any).subprotocol_name;
     const sp_schema = subprotocol_schemas.value[sp_name] ?? {};
-    const excluded = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks']);
+    const excluded = SUBPROTOCOL_EXCLUDED_FIELDS;
     return Object.entries(sp_schema)
       .filter(([field_name]) => !excluded.has(field_name))
       .map(([field_name, input_def]: [string, any]) => {
