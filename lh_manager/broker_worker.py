@@ -96,6 +96,9 @@ class LHManagerBrokerWorker:
         self._pending_step_completions: Dict[Tuple[str, str], asyncio.Event] = {}
         # Subprotocol execution: step_id → retrieval_uri from completed measurement tasks
         self._step_retrieval_uris: Dict[str, str] = {}
+        # step_id → autocontrol task_id for MEASURE (repeatable) steps only.
+        # Included in SUBPROTOCOL_COMPLETED outputs so PS can gate on dm.data.ready.
+        self._step_task_ids: Dict[str, str] = {}
         # Tracks event_keys cancelled by operator; checked after event fires in _on_run_subprotocol.
         self._cancelled_steps: set = set()
         # run_id → {"final_step_id": str, "all_step_ids": list[str]}
@@ -406,7 +409,7 @@ class LHManagerBrokerWorker:
             device_payload = envelope.payload or {}
             retrieval_uri = device_payload.get("retrieval_uri")
             if sample_id and step_id and self._protocol_exchange is not None:
-                method_payload: dict = {"step_id": step_id, "status": new_status.value}
+                method_payload: dict = {"step_id": step_id, "status": new_status.value, "task_id": task_id}
                 resolved_composition = device_payload.get("resolved_composition")
                 if resolved_composition is not None:
                     method_payload["resolved_composition"] = resolved_composition
@@ -425,8 +428,11 @@ class LHManagerBrokerWorker:
             # Only fire on COMPLETED — FAILED leaves the waiter blocked until the
             # operator either resubmits (success) or cancels (signal_step_cancelled).
             if step_id and rk == SCHEDULER_TASK_COMPLETED:
+                task_type = device_payload.get("task_type", "")
                 if retrieval_uri is not None:
                     self._step_retrieval_uris[step_id] = retrieval_uri
+                    if task_type == "measure":
+                        self._step_task_ids[step_id] = task_id
                 # Composite key (sample_id, step_id) matches how the event was
                 # registered in _on_run_subprotocol; prevents concurrent runs of the
                 # same subprotocol on different channels from sharing an event slot.
@@ -575,11 +581,15 @@ class LHManagerBrokerWorker:
             outputs: dict = {}
             for step_id, output_name in step_to_output.items():
                 uri = self._step_retrieval_uris.pop(step_id, None)
+                source_task_id = self._step_task_ids.pop(step_id, None)
                 if uri is not None:
-                    outputs[output_name] = {
+                    out: dict = {
                         "uri": uri,
                         "type": outputs_defn.get(output_name, {}).get("type", "unknown"),
                     }
+                    if source_task_id:
+                        out["source_task_id"] = source_task_id
+                    outputs[output_name] = out
 
             await self._publish_protocol(SUBPROTOCOL_COMPLETED, run_id, actual_sample_id, {
                 "subprotocol_run_id": run_id,
