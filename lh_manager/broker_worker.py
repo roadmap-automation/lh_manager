@@ -180,13 +180,16 @@ class LHManagerBrokerWorker:
         sample_id: str = info["sample_id"]
 
         # Collect autocontrol task IDs whose method_id matches a step in this run.
+        # Must also match item.id == sample_id so that concurrent runs of the same
+        # subprotocol on different channels (identical step_ids, different samples)
+        # do not cancel each other's tasks.
         task_ids_to_cancel: list = []
         with active_tasks.lock:
             for task_id, item in list(active_tasks.pending.items()):
-                if item.method_id in all_step_ids:
+                if item.method_id in all_step_ids and item.id == sample_id:
                     task_ids_to_cancel.append(task_id)
             for task_id, item in list(active_tasks.active.items()):
-                if item.method_id in all_step_ids:
+                if item.method_id in all_step_ids and item.id == sample_id:
                     task_ids_to_cancel.append(task_id)
 
         for task_id in task_ids_to_cancel:
