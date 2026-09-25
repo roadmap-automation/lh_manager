@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue';
 import { num_channels } from '../store';
 import SampleList from './SampleList.vue';
