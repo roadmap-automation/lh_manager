@@ -539,7 +539,7 @@ def submit_maintenance_task(method_name: str, parameters: dict, channel: Optiona
         non_channel_storage="vial" if channel is None else None,
     )
     task = Task(
-        sample_id="maintenance",
+        sample_id=None,
         task_type=TaskType.NOCHANNEL,
         tasks=[task_data],
         priority=1.0,
