@@ -254,6 +254,37 @@ def CancelTasks() -> Response:
 
     return make_response({'result': 'error', 'message': "bad request format; should be {'task_id': <uuid>; 'task': Task"}, 400)
 
+@gui_blueprint.route('/GUI/MaintenanceRun/', methods=['POST'])
+@trigger_samples_update
+def MaintenanceRun() -> Response:
+    """Submit a high-priority one-off LH job as the reserved maintenance sample."""
+    from ..autocontrol.autocontrol import submit_maintenance_task
+    data = request.get_json(force=True)
+    assert isinstance(data, dict)
+    method_name = data.get("method_name")
+    if not method_name:
+        return make_response({'error': 'method_name is required'}, 400)
+    parameters = data.get("parameters", {})
+    channel = data.get("channel")  # int or null
+    if channel is not None:
+        channel = int(channel)
+    result = submit_maintenance_task(method_name, parameters, channel)
+    if "error" in result:
+        return make_response(result, 503)
+    return make_response(result, 200)
+
+
+@gui_blueprint.route('/GUI/DismissMaintenance/', methods=['POST'])
+@trigger_samples_update
+def DismissMaintenance() -> Response:
+    """Remove the maintenance sample once completed or failed."""
+    _, sample = samples.getSampleById("maintenance")
+    if sample is None:
+        return make_response({'error': 'No maintenance sample found'}, 200)
+    samples.deleteSample(sample)
+    return make_response({'dismissed': 'maintenance'}, 200)
+
+
 @gui_blueprint.route('/GUI/UpdateDryRunQueue/', methods=['POST'])
 @trigger_samples_update
 def UpdateDryRunQueue() -> Response:

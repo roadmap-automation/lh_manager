@@ -3,6 +3,7 @@
 import logging
 import threading
 
+from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from uuid import uuid4
 
@@ -493,3 +494,72 @@ def mark_status(id: str, status: SampleStatus) -> None:
         if status not in COMPLETED_STATUS:
             # put it back if not marking complete
             active_tasks.active.update({id: parent_item})
+
+
+def submit_maintenance_task(method_name: str, parameters: dict, channel: Optional[int]) -> dict:
+    """Submit a high-priority one-off LH job as the reserved 'maintenance' sample.
+
+    Clears any previous maintenance sample and its active_tasks entries, then creates a
+    fresh Sample with id='maintenance' and channel=-1 (excluded from channel tabs), and
+    submits the task with priority=1.0 so it jumps ahead of all queued samples.
+    """
+    from ..app_config import config as lh_config
+
+    schema = method_manager._remote_schemas.get(method_name)
+    if schema is None:
+        return {"error": f"No remote schema for '{method_name}'. Is the device running?"}
+    device_id = schema.get("device_id")
+    if not device_id:
+        return {"error": f"Schema for '{method_name}' missing device_id — restart the device."}
+
+    # Clear previous maintenance sample (and any stale active_tasks entries).
+    _, prev = samples.getSampleById("maintenance")
+    if prev is not None:
+        with active_tasks.lock:
+            for tid in [t for t, item in list(active_tasks.active.items()) if item.id == "maintenance"]:
+                active_tasks.active.pop(tid, None)
+            for tid in [t for t, item in list(active_tasks.pending.items()) if item.id == "maintenance"]:
+                active_tasks.pending.pop(tid, None)
+        samples.deleteSample(prev)
+
+    stage = lh_config.stage_names[0]
+    sample = Sample(
+        id="maintenance",
+        name=method_name,
+        description=datetime.now().isoformat(timespec="seconds"),
+        channel=-1,
+    )
+
+    clean_params = {k: v for k, v in parameters.items() if k not in EXCLUDE_FIELDS}
+    task_data = TaskData(
+        id=str(uuid4()),
+        device=device_id,
+        channel=channel,
+        method_data={"method_list": [{"method_name": method_name, "method_data": clean_params}]},
+        non_channel_storage="vial" if channel is None else None,
+    )
+    task = Task(
+        sample_id="maintenance",
+        task_type=TaskType.NOCHANNEL,
+        tasks=[task_data],
+        priority=1.0,
+    )
+    task_container = AutocontrolTaskContainer(task=task, status=SampleStatus.INACTIVE)
+
+    method = RawMethod(
+        method_name=method_name,
+        display_name=method_name,
+        method_type=MethodType.NONE,
+        method_data={"method_name": method_name, **clean_params},
+    )
+    method.tasks.append(task_container)
+    sample.stages[stage].active.append(method)
+    samples.addSample(sample)
+
+    with active_tasks.lock:
+        active_tasks.pending[str(task.id)] = AutocontrolItem(
+            id="maintenance", stage=stage, method_id=method.id,
+        )
+
+    submit_tasks([task_container])
+    return {"task_id": str(task.id)}

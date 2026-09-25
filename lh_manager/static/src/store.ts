@@ -206,6 +206,7 @@ export const waste_layout = ref<DeviceLayout>();
 export const waste_timestamp_table = ref<TimestampTable>();
 //export const layout = ref<{racks: {[rack_id: string]: {rows: number, columns: number, style: 'grid' | 'staggered', max_volume: number}} }>();
 export const samples = ref<Sample[]>([]);
+export const maintenance_samples = computed(() => samples.value.filter(s => s.channel < 0));
 export const sample_status = ref<SampleStatusMap>({});
 //export const source_components = shallowRef<SourceComponents>({solvents: {}, solutes: {}});
 //export const wells = ref<Well[]>([]);
@@ -814,6 +815,19 @@ export async function duplicate_sample(sample_id: string, channel: number) {
   });
   const response_body = await update_result.json();
   return response_body;
+}
+
+export async function submit_maintenance_run(method_name: string, parameters: Record<string, unknown>, channel: number | null): Promise<{ task_id?: string, error?: string }> {
+  const res = await fetch("/GUI/MaintenanceRun/", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method_name, parameters, channel }),
+  });
+  return res.json();
+}
+
+export async function dismiss_maintenance(): Promise<void> {
+  await fetch("/GUI/DismissMaintenance/", { method: "POST", headers: { 'Content-Type': 'application/json' }, body: '{}' });
 }
 
 export async function refreshComponents() {

@@ -411,7 +411,7 @@ class LHManagerBrokerWorker:
             step_id = captured.get("step_id")
             device_payload = envelope.payload or {}
             retrieval_uri = device_payload.get("retrieval_uri")
-            if sample_id and step_id and self._protocol_exchange is not None:
+            if sample_id and step_id and self._protocol_exchange is not None and sample_id != "maintenance":
                 method_payload: dict = {"step_id": step_id, "status": new_status.value, "task_id": task_id}
                 resolved_composition = device_payload.get("resolved_composition")
                 if resolved_composition is not None:
