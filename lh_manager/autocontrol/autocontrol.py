@@ -104,13 +104,34 @@ class AutocontrolItem(Item):
 # Task-building primitives (pure — no side effects, no submission)
 # ---------------------------------------------------------------------------
 
+_UNSET = object()  # sentinel for "use the sample-derived default"
+
+
+def _mtype_to_tasktype(method_type: MethodType) -> TaskType:
+    if method_type == MethodType.MEASURE:
+        return TaskType.MEASURE
+    if method_type == MethodType.PREPARE:
+        return TaskType.PREPARE
+    if method_type in (MethodType.TRANSFER, MethodType.INJECT):
+        return TaskType.TRANSFER
+    return TaskType.NOCHANNEL
+
+
 def _build_raw_method_task(
     sample: Sample,
     method_name: str,
     method_type: MethodType,
     params: dict,
+    *,
+    sample_id=_UNSET,
+    channel_override=_UNSET,
+    priority: Optional[float] = None,
 ) -> Optional[AutocontrolTaskContainer]:
-    """Build a Task for a single raw method. Returns None and logs on schema error."""
+    """Build a Task for a single raw method. Returns None and logs on schema error.
+
+    sample_id / channel_override / priority: when provided, override the values derived
+    from ``sample``. Used by maintenance submissions (sample_id=None, priority=1.0).
+    """
     schema = method_manager._remote_schemas.get(method_name)
     if schema is None:
         logging.error(
@@ -128,23 +149,20 @@ def _build_raw_method_task(
         )
         return None
     device = device_manager.get_device_by_name(device_id)
-    channel = sample.channel if (device is not None and device.multichannel) else None
+    channel = (
+        channel_override if channel_override is not _UNSET
+        else (sample.channel if (device is not None and device.multichannel) else None)
+    )
+    effective_sample_id = sample_id if sample_id is not _UNSET else sample.id
     clean_params = {k: v for k, v in params.items() if k not in EXCLUDE_FIELDS}
     task_data = TaskData(
         device=device_id,
         channel=channel,
         method_data={"method_list": [{"method_name": method_name, "method_data": clean_params}]},
     )
-    if method_type == MethodType.MEASURE:
-        tasktype = TaskType.MEASURE
-    elif method_type == MethodType.PREPARE:
-        tasktype = TaskType.PREPARE
-    elif method_type in (MethodType.TRANSFER, MethodType.INJECT):
-        tasktype = TaskType.TRANSFER
-    else:
-        tasktype = TaskType.NOCHANNEL
     return AutocontrolTaskContainer(
-        task=Task(sample_id=sample.id, task_type=tasktype, tasks=[task_data]),
+        task=Task(sample_id=effective_sample_id, task_type=_mtype_to_tasktype(method_type),
+                  tasks=[task_data], priority=priority),
         status=SampleStatus.INACTIVE,
     )
 
@@ -153,12 +171,19 @@ def _build_method_group_task(
     sample: Sample,
     group: List[dict],
     method_type: MethodType = MethodType.PREPARE,
+    *,
+    sample_id=_UNSET,
+    channel_override=_UNSET,
+    priority: Optional[float] = None,
 ) -> Optional[AutocontrolTaskContainer]:
     """Build a parallel method-group Task. Returns None and logs on schema error.
 
     Each entry in group is ``{"method_name": ..., <params>...}``.
     TaskType is NOCHANNEL when method_type is NONE, otherwise TRANSFER.
+
+    sample_id / channel_override / priority: override values derived from ``sample``.
     """
+    effective_sample_id = sample_id if sample_id is not _UNSET else sample.id
     taskdata = []
     for sub in group:
         method_name = sub["method_name"]
@@ -175,7 +200,10 @@ def _build_method_group_task(
             logging.error("Cannot build group task: schema for '%s' missing device_id.", method_name)
             return None
         device = device_manager.get_device_by_name(device_id)
-        channel = sample.channel if (device is not None and device.multichannel) else None
+        channel = (
+            channel_override if channel_override is not _UNSET
+            else (sample.channel if (device is not None and device.multichannel) else None)
+        )
         params = {k: v for k, v in sub.items() if k not in ("method_name",) and k not in EXCLUDE_FIELDS}
         taskdata.append(TaskData(
             id=str(uuid4()),
@@ -186,7 +214,7 @@ def _build_method_group_task(
         ))
     tasktype = TaskType.NOCHANNEL if method_type == MethodType.NONE else TaskType.TRANSFER
     return AutocontrolTaskContainer(
-        task=Task(sample_id=sample.id, task_type=tasktype, tasks=taskdata),
+        task=Task(sample_id=effective_sample_id, task_type=tasktype, tasks=taskdata, priority=priority),
         status=SampleStatus.INACTIVE,
     )
 
@@ -501,18 +529,28 @@ def submit_maintenance_task(method_name: str, parameters: dict, channel: Optiona
 
     Clears any previous maintenance sample and its active_tasks entries, then creates a
     fresh Sample with id='maintenance' and channel=-1 (excluded from channel tabs), and
-    submits the task with priority=1.0 so it jumps ahead of all queued samples.
+    submits the task(s) with priority=1.0 so they jump ahead of all queued samples.
+
+    The method kind (raw method, method group, or subprotocol) is inferred by probing
+    the three registries in order — no explicit kind parameter needed.
     """
+    import json as _json
     from ..app_config import config as lh_config
+    from ..method_group.db import get_method_group_by_name
+    from ..subprotocol.db import get_subprotocol_by_name
+    from ..subprotocol.executor import _build_method_group, expand_subprotocol
 
-    schema = method_manager._remote_schemas.get(method_name)
-    if schema is None:
-        return {"error": f"No remote schema for '{method_name}'. Is the device running?"}
-    device_id = schema.get("device_id")
-    if not device_id:
-        return {"error": f"Schema for '{method_name}' missing device_id — restart the device."}
+    # Infer kind from registry membership.
+    if method_manager._remote_schemas.get(method_name):
+        kind = 'method'
+    elif (mg := get_method_group_by_name(method_name)) is not None:
+        kind = 'method_group'
+    elif (sp_defn := get_subprotocol_by_name(method_name)) is not None:
+        kind = 'subprotocol'
+    else:
+        return {"error": f"'{method_name}' not found in device methods, method groups, or subprotocols."}
 
-    # Clear previous maintenance sample (and any stale active_tasks entries).
+    # Clear previous maintenance sample and any stale active_tasks entries.
     _, prev = samples.getSampleById("maintenance")
     if prev is not None:
         with active_tasks.lock:
@@ -529,37 +567,103 @@ def submit_maintenance_task(method_name: str, parameters: dict, channel: Optiona
         description=datetime.now().isoformat(timespec="seconds"),
         channel=-1,
     )
-
     clean_params = {k: v for k, v in parameters.items() if k not in EXCLUDE_FIELDS}
-    task_data = TaskData(
-        id=str(uuid4()),
-        device=device_id,
-        channel=channel,
-        method_data={"method_list": [{"method_name": method_name, "method_data": clean_params}]},
-        non_channel_storage="vial" if channel is None else None,
-    )
-    task = Task(
-        sample_id=None,
-        task_type=TaskType.NOCHANNEL,
-        tasks=[task_data],
-        priority=1.0,
-    )
-    task_container = AutocontrolTaskContainer(task=task, status=SampleStatus.INACTIVE)
+    _overrides = dict(sample_id=None, channel_override=channel, priority=1.0)
 
-    method = RawMethod(
-        method_name=method_name,
-        display_name=method_name,
-        method_type=MethodType.NONE,
-        method_data={"method_name": method_name, **clean_params},
-    )
-    method.tasks.append(task_container)
-    sample.stages[stage].active.append(method)
-    samples.addSample(sample)
+    def _register_maintenance(method: RawMethod, containers: List[AutocontrolTaskContainer]) -> None:
+        sample.stages[stage].active.append(method)
+        samples.addSample(sample)
+        with active_tasks.lock:
+            for tc in containers:
+                active_tasks.pending[str(tc.task.id)] = AutocontrolItem(
+                    id="maintenance", stage=stage, method_id=method.id,
+                )
+        submit_tasks(containers)
 
-    with active_tasks.lock:
-        active_tasks.pending[str(task.id)] = AutocontrolItem(
-            id="maintenance", stage=stage, method_id=method.id,
+    if kind == 'method':
+        schema = method_manager._remote_schemas.get(method_name) or {}
+        device_id = schema.get("device_id")
+        if not device_id:
+            return {"error": f"Schema for '{method_name}' missing device_id — restart the device."}
+        task_data = TaskData(
+            id=str(uuid4()),
+            device=device_id,
+            channel=channel,
+            method_data={"method_list": [{"method_name": method_name, "method_data": clean_params}]},
+            non_channel_storage="vial" if channel is None else None,
         )
+        task = Task(sample_id=None, task_type=TaskType.NOCHANNEL, tasks=[task_data], priority=1.0)
+        tc = AutocontrolTaskContainer(task=task, status=SampleStatus.INACTIVE)
+        method = RawMethod(
+            method_name=method_name, display_name=method_name, method_type=MethodType.NONE,
+            method_data={"method_name": method_name, **clean_params},
+        )
+        method.tasks.append(tc)
+        _register_maintenance(method, [tc])
+        return {"task_id": str(task.id)}
 
-    submit_tasks([task_container])
-    return {"task_id": str(task.id)}
+    elif kind == 'method_group':
+        try:
+            mtype = MethodType(mg.get("method_type") or "none")
+        except ValueError:
+            mtype = MethodType.NONE
+        exposed_fields = _json.loads(mg.get("exposed_fields") or "[]")
+        steps = _json.loads(mg.get("steps") or "[]")
+        context = {f"input.{ef['field_name']}": clean_params.get(ef['field_name']) for ef in exposed_fields}
+        try:
+            resolved = _build_method_group(steps, context)
+        except (ValueError, KeyError):
+            logging.exception("Failed to resolve method group refs for maintenance task '%s'", method_name)
+            return {"error": "Failed to resolve method group parameters."}
+        tc = _build_method_group_task(sample, resolved, mtype, **_overrides)
+        if tc is None:
+            return {"error": "Failed to build method group task — check device schemas."}
+        method = RawMethod(
+            method_name="__method_group__", display_name=method_name, method_type=mtype,
+            method_data={"method_name": method_name, **clean_params},
+        )
+        method.tasks.append(tc)
+        _register_maintenance(method, [tc])
+        return {"task_id": str(tc.task.id)}
+
+    else:  # subprotocol
+        context = {f"input.{k}": v for k, v in clean_params.items()}
+        for alloc_name in _json.loads(sp_defn.get("allocations") or "[]"):
+            context[f"alloc.{alloc_name}"] = str(uuid4())
+        try:
+            expanded, _ = expand_subprotocol(sp_defn, context)
+        except Exception:
+            logging.exception("Failed to expand subprotocol '%s'.", method_name)
+            return {"error": f"Failed to expand subprotocol '{method_name}'."}
+
+        method = RawMethod(
+            method_name="__subprotocol__", display_name=method_name, method_type=MethodType.NONE,
+            method_data={"method_name": method_name, "subprotocol_name": method_name, **clean_params},
+        )
+        if not expanded:
+            sample.stages[stage].active.append(method)
+            samples.addSample(sample)
+            return {"task_id": None}
+
+        task_containers: List[AutocontrolTaskContainer] = []
+        for step in expanded:
+            if step["type"] == "method":
+                schema = method_manager._remote_schemas.get(step["method_name"]) or {}
+                try:
+                    mtype = MethodType(schema.get("method_type", "none"))
+                except ValueError:
+                    mtype = MethodType.NONE
+                tc = _build_raw_method_task(sample, step["method_name"], mtype, step["params"], **_overrides)
+            else:  # method_group
+                try:
+                    mtype = MethodType(step.get("method_type", "none"))
+                except ValueError:
+                    mtype = MethodType.NONE
+                tc = _build_method_group_task(sample, step["group"], mtype, **_overrides)
+            if tc is None:
+                return {"error": "Failed to build task during subprotocol expansion — check device schemas."}
+            method.tasks.append(tc)
+            task_containers.append(tc)
+
+        _register_maintenance(method, task_containers)
+        return {"task_id": str(task_containers[0].task.id)}
