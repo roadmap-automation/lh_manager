@@ -596,7 +596,7 @@ def submit_maintenance_task(method_name: str, parameters: dict, channel: Optiona
         tc = AutocontrolTaskContainer(task=task, status=SampleStatus.INACTIVE)
         method = RawMethod(
             method_name=method_name, display_name=method_name, method_type=MethodType.NONE,
-            method_data={"method_name": method_name, **clean_params},
+            method_data={"method_name": method_name, "display_name": method_name, **clean_params},
         )
         method.tasks.append(tc)
         _register_maintenance(method, [tc])
@@ -620,7 +620,7 @@ def submit_maintenance_task(method_name: str, parameters: dict, channel: Optiona
             return {"error": "Failed to build method group task — check device schemas."}
         method = RawMethod(
             method_name="__method_group__", display_name=method_name, method_type=mtype,
-            method_data={"method_name": method_name, **clean_params},
+            method_data={"method_name": "__method_group__", "display_name": method_name, **clean_params},
         )
         method.tasks.append(tc)
         _register_maintenance(method, [tc])
@@ -638,7 +638,7 @@ def submit_maintenance_task(method_name: str, parameters: dict, channel: Optiona
 
         method = RawMethod(
             method_name="__subprotocol__", display_name=method_name, method_type=MethodType.NONE,
-            method_data={"method_name": method_name, "subprotocol_name": method_name, **clean_params},
+            method_data={"method_name": "__subprotocol__", "display_name": method_name, "subprotocol_name": method_name, **clean_params},
         )
         if not expanded:
             sample.stages[stage].active.append(method)
