@@ -1,12 +1,13 @@
 """Gilson Trilution LH 4.0 Endpoints
 
     Designed to operate as an independent web interface; does not depend on sample list state"""
+import os
 from flask import make_response, Response, request, redirect
 
 from . import autocontrol_blueprint
 from autocontrol.status import Status
 
-AUTOCONTROL_URL = 'http://localhost:5004'
+AUTOCONTROL_URL = os.environ.get('AUTOCONTROL_URL', 'http://localhost:5004')
 from ...liquid_handler.lhinterface import InterfaceStatus, lh_interface
 from ...liquid_handler.state import samples
 

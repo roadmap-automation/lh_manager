@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 from flask import Flask, render_template, redirect
 from logging.config import dictConfig
 
@@ -96,6 +97,6 @@ if __name__ == '__main__':
     broker_worker.start()
     set_broker_worker(broker_worker)
     launch_autocontrol_interface()
-    socketio.run(app, host='localhost', port=5009, debug=False)
+    socketio.run(app, host='localhost', port=int(os.environ.get('LH_MANAGER_PORT', '5009')), debug=False)
 
     #app.run(host='127.0.0.1', port=5001, debug=True)
