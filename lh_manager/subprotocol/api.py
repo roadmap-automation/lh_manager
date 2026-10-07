@@ -9,6 +9,9 @@ import json
 from flask import Blueprint, jsonify, request
 
 from . import db
+from ..method_group import db as mg_db
+from ..liquid_handler.methods import method_manager
+from ..validation import compute_availability
 
 blueprint = Blueprint("subprotocol", __name__, url_prefix="/subprotocols")
 
@@ -17,7 +20,18 @@ db.init_db()
 
 @blueprint.get("/")
 def list_subprotocols():
-    return jsonify({"subprotocols": db.list_subprotocols()})
+    sps = db.list_subprotocols()
+    mgs = mg_db.list_method_groups()
+    # Parse steps for the availability walk, then strip before returning.
+    sps_parsed = [{**sp, "steps": json.loads(sp.get("steps") or "[]")} for sp in sps]
+    mgs_parsed = [{**mg, "steps": json.loads(mg.get("steps") or "[]")} for mg in mgs]
+    sp_avail, _ = compute_availability(sps_parsed, mgs_parsed, method_manager.available_method_names())
+    result = []
+    for sp in sps_parsed:
+        row = {k: v for k, v in sp.items() if k != "steps"}
+        row["available"] = sp_avail.get(sp["name"], True)
+        result.append(row)
+    return jsonify({"subprotocols": result})
 
 
 @blueprint.post("/")

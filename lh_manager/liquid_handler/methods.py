@@ -239,6 +239,9 @@ class MethodManager:
         result.update(self._remote_schemas)
         return result
     
+    def available_method_names(self) -> set[str]:
+        return set(self.methods) | set(self._remote_schemas)
+
     def get_method_by_name(self, method_name: str) -> MethodsType:
         """Gets method object by name
 

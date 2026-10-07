@@ -250,7 +250,10 @@ function on_method_change(step_index: number, step: MethodGroupStep) {
           class="list-group-item list-group-item-action py-1 px-2 small"
           :class="{ active: mg.id === selected_id }"
           @click="select_group(mg.id)" style="cursor: pointer;">
-          <div class="fw-semibold text-truncate">{{ mg.name }}</div>
+          <div class="fw-semibold text-truncate">
+            {{ mg.name }}
+            <span v-if="!mg.available" class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;" title="References methods unavailable in the current device configuration">unavailable</span>
+          </div>
           <div class="text-muted" style="font-size:0.75rem;">{{ mg.method_type ?? '—' }}</div>
         </li>
         <li v-if="method_groups.length === 0" class="list-group-item text-muted small fst-italic py-2 px-2">

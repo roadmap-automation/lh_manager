@@ -495,6 +495,24 @@ class LHManagerBrokerWorker:
             })
             return
 
+        from .subprotocol.db import list_subprotocols as _list_sps
+        from .method_group.db import list_method_groups as _list_mgs
+        from .validation import compute_availability
+        from .liquid_handler.methods import method_manager
+        _sps = await asyncio.to_thread(_list_sps)
+        _mgs = await asyncio.to_thread(_list_mgs)
+        _sps_parsed = [{**sp, "steps": json.loads(sp.get("steps") or "[]")} for sp in _sps]
+        _mgs_parsed = [{**mg, "steps": json.loads(mg.get("steps") or "[]")} for mg in _mgs]
+        _sp_avail, _ = compute_availability(_sps_parsed, _mgs_parsed, method_manager.available_method_names())
+        if not _sp_avail.get(name, True):
+            logger.error("Subprotocol %r references unavailable methods — refusing run %s.", name, run_id)
+            await self._publish_protocol(SUBPROTOCOL_FAILED, run_id, sample_id, {
+                "subprotocol_run_id": run_id,
+                "channel": channel,
+                "error": f"Subprotocol {name!r} references methods not available in the current device configuration",
+            })
+            return
+
         try:
             # Build context: allocations minted once, inputs available as $ref.
             context: dict = {f"input.{k}": v for k, v in params.items()}

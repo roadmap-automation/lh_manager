@@ -108,7 +108,7 @@ def list_method_groups() -> List[Dict[str, Any]]:
     conn = _get_conn()
     c = conn.cursor()
     c.execute(
-        "SELECT id, name, description, method_type, created_at, updated_at "
+        "SELECT id, name, description, method_type, steps, created_at, updated_at "
         "FROM method_groups ORDER BY updated_at DESC"
     )
     rows = c.fetchall()

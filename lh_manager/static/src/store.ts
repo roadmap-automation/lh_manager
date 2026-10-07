@@ -958,6 +958,7 @@ export interface SubprotocolSummary {
   inputs: string;
   created_at: string;
   updated_at: string;
+  available: boolean;
 }
 
 export const subprotocols = ref<SubprotocolSummary[]>([]);
@@ -1070,6 +1071,7 @@ export interface MethodGroupSummary {
   method_type: string | null;
   created_at: string;
   updated_at: string;
+  available: boolean;
 }
 
 export const method_groups = ref<MethodGroupSummary[]>([]);

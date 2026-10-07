@@ -464,7 +464,10 @@ function compatible_params(field_type: string): InputParam[] {
           class="list-group-item list-group-item-action py-1 px-2 small"
           :class="{ active: sp.id === selected_id }"
           @click="select_subprotocol(sp.id)" style="cursor: pointer;">
-          <div class="fw-semibold text-truncate">{{ sp.name }}</div>
+          <div class="fw-semibold text-truncate">
+            {{ sp.name }}
+            <span v-if="!sp.available" class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;" title="References methods unavailable in the current device configuration">unavailable</span>
+          </div>
         </li>
         <li v-if="subprotocols.length === 0" class="list-group-item text-muted small fst-italic py-2 px-2">
           No subprotocols yet.
