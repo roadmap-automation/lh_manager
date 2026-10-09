@@ -62,19 +62,30 @@ def get_method_group(mg_id: str):
 
 @blueprint.put("/<mg_id>")
 def update_method_group(mg_id: str):
-    if db.get_method_group(mg_id) is None:
+    existing = db.get_method_group(mg_id)
+    if existing is None:
         return jsonify({"error": "not found"}), 404
     body = request.get_json(force=True) or {}
     name = body.get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
+
+    def _json(key, fallback=None):
+        if key in body:
+            return body[key]
+        raw = existing.get(key)
+        return json.loads(raw) if raw is not None else fallback
+
+    def _text(key):
+        return body[key] if key in body else existing.get(key)
+
     db.update_method_group(
         mg_id=mg_id,
         name=name,
-        steps=body.get("steps", []),
-        description=body.get("description"),
-        exposed_fields=body.get("exposed_fields"),
-        method_type=body.get("method_type"),
+        steps=_json("steps", []),
+        description=_text("description"),
+        exposed_fields=_json("exposed_fields"),
+        method_type=_text("method_type"),
     )
     return jsonify({"ok": True})
 

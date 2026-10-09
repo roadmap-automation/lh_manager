@@ -68,22 +68,33 @@ def get_subprotocol(sub_id: str):
 
 @blueprint.put("/<sub_id>")
 def update_subprotocol(sub_id: str):
-    if db.get_subprotocol(sub_id) is None:
+    existing = db.get_subprotocol(sub_id)
+    if existing is None:
         return jsonify({"error": "not found"}), 404
     body = request.get_json(force=True) or {}
     name = body.get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
+
+    def _json(key, fallback=None):
+        if key in body:
+            return body[key]
+        raw = existing.get(key)
+        return json.loads(raw) if raw is not None else fallback
+
+    def _text(key):
+        return body[key] if key in body else existing.get(key)
+
     db.update_subprotocol(
         sub_id=sub_id,
         name=name,
-        steps=body.get("steps", []),
-        parameter_wiring=body.get("parameter_wiring"),
-        inputs=body.get("inputs"),
-        outputs=body.get("outputs"),
-        execution=body.get("execution"),
-        allocations=body.get("allocations"),
-        method_type=body.get("method_type"),
+        steps=_json("steps", []),
+        parameter_wiring=_json("parameter_wiring"),
+        inputs=_json("inputs"),
+        outputs=_json("outputs"),
+        execution=_text("execution"),
+        allocations=_json("allocations"),
+        method_type=_text("method_type"),
     )
     return jsonify({"ok": True})
 
