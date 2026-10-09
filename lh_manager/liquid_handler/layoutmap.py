@@ -8,6 +8,8 @@ class Zone(str, Enum):
     STOCK = 'Stock Zone'
     MIX = 'Mix Zone'
     INJECT = 'Injection Zone'
+    REAR_MICROPLATE = 'Rear Microplate Zone'
+    FRONT_MICROPLATE = 'Front Microplate Zone'
 
 # Physical racks that are present
 racks={'Carrier': {'columns': 1, 'rows': 1, 'max_volume': 2000.0, 'min_volume': 300.0, 'style': 'grid', 'height': 200, 'width': 200, 'x_translate': 0, 'y_translate': 100, 'shape': 'circle', 'editable': True},
@@ -25,7 +27,9 @@ zone2rack = {Zone.SOLVENT: 'Solvent',
              Zone.SAMPLE: 'Samples',
              Zone.STOCK: 'Stock',
              Zone.MIX: 'Mix',
-             Zone.INJECT: 'Inject'}
+             Zone.INJECT: 'Inject',
+             Zone.REAR_MICROPLATE: 'Rear Microplate',
+             Zone.FRONT_MICROPLATE: 'Front Microplate'}
 
 rack2zone = {v: k for k, v in zone2rack.items()}
 
