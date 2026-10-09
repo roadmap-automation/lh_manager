@@ -162,11 +162,11 @@ onMounted(() => {
         <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
       </rect>
       <path class="fill-fraction" :d="fill_path(col, row)"></path>
-      <text v-if="(props.rack.columns * props.rack.rows > 1)" class="vial-label" :class="(row * props.rack.columns + col + 1) in reserved_cells ? 'vial-reserved' : 'vial-notreserved'" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle">
+      <text v-if="(props.rack.columns * props.rack.rows > 1)" class="vial-label" :class="(row * props.rack.columns + col + 1) in reserved_cells ? 'vial-reserved' : 'vial-notreserved'" :x="x_offset(col, row)" :y="y_offset(row)" text-anchor="middle" :font-size="Math.min(Math.max(cell_size * 0.45, 4), 20)">
         {{ row * props.rack.columns + col + 1 }}</text>
     </g>
   </g>
-  <text class="title" :y="props.rack.height - padding" :x="props.rack.width / 2">{{ props.rack_id }}</text>
+  <text class="title" :y="props.rack.height - padding" :x="props.rack.width / 2" :font-size="Math.min(props.rack.width / (props.rack_id.length * 0.7), text_size * 0.9)">{{ props.rack_id }}</text>
   <image @click="batch_edit" v-if="props.rack.editable" class="vial-button" :x="props.rack.width - text_size * 2" :y="props.rack.height - text_size" :width="text_size - padding" :height="text_size - padding" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-grid-3x3-gap" viewBox="0 0 16 16"><path d="M4 2v2H2V2zm1 12v-2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1m0-5V7a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1m0-5V2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1m5 10v-2a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1m0-5V7a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1m0-5V2a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1M9 2v2H7V2zm5 0v2h-2V2zM4 7v2H2V7zm5 0v2H7V7zm5 0h-2v2h2zM4 12v2H2v-2zm5 0v2H7v-2zm5 0v2h-2v-2zM12 1a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm-1 6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1zm1 4a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1z"/></svg>'>
     <title>Batch edit wells</title>
   </image>  
@@ -189,7 +189,7 @@ rect {
 
 .title {
   fill: white;
-  font: normal 2vmin sans-serif;
+  font-family: sans-serif;
   text-anchor: middle;
 }
 
@@ -210,7 +210,7 @@ rect {
 }
 
 .vial-label {
-  font: normal 2vmin sans-serif;
+  font-family: sans-serif;
   pointer-events: none;
   dominant-baseline: central;
 }
