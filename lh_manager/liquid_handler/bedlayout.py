@@ -312,6 +312,7 @@ class Rack(BaseModel):
     y_translate: int
     shape: str = 'rect' # rect | circle
     editable: bool = True
+    allow_mixing: bool = False
 
 class LHBedLayout(BaseModel):
     """Class representing a general LH bed layout"""

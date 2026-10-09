@@ -62,6 +62,15 @@ function send_changes() {
             <div class="row-auto">
                 <label>Max Volume (mL): <input type="number" v-model="current_rack.max_volume" /></label>
             </div>
+            <div class="row-auto mt-2">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" v-model="current_rack.allow_mixing" id="allow_mixing_check" />
+                  <label class="form-check-label" for="allow_mixing_check">
+                    Allow mixing
+                    <small class="text-muted d-block">This rack may be used as an intermediate mixing target for multi-component formulations. Enable for dedicated mixing plates only; leave off for sample plates and pre-prepared stocks.</small>
+                  </label>
+                </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer justify-content-between">

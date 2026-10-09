@@ -186,7 +186,8 @@ export interface Rack {
   x_translate: number,
   y_translate: number,
   shape: string,
-  editable: boolean
+  editable: boolean,
+  allow_mixing: boolean,
 }
 
 export interface DeviceLayout {
