@@ -432,7 +432,7 @@ class LHManagerBrokerWorker:
             # operator either resubmits (success) or cancels (signal_step_cancelled).
             if step_id and rk == SCHEDULER_TASK_COMPLETED:
                 task_type = device_payload.get("task_type", "")
-                if retrieval_uri is not None:
+                if retrieval_uri is not None and task_type == "measure":
                     self._step_retrieval_uris[step_id] = retrieval_uri
                     self._step_task_ids[step_id] = task_id
                 # Composite key (sample_id, step_id) matches how the event was
