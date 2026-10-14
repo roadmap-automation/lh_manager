@@ -96,7 +96,7 @@ class LHManagerBrokerWorker:
         self._pending_step_completions: Dict[Tuple[str, str], asyncio.Event] = {}
         # Subprotocol execution: step_id → retrieval_uri from completed measurement tasks
         self._step_retrieval_uris: Dict[str, str] = {}
-        # step_id → autocontrol task_id for MEASURE (repeatable) steps only.
+        # step_id → autocontrol task_id for any step that produces a retrieval_uri.
         # Included in SUBPROTOCOL_COMPLETED outputs so PS can gate on dm.data.ready.
         self._step_task_ids: Dict[str, str] = {}
         # Tracks event_keys cancelled by operator; checked after event fires in _on_run_subprotocol.
@@ -434,8 +434,7 @@ class LHManagerBrokerWorker:
                 task_type = device_payload.get("task_type", "")
                 if retrieval_uri is not None:
                     self._step_retrieval_uris[step_id] = retrieval_uri
-                    if task_type == "measure":
-                        self._step_task_ids[step_id] = task_id
+                    self._step_task_ids[step_id] = task_id
                 # Composite key (sample_id, step_id) matches how the event was
                 # registered in _on_run_subprotocol; prevents concurrent runs of the
                 # same subprotocol on different channels from sharing an event slot.
