@@ -94,11 +94,11 @@ class LHManagerBrokerWorker:
         # different channels (same final_step_id, different sample_id) each get their
         # own event and don't overwrite each other.
         self._pending_step_completions: Dict[Tuple[str, str], asyncio.Event] = {}
-        # Subprotocol execution: step_id → retrieval_uri from completed measurement tasks
-        self._step_retrieval_uris: Dict[str, str] = {}
-        # step_id → autocontrol task_id for any step that produces a retrieval_uri.
+        # Subprotocol execution: (sample_id, step_id) → retrieval_uri from completed measurement tasks
+        self._step_retrieval_uris: Dict[Tuple[str, str], str] = {}
+        # (sample_id, step_id) → autocontrol task_id for any step that produces a retrieval_uri.
         # Included in SUBPROTOCOL_COMPLETED outputs so PS can gate on dm.data.ready.
-        self._step_task_ids: Dict[str, str] = {}
+        self._step_task_ids: Dict[Tuple[str, str], str] = {}
         # Tracks event_keys cancelled by operator; checked after event fires in _on_run_subprotocol.
         self._cancelled_steps: set = set()
         # run_id → {"final_step_id": str, "all_step_ids": list[str]}
@@ -433,8 +433,9 @@ class LHManagerBrokerWorker:
             if step_id and rk == SCHEDULER_TASK_COMPLETED:
                 task_type = device_payload.get("task_type", "")
                 if retrieval_uri is not None and task_type == "measure":
-                    self._step_retrieval_uris[step_id] = retrieval_uri
-                    self._step_task_ids[step_id] = task_id
+                    _uri_key = (captured.get("sample_id"), step_id)
+                    self._step_retrieval_uris[_uri_key] = retrieval_uri
+                    self._step_task_ids[_uri_key] = task_id
                 # Composite key (sample_id, step_id) matches how the event was
                 # registered in _on_run_subprotocol; prevents concurrent runs of the
                 # same subprotocol on different channels from sharing an event slot.
@@ -600,8 +601,8 @@ class LHManagerBrokerWorker:
             # Collect outputs from any steps that produced a retrieval_uri.
             outputs: dict = {}
             for step_id, output_name in step_to_output.items():
-                uri = self._step_retrieval_uris.pop(step_id, None)
-                source_task_id = self._step_task_ids.pop(step_id, None)
+                uri = self._step_retrieval_uris.pop((actual_sample_id, step_id), None)
+                source_task_id = self._step_task_ids.pop((actual_sample_id, step_id), None)
                 if uri is not None:
                     out: dict = {
                         "uri": uri,
