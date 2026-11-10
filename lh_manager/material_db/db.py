@@ -9,13 +9,16 @@ from dataclasses import dataclass, fields
 class Material:
     name: str
     pubchem_cid: Optional[int] = None
-    full_name: Optional[str] = None    
+    full_name: Optional[str] = None
     iupac_name: Optional[str] = None
     molecular_weight: Optional[float] = None
     metadata: Optional[dict] = None
     type: Optional[str] = None
     density: Optional[float] = None
     concentration_units: Optional[str] = None
+    hidden: int = 0
+    formula: Optional[str] = None
+    sld: Optional[float] = None
 
 MATERIAL_DB = Path(__file__).parent.parent.parent / 'persistent_state' / 'materials.sqlite'
 
@@ -45,6 +48,20 @@ class MaterialDB:
         self.db = sqlite3.connect(self.db_path)
         if not db_exists:
             self.db.execute(self.table_definition)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        migrations = [
+            "ALTER TABLE materials ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE materials ADD COLUMN formula TEXT",
+            "ALTER TABLE materials ADD COLUMN sld REAL",
+        ]
+        for sql in migrations:
+            try:
+                self.db.execute(sql)
+            except sqlite3.OperationalError:
+                pass
+        self.db.commit()
 
     def close(self) -> None:
         self.db.close()
@@ -76,6 +93,7 @@ class MaterialDB:
         compound = pcp.Compound.from_cid(pubchem_cid)
         material.molecular_weight = compound.molecular_weight
         material.iupac_name = compound.iupac_name
+        material.formula = compound.molecular_formula
         self.smart_insert(material)
         return material
     
@@ -96,8 +114,13 @@ class MaterialDB:
         return material
 
 
-    def search_name(self, name: str, case_sensitive: bool = False) -> List[Material]:
-        res = self.db.execute(f"SELECT * FROM {self.table_name} WHERE name {'LIKE' if case_sensitive else 'ILIKE'} ?", (f'%{name}%',))
+    def search_name(self, name: str, case_sensitive: bool = False, show_hidden: bool = False) -> List[Material]:
+        hidden_clause = "" if show_hidden else " AND hidden = 0"
+        like_op = "LIKE" if case_sensitive else "LIKE"
+        res = self.db.execute(
+            f"SELECT * FROM {self.table_name} WHERE name {like_op} ?{hidden_clause}",
+            (f'%{name}%',)
+        )
         materials = res.fetchall()
         return [Material(*m) for m in materials]
     
@@ -116,10 +139,18 @@ class MaterialDB:
         material = res.fetchone()
         return None if not material else Material(*material)
     
-    def get_all_materials(self) -> List[Material]:
-        res = self.db.execute(f"SELECT * FROM {self.table_name}")
+    def get_all_materials(self, show_hidden: bool = False) -> List[Material]:
+        hidden_clause = "" if show_hidden else " WHERE hidden = 0"
+        res = self.db.execute(f"SELECT * FROM {self.table_name}{hidden_clause}")
         materials = res.fetchall()
         return [Material(*m) for m in materials]
+
+    def set_hidden(self, name: str, hidden: bool) -> None:
+        self.db.execute(
+            f"UPDATE {self.table_name} SET hidden=? WHERE name=?",
+            (1 if hidden else 0, name)
+        )
+        self.db.commit()
     
     def delete_material(self, material: Material) -> None:
         self.db.execute(f"DELETE FROM {self.table_name} WHERE name=?", (material.name,))

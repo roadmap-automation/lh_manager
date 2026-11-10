@@ -15,18 +15,17 @@ const soluteUnits = [...soluteMassUnits, ...soluteVolumeUnits];
 
 const filtered_solute_materials = computed(() => {
   return materials.value.filter((m) => {
-    return (m.type !== 'solvent' && (solute_search_regexp.value?.test(m.name) ?? true))
+    return (!m.hidden && m.type !== 'solvent' && (solute_search_regexp.value?.test(m.name) ?? true))
   });
 });
 
 const filtered_solvent_materials = computed(() => {
   return materials.value.filter((m) => {
-    //console.log(m.name, m);
-    return ( (m.type === 'solvent' || m.type === null) && (solvent_search_regexp.value?.test(m.name) ?? true))
+    return (!m.hidden && (m.type === 'solvent' || m.type === null) && (solvent_search_regexp.value?.test(m.name) ?? true))
   });
 });
 
-const generate_solute = () => ({ name: filtered_solute_materials.value[0]?.name ?? "", molecular_weight: filtered_solute_materials.value[0]?.molecular_weight ?? null, concentration: 0, units: "M" }) as Solute;
+const generate_solute = () => ({ name: filtered_solute_materials.value[0]?.name ?? "", molecular_weight: filtered_solute_materials.value[0]?.molecular_weight ?? null, concentration: 0, units: "M", pH: null }) as Solute;
 const new_solute = ref(generate_solute());
 const generate_solvent = () => ({ name: filtered_solvent_materials.value[0]?.name ?? "", fraction: 0 }) as Solvent;
 const new_solvent = ref(generate_solvent());
@@ -45,10 +44,13 @@ async function do_solute_search() {
   solute_search_regexp.value = new RegExp(solute_search_pattern.value ?? '.', 'i');
   await nextTick();
   if (filtered_solute_materials.value.length > 0) {
-    //console.log({filtered_solute_materials})
     new_solute.value.name = filtered_solute_materials.value[0].name;
     new_solute.value.molecular_weight = filtered_solute_materials.value[0].molecular_weight;
   }
+}
+
+function selected_solute_type(name: string) {
+  return materials.value.find(m => m.name === name)?.type ?? null;
 }
 
 async function select_solute_search() {
@@ -98,6 +100,9 @@ async function do_solvent_search() {
         <select v-model="solute.units" @change="select_solvent_search">
             <option v-for="unit in soluteUnits" :key="unit" :value="unit">{{ unit }}</option>
         </select>
+        <label v-if="selected_solute_type(solute.name) === 'buffer'" class="ms-2">pH
+            <input class="number px-1 py-0" type="number" step="0.1" min="0" max="14" v-model.number="solute.pH" />
+        </label>
         <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
             @click="current_composition.solutes.splice(sindex, 1)"></button>
         </div>

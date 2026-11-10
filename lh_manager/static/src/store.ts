@@ -121,7 +121,7 @@ export interface SampleStatusMap {
   }
 }
 
-export type Solute = {name: string, concentration: number, molecular_weight: number, units: SoluteMassUnits | SoluteVolumeUnits};
+export type Solute = {name: string, concentration: number, molecular_weight: number, units: SoluteMassUnits | SoluteVolumeUnits, pH?: number | null};
 export type Solvent = {name: string, fraction: number};
 
 
@@ -144,7 +144,7 @@ interface SourceComponents {
 
 export const SUBPROTOCOL_EXCLUDED_FIELDS = new Set(['method_name', 'display_name', 'subprotocol_name', 'id', 'status', 'tasks', 'method_type']);
 
-export const materialType = ["solvent", "solute", "lipid", "protein"] as const;
+export const materialType = ["solvent", "solute", "buffer", "lipid", "protein", "sample"] as const;
 export type MaterialType = typeof materialType[number];
 export const soluteMassUnits = ["mg/mL", "mg/L"] as const;
 export const soluteVolumeUnits = ["M", "mM", "uM", "nM"] as const;
@@ -173,6 +173,9 @@ export interface Material {
   type: MaterialType | null,
   density: number | null,
   concentration_units: SoluteMassUnits | SoluteVolumeUnits | null,
+  hidden: number,
+  formula: string | null,
+  sld: number | null,
 }
 
 export interface Rack {
@@ -838,7 +841,7 @@ export async function refreshComponents() {
 }
 
 export async function refreshMaterials() {
-  const { materials: new_materials } = await (await fetch("/Materials/all/")).json();
+  const { materials: new_materials } = await (await fetch("/Materials/all/?show_hidden=true")).json();
   materials.value = new_materials;
   console.log({new_materials});
 }
@@ -861,6 +864,16 @@ export async function delete_material(material: Material) {
   });
   const response_body = await update_result.json();
   return response_body;
+}
+
+export async function set_hidden(names: string[], hidden: boolean) {
+  await Promise.all(names.map(name =>
+    fetch("/Materials/set_hidden/", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, hidden }),
+    })
+  ));
 }
 
 export async function material_from_sequence(name: string, sequence: string) {

@@ -64,7 +64,7 @@ const all_devices = computed(() => {
   <div class="tab-content d-flex flex-column flex-grow-1" id="myTabContent">
     <div class="tab-pane show active d-flex flex-row flex-grow-1 align-items-stretch overflow-auto" id="Layout"
       role="tabpanel" aria-labelledby="layout-tab">
-      <div class="overflow-auto">
+      <div class="overflow-auto" style="max-width: 50%;">
         <div class="card m-3">
           <div class="card-body">
             <h5 class="card-title">Samples</h5>

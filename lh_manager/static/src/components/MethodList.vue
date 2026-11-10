@@ -59,6 +59,11 @@ function any_method_tasks_pending(method: MethodType) {
   return method.tasks.some((task) => (task.status === 'pending') || (task.status === 'error') || (task.status === 'active') || (task.status === 'failed'));
 }
 
+function method_display_status(method: MethodType): string {
+  if (method.tasks.some(t => t.status === 'cancelled')) return 'cancelled';
+  return method.status ?? '';
+}
+
 function method_string(method: MethodType) {
   if (method.method_name === '__method_group__') {
     const exposed_fields: any[] = (method as any).exposed_fields ?? [];
@@ -157,8 +162,8 @@ const status = computed(() => {
       <h2 class="accordion-header">
         <button class="accordion-button p-1" :class="{ collapsed: stage_name !== active_stage || index !== active_method_index || props.stage_label !== active_stage_label}" type="button"
           @click="toggleItem(index)" :aria-expanded="index === active_method_index">
-          <span class="d-inline align-middle text-light bg-dark" > {{ method.display_name }}:</span>
-          <span class="d-inline align-middle px-2 method-string" :class="'task-' + method.status">
+          <span class="fw-bold me-1" :class="props.stage_label === 'active' ? 'task-' + method_display_status(method) : 'text-primary'">{{ method.display_name }}:</span>
+          <span class="d-inline align-middle px-2 method-string" :class="'task-' + method_display_status(method)">
             {{ method_string(method) }}
           </span>
           <button
@@ -211,6 +216,7 @@ const status = computed(() => {
         </h2>
       <div class="accordion-collapse collapse" :class="{ show: stage_name === active_stage && props.stage_label === active_stage_label && index === active_method_index }">
         <div class="accordion-body p-2 border bg-light">
+          <div style="overflow-x: auto;">
           <table class="table m-0 table-borderless" v-if="stage_name === active_stage && index === active_method_index">
             <MethodFields
               :sample_id="sample_id"
@@ -220,6 +226,7 @@ const status = computed(() => {
               :hide_fields="[]"
             />
           </table>
+          </div>
           <MethodTasks
             v-if="stage_name === active_stage && index === active_method_index && method.tasks.length"
             :sample_id="sample_id"
@@ -337,6 +344,10 @@ input.dirty {
   color: red;
 }
 span.method-string {
-  max-width: 800px;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

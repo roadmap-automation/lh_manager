@@ -516,6 +516,8 @@ def mark_status(id: str, status: SampleStatus) -> None:
                     m.status = SampleStatus.ACTIVE
                 elif any(t.status in (SampleStatus.ERROR, SampleStatus.FAILED) for t in m.tasks):
                     m.status = SampleStatus.ERROR
+                elif all(t.status in (SampleStatus.CANCELLED, SampleStatus.COMPLETED) for t in m.tasks):
+                    m.status = SampleStatus.CANCELLED
                 else:
                     m.status = SampleStatus.PENDING
 

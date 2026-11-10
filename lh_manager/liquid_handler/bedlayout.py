@@ -44,6 +44,7 @@ class Solute(BaseModel):
     concentration: float = 0.0
     molecular_weight: float | None = None
     units: str = 'M'
+    pH: Optional[float] = None
 
     def convert_units(self, ref_units: str = 'M'):
         """Returns concentration value in reference units
@@ -80,7 +81,7 @@ class Solute(BaseModel):
         # NOTE: compares name and converted concentration. There is an edge case where molecular weights
         # are different and this leads to an incorrect equality; but it is better to allow molecular weights
         # to occasionally be None
-        return (self.name == value.name) & (is_close(self.concentration, value.convert_units(self.units)))
+        return (self.name == value.name) & (is_close(self.concentration, value.convert_units(self.units))) & (self.pH == value.pH)
 
 class Composition(BaseModel):
     """Class representing a solution composition"""
@@ -99,7 +100,10 @@ class Composition(BaseModel):
         elif len(self.solvents) == 1:
             solvent_text = self.solvents[0].name
 
-        solute_text = ' + '.join(f'{solute.concentration:.4g} {solute.units} {solute.name}' for solute in self.solutes)
+        solute_text = ' + '.join(
+            f'{s.concentration:.4g} {s.units} {s.name}' + (f' pH {s.pH}' if s.pH is not None else '')
+            for s in self.solutes
+        )
         separator_text = ' + ' if ((len(solvent_text) > 0) & (len(solute_text) > 0)) else ''
 
         return solvent_text + separator_text + solute_text
@@ -255,8 +259,9 @@ class Solution(BaseModel):
                 new_solute = Solute(name=solute_name,
                                     concentration=new_concentration,
                                     molecular_weight=solute.molecular_weight,
-                                    units=solute.units)
-                
+                                    units=solute.units,
+                                    pH=solute.pH)
+
             new_solutes.append(new_solute)
         
         for solute_name, solute in zip(solutes2, composition.solutes):

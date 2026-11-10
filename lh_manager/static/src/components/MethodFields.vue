@@ -156,7 +156,7 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
   console.log(component_type, first_available);
   if (first_available !== undefined) {
     const [name, values] = first_available;
-    const new_component: {name: string, fraction?: number, concentration?: number, molecular_weight?: number, units?: string} = { name };
+    const new_component: {name: string, fraction?: number, concentration?: number, molecular_weight?: number, units?: string, pH?: number | null} = { name };
     if (component_type === 'solvents') {
       new_component.fraction = values[0].fraction ?? 0;
     }
@@ -164,6 +164,7 @@ function add_component(param, component_type: 'solvents' | 'solutes') {
       new_component.concentration = values[0].concentration ?? 0;
       new_component.molecular_weight = values[0].molecular_weight ?? null;
       new_component.units = values[0].units ?? 'M';
+      new_component.pH = null;
     }
     console.log({param});
     param.value[component_type].push(new_component);
@@ -184,6 +185,10 @@ function filter_components(component_key: 'solutes' | 'solvents') {
     return [name, values.filter((v) => include_zones.includes(v.zone))];
   });
   return filtered_components.filter(([name, values]) => values.length > 0);
+}
+
+function selected_solute_type(name: string) {
+  return materials.value.find(m => m.name === name)?.type ?? null;
 }
 
 function change_solute(solute, param) {
@@ -280,24 +285,26 @@ function activateSelector({name, type}) {
           <option v-for="zone in Object.keys(available_racks)" :value="zone">{{ zone }}</option>
         </select>
       </td>
-      <td v-if="isCompositionType(param.type)">
+      <td v-if="isCompositionType(param.type)" style="min-width: 0; max-width: 420px;">
         <div>
           <div>Solutes:
             <button class="btn btn-sm btn-outline-primary" @click="add_component(param, 'solutes')">add</button>
           </div>
-          <div class="ps-3" v-for="(solute, sindex) of (param?.value?.solutes ?? [])">
-            <select v-model="solute.name" @change="change_solute(solute, param)">
+          <div class="ps-3 d-flex flex-nowrap align-items-center gap-1" v-for="(solute, sindex) of (param?.value?.solutes ?? [])">
+            <select class="flex-shrink-1" style="min-width: 0;" v-model="solute.name" @change="change_solute(solute, param)">
               <option v-for="source_solute of filter_components('solutes')" :value="source_solute[0]">{{
                 source_solute[0] }}</option>
             </select>
-            <label>concentration:
-              <input class="number px-1 py-0" v-model="solute.concentration" @keydown.enter="send_changes(param)"
-                @blur="send_changes(param)" />
-            </label>
-            <select v-model="solute.units" @change="send_changes(param)">
+            <input class="number px-1 py-0 flex-shrink-0" style="width: 6em;" v-model="solute.concentration" @keydown.enter="send_changes(param)"
+              @blur="send_changes(param)" />
+            <select class="flex-shrink-0" v-model="solute.units" @change="send_changes(param)">
               <option v-for="unit of available_solute_units(solute.name)" :value="unit">{{ unit }}</option>
             </select>
-            <button type="button" class="btn-close btn-sm align-middle" aria-label="Close"
+            <label v-if="selected_solute_type(solute.name) === 'buffer'" class="d-flex align-items-center gap-1 mb-0 flex-shrink-0">pH
+              <input class="number px-1 py-0" type="number" step="0.1" min="0" max="14" style="width: 4em;"
+                v-model.number="solute.pH" @keydown.enter="send_changes(param)" @blur="send_changes(param)" />
+            </label>
+            <button type="button" class="btn-close btn-sm flex-shrink-0" aria-label="Close"
               @click="param.value.solutes.splice(sindex, 1); send_changes(param)"></button>
           </div>
         </div>

@@ -41,9 +41,31 @@ def search_name(query: str) -> Response:
 @blueprint.route('/Materials/all/', methods=['GET'])
 def get_all() -> Response:
     """Get all materials from the database"""
+    show_hidden = request.args.get('show_hidden', 'false').lower() == 'true'
     with db.MaterialDB() as database:
-        materials = database.get_all_materials()
+        materials = database.get_all_materials(show_hidden=show_hidden)
     return make_response({'materials': [asdict(material) for material in materials]}, 200)
+
+@blueprint.route('/Materials/get_by_name/', methods=['GET'])
+def get_by_name() -> Response:
+    """Get a material by name"""
+    name = request.args.get('name', '')
+    with db.MaterialDB() as database:
+        material = database.get_material_by_name(name)
+    if material is None:
+        return make_response({'material': None}, 404)
+    return make_response({'material': asdict(material)}, 200)
+
+@blueprint.route('/Materials/set_hidden/', methods=['POST'])
+def set_hidden() -> Response:
+    """Hide or unhide a material"""
+    data = request.get_json(force=True)
+    name = data['name']
+    hidden = bool(data['hidden'])
+    with db.MaterialDB() as database:
+        database.set_hidden(name, hidden)
+    socketio.emit('update_materials', {'msg': 'update_materials'}, include_self=True)
+    return make_response({'name': name, 'hidden': hidden}, 200)
 
 @blueprint.route('/Materials/delete/', methods=['GET', 'POST'])
 def delete() -> Response:

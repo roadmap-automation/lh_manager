@@ -180,7 +180,7 @@ const status_class_map: {[status in StatusType]: string} = {
                 :display_label="'Draft'"
                 @update_method="(index, field_name, field_value) => update_method(sample, stage_name, index, field_name, field_value)" />
             </div>
-            <div class="pm-2" v-if="!!stage.active.length">
+            <div class="pm-2 border-start border-3 border-primary ps-2" v-if="!!stage.active.length">
               <MethodList
               :sample_id="sample.id"
               :stage_name="stage_name"
