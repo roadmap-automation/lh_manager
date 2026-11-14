@@ -22,6 +22,7 @@ const UP_ARROW = "▲";
 const DOWN_ARROW = "▼";
 
 const active_sequence = ref<string>("");
+const sequence_error = ref<string | null>(null);
 const active_search_pattern = ref<string | null>(null);
 const active_search_regexp = ref<RegExp | null>(null);
 
@@ -105,8 +106,18 @@ async function pubchem_search() {
 }
 
 async function fetch_material_from_sequence() {
-  const material = await material_from_sequence(new_material.value.name ? new_material.value.name : "", active_sequence.value)
-  if (material) new_material.value = material;
+  if (!active_sequence.value.trim()) return;
+  sequence_error.value = null;
+  try {
+    const material = await material_from_sequence(new_material.value.name ?? "", active_sequence.value.trim());
+    if (material) {
+      new_material.value = material;
+    } else {
+      sequence_error.value = 'Server returned no material — check the sequence is valid single-letter amino acid codes.';
+    }
+  } catch {
+    sequence_error.value = 'Request failed — is periodictable installed on the server?';
+  }
 }
 
 async function submit_add() {
@@ -175,7 +186,7 @@ function edit_material(material: Material) {
           </div>
           <div class="form-floating">
             <input type="number" class="form-control" v-model="new_material.density" id="floatingInputDensity"
-              :disabled="new_material.type !== 'solvent' && new_material.type !== 'sample'">
+              :disabled="new_material.type !== 'solvent' && new_material.type !== 'sample' && new_material.type !== 'protein'">
             <label for="floatingInputDensity">Density (g/cm<sup>3</sup>)</label>
           </div>
           <div class="form-floating">
@@ -188,8 +199,12 @@ function edit_material(material: Material) {
           <button class="btn btn-outline-secondary" type="button" @click="submit_add">{{ materials.some((m) => m.name === new_material.name) ? 'Save' : 'Add' }}</button>
           <button class="btn btn-outline-secondary" type="button" @click="clear">Clear</button>
         </div>
-        <div v-if="new_material.type == 'protein'" class="input-group mb-3">
-          <input type="text" class="form-control" placeholder="Create material from amino acid sequence" v-model="active_sequence" @keydown.enter="fetch_material_from_sequence" @blur="fetch_material_from_sequence">
+        <div v-if="new_material.type == 'protein'" class="mb-3">
+          <div class="input-group">
+            <input type="text" class="form-control" placeholder="Amino acid sequence (single-letter codes)" v-model="active_sequence" @keydown.enter.prevent="fetch_material_from_sequence">
+            <button class="btn btn-outline-secondary" type="button" @click="fetch_material_from_sequence" :disabled="!active_sequence.trim()">Calculate MW &amp; density</button>
+          </div>
+          <div v-if="sequence_error" class="text-danger small mt-1">{{ sequence_error }}</div>
         </div>
         <div class="row input-group mb-3">
           <input type="text" class="form-control" placeholder="Search for material" v-model="active_search_pattern"

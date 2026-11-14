@@ -877,12 +877,13 @@ export async function set_hidden(names: string[], hidden: boolean) {
 }
 
 export async function material_from_sequence(name: string, sequence: string) {
-  const update_result = await fetch("/Materials/MaterialFromSequence/", {
+  const response = await fetch("/Materials/MaterialFromSequence/", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, sequence })
   });
-  const { material } = await update_result.json();
+  if (!response.ok) throw new Error(`Server error ${response.status}`);
+  const { material } = await response.json();
   return material as Material;
 }
 
