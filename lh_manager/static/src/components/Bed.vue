@@ -3,6 +3,33 @@ import { computed, onMounted } from 'vue';
 import { pick_handler, rack_editor_active, rack_to_edit, source_well, target_well, well_editor_active, well_to_edit, batch_editor_active } from '../store';
 import type { Rack, Well } from '../store';
 
+function composition_repr(well: Well): string {
+  const { solvents, solutes } = well.composition;
+  let solvent_text = '';
+  if (solvents.length > 1) {
+    const sorted = [...solvents].sort((a, b) => b.fraction - a.fraction);
+    solvent_text = sorted.map(s => `${(s.fraction * 100).toFixed(0)}`).join(':')
+      + ' ' + sorted.map(s => s.name).join(':');
+  } else if (solvents.length === 1) {
+    solvent_text = solvents[0].name;
+  }
+  const solute_text = solutes
+    .map(s => `${parseFloat(s.concentration.toPrecision(4))} ${s.units} ${s.name}${s.pH != null ? ` pH ${s.pH}` : ''}`)
+    .join(' + ');
+  const sep = (solvent_text && solute_text) ? ' + ' : '';
+  return solvent_text + sep + solute_text || '(empty)';
+}
+
+function well_tooltip(well: Well, rack_id: string): string {
+  const lines: string[] = [
+    `${rack_id.toUpperCase()} ${well.well_number}`,
+    composition_repr(well),
+    `Volume: ${well.volume.toFixed(3)} mL`,
+  ];
+  if (well.id != null) lines.push(`Reserved: ${well.id}`);
+  return lines.join('\n');
+}
+
 const props = defineProps<{
   rack_id: string,
   rack: Rack,
@@ -189,11 +216,11 @@ onMounted(() => {
       <circle v-if="props.rack.shape === 'circle'" class="vial-button" :cx="x_offset(col, row)" :cy="y_offset(row)" :r="r"
         @click="clicked(row, col)"
         @contextmenu.prevent="edit_well(row, col)">
-        <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
+        <title>{{ filled_cells[row*props.rack.columns + col + 1] ? well_tooltip(filled_cells[row*props.rack.columns + col + 1], props.rack_id) : `${props.rack_id.toUpperCase()} ${row*props.rack.columns + col + 1}` }}</title>
       </circle>
       <rect :class="highlight_class(col, row)" v-if="props.rack.shape === 'rect'" class="vial-button" :width="col_width - 2*padding" :height="row_height - 2*padding"
         :x="x_offset(col, row, false)" :y="y_offset(row, false)" @click="clicked(row, col)" @contextmenu.prevent="edit_well(row, col)">
-        <title>{{ filled_cells[row*props.rack.columns + col + 1] }}</title>
+        <title>{{ filled_cells[row*props.rack.columns + col + 1] ? well_tooltip(filled_cells[row*props.rack.columns + col + 1], props.rack_id) : `${props.rack_id.toUpperCase()} ${row*props.rack.columns + col + 1}` }}</title>
       </rect>
       <path class="fill-fraction" :d="fill_path(col, row)"></path>
       <text v-if="(props.rack.columns * props.rack.rows > 1)" class="vial-label" :class="(row * props.rack.columns + col + 1) in reserved_cells ? 'vial-reserved' : 'vial-notreserved'" :x="text_cx(col, row)" :y="text_cy(row)" text-anchor="middle" :font-size="Math.min(Math.max(cell_size * 0.45, 4), 20)">
