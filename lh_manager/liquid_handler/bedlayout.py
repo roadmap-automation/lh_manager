@@ -1,7 +1,7 @@
 """Class definitions for bed layout, wells, and compositions"""
 from copy import deepcopy
 from uuid import uuid4
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Tuple, List
 
 # ======= Unit conversions ===========
@@ -45,6 +45,13 @@ class Solute(BaseModel):
     molecular_weight: float | None = None
     units: str = 'M'
     pH: Optional[float] = None
+
+    @field_validator('pH', 'molecular_weight', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '':
+            return None
+        return v
 
     def convert_units(self, ref_units: str = 'M'):
         """Returns concentration value in reference units
