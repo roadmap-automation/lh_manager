@@ -53,6 +53,18 @@ class Solute(BaseModel):
             return None
         return v
 
+    def __eq__(self, other):
+        if not isinstance(other, Solute):
+            return NotImplemented
+        if self.name != other.name or not is_close(self.concentration, other.concentration) or self.units != other.units:
+            return False
+        if self.pH is not None and other.pH is not None:
+            return is_close(self.pH, other.pH)
+        return True
+
+    def __hash__(self):
+        return hash((self.name, self.concentration, self.units))
+
     def convert_units(self, ref_units: str = 'M'):
         """Returns concentration value in reference units
 
