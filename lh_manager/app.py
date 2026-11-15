@@ -30,11 +30,7 @@ dictConfig({
     }
 })
 
-class _HealthCheckFilter(logging.Filter):
-    def filter(self, record):
-        return 'GET /health HTTP' not in record.getMessage()
-
-logging.getLogger('werkzeug').addFilter(_HealthCheckFilter())
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 from .gui_api import gui_blueprint
 from .lh_api import lh_blueprint
