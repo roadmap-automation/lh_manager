@@ -260,8 +260,8 @@ function edit_material(material: Material) {
                 <td><input type="checkbox" :checked="selected_names.has(material.name)" @change="toggleSelect(material.name)" @click.stop></td>
                 <td :style="material.hidden ? 'text-decoration: line-through' : ''">{{ material.name }}</td>
                 <td>{{ material.pubchem_cid }}</td>
-                <td>{{ material.full_name }}</td>
-                <td>{{ material.iupac_name }}</td>
+                <td class="truncate-cell" :title="material.full_name ?? undefined">{{ material.full_name }}</td>
+                <td class="truncate-cell" :title="material.iupac_name ?? undefined">{{ material.iupac_name }}</td>
                 <td>{{ material.molecular_weight }}</td>
                 <td>{{ material.formula }}</td>
                 <td>{{ material.sld }}</td>
@@ -287,5 +287,11 @@ function edit_material(material: Material) {
   }
   .form-floating>label {
     padding-left: 0.1rem;
+  }
+  .truncate-cell {
+    max-width: 30ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>
