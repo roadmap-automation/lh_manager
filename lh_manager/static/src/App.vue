@@ -4,7 +4,7 @@
 import LiquidHandler from './components/LiquidHandler.vue';
 import { ref } from 'vue';
 import { io } from 'socket.io-client';
-import { refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, refreshSubprotocols, refreshMethodGroups } from './store';
+import { atc_paused, resume_autocontrol, refreshAtcPaused, refreshSamples, refreshSampleStatus, refreshMethodDefs, refreshWaste, refreshWells, refreshMaterials, refreshDeviceDefs, refreshDeviceLayouts, refreshSubprotocols, refreshMethodGroups } from './store';
 
 const connected = ref(false);
 
@@ -20,6 +20,7 @@ socket.on('connect', () => {
   refreshMaterials();
   refreshDeviceLayouts();
   refreshWaste();
+  refreshAtcPaused();
 });
 
 socket.on('disconnect', (payload) => {
@@ -65,6 +66,10 @@ socket.on('update_methods', () => {
   refreshMethodGroups();
 });
 
+socket.on('autocontrol:hold_changed', (data: { paused: boolean }) => {
+  atc_paused.value = data.paused;
+});
+
 
 </script>
 
@@ -79,6 +84,10 @@ socket.on('update_methods', () => {
         </div>
       </div>
     </nav>
+    <div v-if="atc_paused" class="alert alert-warning rounded-0 py-2 mb-0 flex-shrink-0 d-flex align-items-center justify-content-between">
+      <span><strong>Autocontrol paused</strong> — no new tasks will be dispatched.</span>
+      <button class="btn btn-sm btn-warning" @click="resume_autocontrol()">Resume</button>
+    </div>
     <LiquidHandler />
   </div>
 </template>

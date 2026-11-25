@@ -37,6 +37,10 @@ def set_broker_worker(worker) -> None:
     _broker_worker = worker
 
 
+def _get_atc_paused() -> bool:
+    return _broker_worker._atc_paused if _broker_worker is not None else False
+
+
 def launch_autocontrol_interface():
     """Register submission/cancel callbacks and send device INIT tasks."""
     submit_handler.submit_callbacks.append(submission_callback)

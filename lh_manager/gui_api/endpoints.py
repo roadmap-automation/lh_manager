@@ -482,3 +482,28 @@ def RemoveWellDefinition() -> Response:
     assert isinstance(data, dict)
     layout.remove_well_definition(data["rack_id"], data["well_number"])
     return make_response({"well definition removed": data}, 200)
+
+
+@gui_blueprint.route('/GUI/GetAutocontrolPaused', methods=['GET'])
+def GetAutocontrolPaused() -> Response:
+    """Return current autocontrol hold state."""
+    from ..autocontrol.autocontrol import _get_atc_paused
+    return make_response({'paused': _get_atc_paused()}, 200)
+
+
+@gui_blueprint.route('/GUI/PauseAutocontrol', methods=['POST'])
+def PauseAutocontrol() -> Response:
+    """Engage the global hardware hold — no new tasks will be dispatched."""
+    from ..autocontrol.autocontrol import _broker_worker
+    if _broker_worker is not None:
+        _broker_worker.pause_autocontrol()
+    return make_response('OK', 200)
+
+
+@gui_blueprint.route('/GUI/ResumeAutocontrol', methods=['POST'])
+def ResumeAutocontrol() -> Response:
+    """Release the global hardware hold."""
+    from ..autocontrol.autocontrol import _broker_worker
+    if _broker_worker is not None:
+        _broker_worker.resume_autocontrol()
+    return make_response('OK', 200)

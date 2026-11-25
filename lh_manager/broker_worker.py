@@ -44,8 +44,12 @@ from roadmap_broker_client.envelope import Envelope, build
 from roadmap_broker_client.publisher import publish
 from roadmap_broker_client.topology import declare_node_queue, declare_topology
 from roadmap_broker_client.topics import (
+    AUTOCONTROL_PAUSED,
+    AUTOCONTROL_RESUMED,
+    CMD_ANNOUNCE_HOLD,
     CMD_CANCEL_SUBPROTOCOL,
     CMD_RUN_SUBPROTOCOL,
+    CMD_SET_HOLD,
     DEVICE_ANNOUNCE_REQUEST,
     DEVICE_REGISTERED,
     INSTRUMENT_EXCHANGE,
@@ -85,6 +89,7 @@ class LHManagerBrokerWorker:
         self._socketio = socketio
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._exchange: Optional[aio_pika.abc.AbstractExchange] = None
+        self._atc_paused: bool = False
         self._protocol_exchange: Optional[aio_pika.abc.AbstractExchange] = None
         self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
@@ -135,6 +140,14 @@ class LHManagerBrokerWorker:
              "include_active_queue": include_active_queue,
              "drop_material": drop_material},
         ))
+
+    def pause_autocontrol(self) -> None:
+        """Publish command.autocontrol.pause to engage the global hold."""
+        self._schedule(self._emit_command("pause", {}))
+
+    def resume_autocontrol(self) -> None:
+        """Publish command.autocontrol.resume to release the global hold."""
+        self._schedule(self._emit_command("resume", {}))
 
     # ------------------------------------------------------------------
     # Internal: schedule a coroutine on the broker event loop
@@ -349,6 +362,16 @@ class LHManagerBrokerWorker:
                 routing_key=command_subscription_pattern("lh_manager"),
             )
 
+            # Non-durable queue for autocontrol hold events — auto-deletes on disconnect
+            # so stale paused/resumed events never replay across restarts.
+            hold_queue = await channel.declare_queue(
+                "lh_manager.autocontrol_hold",
+                durable=False,
+                auto_delete=True,
+            )
+            await hold_queue.bind(self._exchange, routing_key=AUTOCONTROL_PAUSED)
+            await hold_queue.bind(self._exchange, routing_key=AUTOCONTROL_RESUMED)
+
             # Request all running devices to re-announce themselves with their current
             # method schemas. This handles the case where lh_manager starts after devices.
             announce_msg = build(
@@ -359,6 +382,21 @@ class LHManagerBrokerWorker:
             await publish(self._exchange, DEVICE_ANNOUNCE_REQUEST, announce_msg)
             logger.info("LHManager published device.announce_request to trigger re-registration.")
 
+            # Ask autocontrol to re-publish its current hold state via the broker.
+            # hold_queue is already declared and bound above, so the reply will be
+            # queued in RabbitMQ and delivered once consume(hold_queue) starts below.
+            _announce_hold_msg = build(
+                device_id="lh_manager",
+                routing_key=command_key("autocontrol", "announce_hold"),
+                payload={},
+            )
+            await publish(
+                self._exchange,
+                command_key("autocontrol", "announce_hold"),
+                _announce_hold_msg,
+            )
+            logger.info("LHManager requested autocontrol hold state via broker announce.")
+
             logger.info("LHManager broker worker running.")
             await asyncio.gather(
                 consume(task_queue, self._on_scheduler_event),
@@ -366,6 +404,7 @@ class LHManagerBrokerWorker:
                 consume(waste_queue, self._on_waste_generated),
                 consume(reg_queue, self._on_device_registered),
                 consume(subprotocol_cmd_queue, self._on_lhmanager_command),
+                consume(hold_queue, self._on_hold_changed),
             )
 
     # ------------------------------------------------------------------
@@ -457,8 +496,32 @@ class LHManagerBrokerWorker:
         elif rk == command_key("lh_manager", CMD_CANCEL_SUBPROTOCOL):
             run_id = (envelope.payload or {}).get("subprotocol_run_id", "")
             asyncio.create_task(self._on_cancel_subprotocol(run_id))
+        elif rk == command_key("lh_manager", CMD_SET_HOLD):
+            paused = bool((envelope.payload or {}).get("paused", False))
+            asyncio.create_task(self._on_set_hold(paused))
+        elif rk == command_key("lh_manager", CMD_ANNOUNCE_HOLD):
+            asyncio.create_task(self._on_announce_hold())
         else:
             logger.debug("Ignoring unknown lh_manager command: %s", rk)
+
+    async def _on_set_hold(self, paused: bool) -> None:
+        """Publish command.autocontrol.pause/resume to exchange.instrument."""
+        if self._exchange is None:
+            return
+        verb = "pause" if paused else "resume"
+        rk = command_key("autocontrol", verb)
+        msg = build(device_id="lh_manager", routing_key=rk, payload={})
+        await publish(self._exchange, rk, msg)
+        logger.info("lh_manager: published command.autocontrol.%s to exchange.instrument.", verb)
+
+    async def _on_announce_hold(self) -> None:
+        """Forward announce_hold to autocontrol so it re-publishes its authoritative hold state."""
+        if self._exchange is None:
+            return
+        rk = command_key("autocontrol", "announce_hold")
+        msg = build(device_id="lh_manager", routing_key=rk, payload={})
+        await publish(self._exchange, rk, msg)
+        logger.debug("lh_manager: forwarded announce_hold to autocontrol.")
 
     async def _on_run_subprotocol(self, envelope: Envelope) -> None:
         """Execute a named subprotocol and publish SUBPROTOCOL_COMPLETED/FAILED.
@@ -721,6 +784,17 @@ class LHManagerBrokerWorker:
         # Tell the frontend to refresh its method dropdown — new schemas may have arrived.
         if methods:
             self._sio_emit("update_methods", {})
+
+    # ------------------------------------------------------------------
+    # Inbound: autocontrol.paused / autocontrol.resumed hold events
+    # ------------------------------------------------------------------
+
+    async def _on_hold_changed(
+        self, envelope: Envelope, message: aio_pika.abc.AbstractIncomingMessage
+    ) -> None:
+        paused = message.routing_key == AUTOCONTROL_PAUSED
+        self._atc_paused = paused
+        self._sio_emit("autocontrol:hold_changed", {"paused": paused})
 
     # ------------------------------------------------------------------
     # Inbound: layout.updated events from devices

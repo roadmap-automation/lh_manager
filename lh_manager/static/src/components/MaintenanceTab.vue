@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import {
+  atc_paused,
+  pause_autocontrol,
+  resume_autocontrol,
   maintenance_samples,
   method_defs,
   grouped_method_defs,
@@ -185,6 +188,16 @@ const channels = computed(() => Array.from({ length: num_channels.value }, (_, i
 
 <template>
   <div class="p-3">
+
+    <!-- Global Job Hold -->
+    <div class="card mb-3">
+      <div class="card-header fw-bold">Global Job Hold</div>
+      <div class="card-body d-flex align-items-center gap-3">
+        <span class="text-muted small">{{ atc_paused ? 'Autocontrol is paused. No new tasks will be dispatched.' : 'Autocontrol is running normally.' }}</span>
+        <button v-if="!atc_paused" class="btn btn-sm btn-outline-warning ms-auto" @click="pause_autocontrol()">Pause autocontrol</button>
+        <button v-else class="btn btn-sm btn-warning ms-auto" @click="resume_autocontrol()">Resume autocontrol</button>
+      </div>
+    </div>
 
     <!-- Submission form -->
     <div class="card mb-3">

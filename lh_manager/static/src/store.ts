@@ -203,6 +203,8 @@ export interface TimestampTable {
   timestamp_table: string[][]
 }
 
+export const atc_paused = ref<boolean>(false);
+
 export const method_defs = shallowRef<Record<string, MethodDef>>({});
 export const device_defs = shallowRef<Record<string, DeviceType>>({});
 export const device_layouts = ref<Record<string, DeviceLayout>>({});
@@ -832,6 +834,19 @@ export async function submit_maintenance_run(method_name: string, parameters: Re
 
 export async function dismiss_maintenance(): Promise<void> {
   await fetch("/GUI/DismissMaintenance/", { method: "POST", headers: { 'Content-Type': 'application/json' }, body: '{}' });
+}
+
+export async function refreshAtcPaused(): Promise<void> {
+  const { paused } = await (await fetch('/GUI/GetAutocontrolPaused')).json();
+  atc_paused.value = Boolean(paused);
+}
+
+export async function pause_autocontrol(): Promise<void> {
+  await fetch('/GUI/PauseAutocontrol', { method: 'POST' });
+}
+
+export async function resume_autocontrol(): Promise<void> {
+  await fetch('/GUI/ResumeAutocontrol', { method: 'POST' });
 }
 
 export async function refreshComponents() {
